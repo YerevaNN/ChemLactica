@@ -8,16 +8,22 @@ model_name = "facebook/galactica-125m"
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+
 def preprocess_data(compound_data):
     decoder = json.JSONDecoder()
-    compound_data = convert_to_json(compound_data,decoder) 
+    compound_data = convert_to_json(compound_data, decoder)
     return tokenizer(compound_data["text"], padding="max_length", truncation=True)
 
-def convert_to_json(compound_data,decoder):
+
+def convert_to_json(compound_data, decoder):
     # Decode and load json strings
-    compound_data["text"] = [generate_formatted_string(json.loads(decoder.decode(compound_string))) for compound_string in compound_data["text"]]
-    
+    compound_data["text"] = [
+        generate_formatted_string(json.loads(decoder.decode(compound_string)))
+        for compound_string in compound_data["text"]
+    ]
+
     return compound_data
+
 
 def generate_formatted_string(compound_json):
     # Shuffle the keys
@@ -36,16 +42,6 @@ def generate_formatted_string(compound_json):
     return compound_formatted_string
 
 
-
-
-
 dataset = load_dataset(path="data")
 tokenized_datasets = dataset.map(preprocess_data, batched=True)
 subset_dataset = tokenized_datasets["train"].shuffle(seed=42).select(range(1000))
-
-
-
-
-
-
-
