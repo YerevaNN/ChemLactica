@@ -3,6 +3,8 @@ from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
+from eval_metrics import compute_metrics
+
 
 model_checkpoint = "facebook/galactica-125m"
 
@@ -25,6 +27,10 @@ def tokenize_function(examples):
     return tokenizer(examples["text"])
 
 
+def tokenize_function(examples):
+    return tokenizer(examples["text"])
+
+
 tokenized_datasets = dataset.map(tokenize_function, batched=True)
 
 model_name = model_checkpoint.split("/")[-1]
@@ -41,7 +47,8 @@ trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=dataset,
-    # eval_dataset=lm_datasets["validation"]
+    # eval_dataset=lm_datasets["validation"],
+    compute_metrics=compute_metrics,
 )
 
 trainer.train()
