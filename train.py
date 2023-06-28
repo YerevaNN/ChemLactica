@@ -3,7 +3,6 @@ from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
-import aim_utils
 
 model_checkpoint = "facebook/galactica-125m"
 
@@ -42,8 +41,7 @@ trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=dataset,
-    # eval_dataset=lm_datasets["validation"],
-    # callbacks=[aim_utils.AimTrackerCallback]
+    # eval_dataset=lm_datasets["validation"]
 )
 
 trainer.train()
