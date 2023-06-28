@@ -4,6 +4,8 @@ from transformers import AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 from eval_metrics import compute_metrics
+import aim_utils
+
 
 model_checkpoint = "facebook/galactica-125m"
 block_size = 128
@@ -46,10 +48,16 @@ lm_datasets = tokenized_datasets.map(
     batched=True,
     batch_size=1000,
 )
+def tokenize_function(examples):
+    return tokenizer(examples["text"])
+
+
+tokenized_datasets = dataset.map(tokenize_function, batched=True)
 
 model_name = model_checkpoint.split("/")[-1]
+
 training_args = TrainingArguments(
-    f"{model_name}-finetuned-pubchem",
+    output_dir=f"{model_name}-finetuned-pubchem",
     evaluation_strategy="epoch",
     learning_rate=2e-5,
     weight_decay=0.01,
@@ -63,6 +71,7 @@ trainer = Trainer(
     compute_metrics=compute_metrics,
     train_dataset=lm_datasets['train'],
     eval_dataset=lm_datasets["validation"],
+    callbacks=[aim_utils.AimTrackerCallback],
 )
 
 trainer.train()
