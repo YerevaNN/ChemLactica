@@ -1,35 +1,33 @@
 from transformers import TrainingArguments
+import transformers
 import aim
 
-aim_run = aim.Run(repo=".", experiment="sample expermient")
+"""
+    this can be an alternative intagration to huggingface.AimCallback,
+    which is not used for now, because huggingface.AimCallback serves our purpose well so far
+"""
 
 
-class AimTrackerCallback(TrainerCallback):
-    def __init__(self, aim_run, *args, **kwargs):
+class AimTrackerCallback(transformers.TrainerCallback):
+    def __init__(self, *args, **kwargs):
         super(AimTrackerCallback, self).__init__(*args, **kwargs)
-        self._aim_run = aim_run
+        self._aim_run = aim.Run(repo=".", experiment="sample exp")
+
+    def on_log(self, args, state, contro, model, logs=None, **kwargs):
+        for name, value in logs.items():
+            print(name, value)
 
     def on_train_begin(self, args: TrainingArguments, state, control, **kwargs):
-        print("aim tracker train begin")
+        print("ATTENTION! aim tracker train begin")
         _hyper_params = {
             name: value
             for name, value in zip(
-                [
-                    "leadning_rate",
-                    "batch_szie",
-                    "weight_decay",
-                    "max_steps",
-                    "evaluation_strategy",
-                ],
-                [
-                    args.leadning_rate,
-                    args.batch_size,
-                    args.weight_decay,
-                    args.max_steps,
-                ],
+                ["learning_rate", "weight_decay"],
+                [args.learning_rate, args.weight_decay],
             )
         }
-        self._aim_run["hyper_params"] = _hyper_params
+        print(_hyper_params)
+        self._aim_run["hparams"] = _hyper_params
 
     def on_epoch_begin(self, args, state, control, **kwargs):
         print("aim tracker epoch begin")
