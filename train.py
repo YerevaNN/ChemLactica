@@ -1,51 +1,49 @@
 import transformers
-import random
 from transformers import AutoTokenizer
+from transformers import AutoModelForCausalLM
+from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
-import json
+import aim_utils
 
-model_name = "facebook/galactica-125m"
+model_checkpoint = "facebook/galactica-125m"
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-def preprocess_data(compound_data):
-    decoder = json.JSONDecoder()
-    compound_data = convert_to_json(compound_data,decoder) 
-    return tokenizer(compound_data["text"], padding="max_length", truncation=True)
-
-def convert_to_json(compound_data,decoder):
-    # Decode and load json strings
-    compound_data["text"] = [generate_formatted_string(json.loads(decoder.decode(compound_string))) for compound_string in compound_data["text"]]
-    
-    return compound_data
-
-def generate_formatted_string(compound_json):
-    # Shuffle the keys
-    keys = list(compound_json.keys())
-    random.shuffle(keys)
-
-    # Convert keys to uppercase and create the key-value string
-    key_value_pairs = []
-    for key in keys:
-        upper_key = key.upper()
-        value = compound_json[key]
-        key_value_pairs.append(f"{upper_key}{value}")
-
-    # Join the key-value pairs into a string
-    compound_formatted_string = "".join(key_value_pairs)
-    return compound_formatted_string
+model = AutoModelForCausalLM.from_pretrained(model_checkpoint)
+tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
 
+def process_str(str):
+    str["text"] = str["text"].replace("\\", "")
+    return str
 
 
-
-dataset = load_dataset(path="data")
-tokenized_datasets = dataset.map(preprocess_data, batched=True)
-subset_dataset = tokenized_datasets["train"].shuffle(seed=42).select(range(1000))
-
-
+dataset = load_dataset(
+    "text", data_files="./523129_start.jsonl", split="train", streaming=True
+)
+dataset = dataset.map(process_str)
 
 
+def tokenize_function(examples):
+    return tokenizer(examples["text"])
 
 
+tokenized_datasets = dataset.map(tokenize_function, batched=True)
 
+model_name = model_checkpoint.split("/")[-1]
+
+training_args = TrainingArguments(
+    output_dir=f"{model_name}-finetuned-pubchem",
+    evaluation_strategy="epoch",
+    learning_rate=2e-5,
+    weight_decay=0.01,
+    max_steps=2,
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=dataset,
+    # eval_dataset=lm_datasets["validation"],
+    # callbacks=[aim_utils.AimTrackerCallback]
+)
+
+trainer.train()
