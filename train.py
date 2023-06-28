@@ -6,27 +6,12 @@ from datasets import load_dataset
 from eval_metrics import compute_metrics
 import aim_utils
 
-
-model_checkpoint = "facebook/galactica-125m"
-block_size = 128
-
-model = AutoModelForCausalLM.from_pretrained(model_checkpoint)
-tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-
-
 def process_str(str):
     str["text"] = str["text"].replace("\\", "")
     return str
 
-
-dataset = load_dataset("text", data_files={"train": './train.jsonl', "validation": './evaluation.jsonl'}, streaming=True)
-dataset = dataset.map(process_str)
-
-
 def tokenize_function(examples):
     return tokenizer(examples["text"])
-
-tokenized_datasets = dataset.map(tokenize_function, batched=True, remove_columns=["text"])
 
 def group_texts(examples):
     # Concatenate all texts.
@@ -43,35 +28,40 @@ def group_texts(examples):
     result["labels"] = result["input_ids"].copy()
     return result
 
-lm_datasets = tokenized_datasets.map(
-    group_texts,
-    batched=True,
-    batch_size=1000,
-)
 def tokenize_function(examples):
     return tokenizer(examples["text"])
 
+if __name__ == "__main__": 
+    model_checkpoint = "facebook/galactica-125m"
+    block_size = 128
 
-tokenized_datasets = dataset.map(tokenize_function, batched=True)
+    model = AutoModelForCausalLM.from_pretrained(model_checkpoint)
+    tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
-model_name = model_checkpoint.split("/")[-1]
+    dataset = load_dataset("text", data_files={"train": './train.jsonl', "validation": './evaluation.jsonl'}, streaming=True)
+    dataset = dataset.map(process_str)
+    tokenized_datasets = dataset.map(tokenize_function, batched=True, remove_columns=["text"])
+    lm_datasets = tokenized_datasets.map(
+        group_texts,
+        batched=True,
+        batch_size=1000
+    ) 
+    
+    training_args = TrainingArguments(
+        output_dir=f"{model_checkpoint.split('/')[-1]}-finetuned-pubchem",
+        evaluation_strategy="epoch",
+        learning_rate=2e-5,
+        weight_decay=0.01,
+        max_steps=2,
+    )
 
-training_args = TrainingArguments(
-    output_dir=f"{model_name}-finetuned-pubchem",
-    evaluation_strategy="epoch",
-    learning_rate=2e-5,
-    weight_decay=0.01,
-    max_steps=2,
-)
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        compute_metrics=compute_metrics,
+        train_dataset=lm_datasets['train'],
+        eval_dataset=lm_datasets["validation"],
+        callbacks=[aim_utils.AimTrackerCallback],
+    )
 
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=dataset,
-    compute_metrics=compute_metrics,
-    train_dataset=lm_datasets['train'],
-    eval_dataset=lm_datasets["validation"],
-    callbacks=[aim_utils.AimTrackerCallback],
-)
-
-trainer.train()
+    trainer.train()
