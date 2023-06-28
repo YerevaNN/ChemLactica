@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     model = AutoModelForCausalLM.from_pretrained(model_checkpoint)
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-
+                               
     dataset = load_dataset(
         "text",
         data_files={"train": "./train.jsonl", "validation": "./evaluation.jsonl"},
@@ -58,16 +58,23 @@ if __name__ == "__main__":
 
     training_args = TrainingArguments(
         output_dir=f"{model_checkpoint.split('/')[-1]}-finetuned-pubchem",
-        evaluation_strategy="epoch",
-        learning_rate=2e-5,
-        weight_decay=0.01,
-        max_steps=2,
+        evaluation_strategy="steps",
+        learning_rate=6e-6,
+        lr_scheduler_type='linear',
+        weight_decay=0.1,
+        adam_beta1=0.9,
+        adam_beta2=0.95,
+        warmup_steps=500,
+        max_grad_norm=1.0,
+        eval_steps=1,
+        max_steps=10,
+        num_train_epochs=5
     )
 
     trainer = Trainer(
         model=model,
         args=training_args,
-        compute_metrics=compute_metrics,
+        # compute_metrics=compute_metrics,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
         callbacks=[aim_callback],
