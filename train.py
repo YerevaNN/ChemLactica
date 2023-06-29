@@ -5,10 +5,19 @@ from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 from eval_metrics import compute_metrics
 from aim.hugging_face import AimCallback
+from text_format_utils import generate_formatted_string
+import json
 
 
 def process_str(str):
-    str["text"] = str["text"].replace("\\", "")
+    #it's wierd workaround but works for now
+    # st = str["text"].replace("\\", "")
+    # print('ST IS    :   ',st)
+    compound = json.loads(json.loads((str["text"])))
+    str['text'] = generate_formatted_string(compound)
+    # print(str['text'])
+    # print('***************')
+    # print(type(str['text']))
     return str
 
 
