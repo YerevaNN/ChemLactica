@@ -37,7 +37,9 @@ aim_callback = AimCallback(repo=".", experiment="your_experiment_name")
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
     predictions = np.argmax(logits, axis=-1)
-    return metric.compute(predictions=predictions, references=labels)
+    temp = metric.compute(predictions=predictions, references=labels)
+    print("perplexity", temp)
+    return temp
 
 
 training_args = TrainingArguments(
