@@ -10,11 +10,11 @@ import json
 
 
 def process_str(str):
-    #it's wierd workaround but works for now
+    # it's wierd workaround but works for now
     # st = str["text"].replace("\\", "")
     # print('ST IS    :   ',st)
     compound = json.loads(json.loads((str["text"])))
-    str['text'] = generate_formatted_string(compound)
+    str["text"] = generate_formatted_string(compound)
     # print(str['text'])
     # print('***************')
     # print(type(str['text']))
@@ -34,10 +34,14 @@ def group_texts(examples):
     total_length = (total_length // block_size) * block_size
     # Split by chunks of max_len.
     result = {
-        k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
+        k: [
+            t[i : i + block_size] for i in range(0, total_length, block_size)
+        ]  # TODO: is this correct? seems like the index will go out of the range
         for k, t in concatenated_examples.items()
     }
-    result["labels"] = result["input_ids"].copy()
+    result["labels"] = result[
+        "input_ids"
+    ].copy()  # TODO: are not the targets shifted one to the right?
     return result
 
 
@@ -51,25 +55,29 @@ if __name__ == "__main__":
 
     model = AutoModelForCausalLM.from_pretrained(model_checkpoint)
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-                               
+
     dataset = load_dataset(
         "text",
         data_files={"train": "./train.jsonl", "validation": "./evaluation.jsonl"},
         streaming=True,
     )
     dataset = dataset.map(process_str)
+
     tokenized_datasets = dataset.map(
         tokenize_function, batched=True, remove_columns=["text"]
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
 
-    aim_callback = AimCallback(repo=".", experiment="your_experiment_name")
+    aim_callback = AimCallback(
+        repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+        experiment="experiment",
+    )
 
     training_args = TrainingArguments(
         output_dir=f"{model_checkpoint.split('/')[-1]}-finetuned-pubchem",
         evaluation_strategy="steps",
         learning_rate=6e-6,
-        lr_scheduler_type='linear',
+        lr_scheduler_type="linear",
         weight_decay=0.1,
         adam_beta1=0.9,
         adam_beta2=0.95,
@@ -77,16 +85,18 @@ if __name__ == "__main__":
         max_grad_norm=1.0,
         eval_steps=1,
         max_steps=10,
-        num_train_epochs=5
+        num_train_epochs=5,
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=8,
     )
 
     trainer = Trainer(
         model=model,
         args=training_args,
-        # compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
-        callbacks=[aim_callback],
+        # callbacks=[aim_callback],
     )
 
     trainer.train()
