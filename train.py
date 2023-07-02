@@ -12,7 +12,7 @@ batch_size = 1
 
 
 def process_str(example):
-    example["text"] = example["text"].replace(r"\"", " ")
+    example["text"] = example["text"].replace("\\", "")
     return example
 
 
@@ -51,30 +51,36 @@ if __name__ == "__main__":
     #     print(len(sample["token_type_ids"]))
     #     print(len(sample["attention_mask"]))
 
-    # print(tokenizer(" hello _ lijasdklhj lijasldkj"))
+    # print([tokenizer.decode(s) for s in tokenizer('{"synonyms":[{nam')["input_ids"]])
+
+    # for sample in lm_datasets["train"]:
+    # print([tokenizer.decode(s) for s in sample["input_ids"]])
+    #     break
+
+    # print([tokenizer.decode([s]) for s in tokenizer('")Cl\",\"similarity\":0.78},{"')["input_ids"]])
 
     aim_callback = AimCallback(
         repo="/mnt/sxtn/chem/ChemLactica/metadata", experiment="your_experiment_name"
     )
 
-    # training_args = TrainingArguments(
-    #     output_dir=f"{model_checkpoint.split('/')[-1]}-finetuned-pubchem",
-    #     evaluation_strategy="steps",
-    #     eval_steps=1,
-    #     learning_rate=2e-5,
-    #     weight_decay=0.01,
-    #     max_steps=10,
-    #     per_device_train_batch_size=batch_size,
-    #     per_device_eval_batch_size=batch_size
-    # )
+    training_args = TrainingArguments(
+        output_dir=f"{model_checkpoint.split('/')[-1]}-finetuned-pubchem",
+        evaluation_strategy="steps",
+        eval_steps=1,
+        learning_rate=2e-5,
+        weight_decay=0.01,
+        max_steps=10,
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
+    )
 
-    # trainer = Trainer(
-    #     model=model,
-    #     args=training_args,
-    #     compute_metrics=compute_metrics,
-    #     train_dataset=lm_datasets["train"],
-    #     eval_dataset=lm_datasets["validation"],
-    #     # callbacks=[aim_callback]
-    # )
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        compute_metrics=compute_metrics,
+        train_dataset=lm_datasets["train"],
+        eval_dataset=lm_datasets["validation"],
+        # callbacks=[aim_callback]
+    )
 
-    # trainer.train()
+    trainer.train()
