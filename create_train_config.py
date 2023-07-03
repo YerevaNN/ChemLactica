@@ -49,5 +49,12 @@ model_train_configs = {
     },
 }
 
+# manual changes
+model_train_configs["125m"]["batch_size"] = 4
+
+for key in model_train_configs.keys():
+    model_train_configs[key]["max_learning_rate"] *= 0.1
+
+
 with open("models_train_config.yaml", "w") as f_:
     yaml.dump(model_train_configs, f_)
