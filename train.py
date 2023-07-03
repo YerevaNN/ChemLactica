@@ -1,9 +1,9 @@
-import transformers
 from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
-from eval_metrics import compute_metrics
+
+# from eval_metrics import compute_metrics
 from aim.hugging_face import AimCallback
 from text_format_utils import generate_formatted_string
 import json
@@ -29,24 +29,18 @@ def group_texts(examples):
     # Concatenate all texts.
     concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
     total_length = len(concatenated_examples[list(examples.keys())[0]])
-    # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-    # customize this part to your needs.
+    # We drop the small remainder,
+    # we could add padding if the model supported it instead of this drop.
     total_length = (total_length // block_size) * block_size
     # Split by chunks of max_len.
     result = {
-        k: [
-            t[i : i + block_size] for i in range(0, total_length, block_size)
-        ]  # TODO: is this correct? seems like the index will go out of the range
+        k: [t[i : i + block_size] for i in range(0, total_length, block_size)]  # noqa
         for k, t in concatenated_examples.items()
     }
     result["labels"] = result[
         "input_ids"
     ].copy()  # TODO: are not the targets shifted one to the right?
     return result
-
-
-def tokenize_function(examples):
-    return tokenizer(examples["text"])
 
 
 if __name__ == "__main__":
@@ -93,7 +87,7 @@ if __name__ == "__main__":
     trainer = Trainer(
         model=model,
         args=training_args,
-        compute_metrics=compute_metrics,
+        # compute_metrics=compute_metrics,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
         # callbacks=[aim_callback],
