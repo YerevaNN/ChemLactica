@@ -1,9 +1,7 @@
-import evaluate
 import transformers
 from transformers import AutoTokenizer
 import torch
 import torch.nn.functional as F
-import numpy as np
 
 # perplexity_metric = evaluate.load("perplexity", module_type="metric")
 
@@ -29,37 +27,37 @@ def property_wise_perplexity(
     logits: torch.Tensor, labels: torch.Tensor, property_names
 ):
     # print(logits.shape, labels.shape)
-    properties_perploxity_freq = {}
+    # properties_perploxity_freq = {}
     properties_perploxity = {}
-    for pred, target in zip(logits, labels):
-        for name in property_names:
-            prop_ids = torch.tensor(galactica_tokenizer.encode('"' + name + '"'))
-            start_index = -1
-            end_index = -1
-            for i in range(len(target) - len(prop_ids)):
-                if torch.all(target[i : i + len(prop_ids)] == prop_ids):
-                    start_index = i + len(prop_ids) - 1
+    # for pred, target in zip(logits, labels):
+    #     for name in property_names:
+    #         prop_ids = torch.tensor(
+    #             galactica_tokenizer.encode('"' + name + '"'), device="cpu"
+    #         )
+    #         start_index = -1
+    #         end_index = -1
+    #         for i in range(len(target) - len(prop_ids)):
+    #             if torch.all(target[i : i + len(prop_ids)] == prop_ids):
+    #                 start_index = i + len(prop_ids) - 1
 
-            if start_index != -1:
-                for i in range(start_index + 2, len(target)):
-                    if galactica_tokenizer.encode(",")[0] == target[i].item():
-                        end_index = i
-                        break
+    #         if start_index != -1:
+    #             for i in range(start_index + 2, len(target)):
+    #                 if galactica_tokenizer.encode(",")[0] == target[i].item():
+    #                     end_index = i
+    #                     break
 
-            if start_index != -1 and end_index != -1:
-                if properties_perploxity.get(name) == None:
-                    properties_perploxity[name] = 0
-                    properties_perploxity_freq[name] = 0
-                properties_perploxity[name] += perplexity(
-                    pred[start_index:end_index].unsqueeze(0),
-                    target[start_index:end_index].unsqueeze(0),
-                )
-                properties_perploxity_freq[name] += 1
+    #         if start_index != -1 and end_index != -1:
+    #             if properties_perploxity.get(name) is None:
+    #                 properties_perploxity[name] = 0
+    #                 properties_perploxity_freq[name] = 0
+    #             properties_perploxity[name] += perplexity(
+    #                 pred[start_index:end_index].unsqueeze(0),
+    #                 target[start_index:end_index].unsqueeze(0),
+    #             )
+    #             properties_perploxity_freq[name] += 1
 
-        break
-
-    for k, v in properties_perploxity.items():
-        properties_perploxity[k] = v / properties_perploxity_freq[k]
+    # for k, v in properties_perploxity.items():
+    #     properties_perploxity[k] = v / properties_perploxity_freq[k]
 
     return properties_perploxity
 
@@ -67,7 +65,9 @@ def property_wise_perplexity(
 def compute_metrics(eval_pred: transformers.EvalPrediction):
     logits, labels = eval_pred.predictions, eval_pred.label_ids
 
-    logits, labels = torch.tensor(logits), torch.tensor(labels)
+    logits, labels = torch.tensor(logits, device="cpu"), torch.tensor(
+        labels, device="cpu"
+    )
     prop_wise_perp = property_wise_perplexity(
         logits,
         labels,
@@ -87,24 +87,5 @@ def compute_metrics(eval_pred: transformers.EvalPrediction):
             # "NHOHCOUNT",
         ],
     )
-    print(prop_wise_perp)
+    # print(prop_wise_perp)
     return prop_wise_perp
-
-
-"""
-perplexity = evaluate.load("perplexity", module_type="metric")
-input_texts = ["lorem ipsum", "Happy Birthday!", "Bienvenue"]
-
-results = perplexity.compute(model_id='gpt2',
-                             add_start_token=False,
-                             predictions=input_texts)
-print(list(results.keys()))
-
-[out]:
-
->>>['perplexities', 'mean_perplexity']
-print(round(results["mean_perplexity"], 2))
->>>646.75
-print(round(results["perplexities"][0], 2))
->>>32.25
-"""

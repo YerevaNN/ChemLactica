@@ -7,6 +7,8 @@ from datasets import load_dataset
 from aim.hugging_face import AimCallback
 from text_format_utils import generate_formatted_string
 import json
+import yaml
+import argparse
 
 
 def process_str(str):
@@ -44,11 +46,45 @@ def group_texts(examples):
 
 
 if __name__ == "__main__":
-    model_checkpoint = "facebook/galactica-125m"
-    block_size = 128
+    parser = argparse.ArgumentParser(description="none")
+
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        metavar="MT",
+        dest="model_type",
+        required=True,
+        help="the type of the model (depending on param size)",
+    )
+
+    args = parser.parse_args()
+    model_type = args.model_type
+
+    model_checkpoint = f"facebook/galactica-{model_type}"
+    block_size = 2048
+
+    with open("models_train_config.yaml", "r") as f_:
+        train_config = yaml.full_load(f_)[model_type]
 
     model = AutoModelForCausalLM.from_pretrained(model_checkpoint)
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+
+    training_args = TrainingArguments(
+        output_dir=f"{model_checkpoint.split('/')[-1]}-finetuned-pubchem",
+        per_device_train_batch_size=train_config["batch_size"],
+        per_device_eval_batch_size=train_config["batch_size"],
+        learning_rate=train_config["max_learning_rate"],
+        lr_scheduler_type="linear",
+        weight_decay=train_config["weight_decay"],
+        adam_beta1=train_config["adam_beta1"],
+        adam_beta2=train_config["adam_beta2"],
+        warmup_steps=train_config["warmup_steps"],
+        max_grad_norm=train_config["global_gradient_norm"],
+        evaluation_strategy="steps",
+        eval_steps=1,
+        max_steps=10,
+        num_train_epochs=5,
+    )
 
     dataset = load_dataset(
         "text",
@@ -67,30 +103,13 @@ if __name__ == "__main__":
         experiment="experiment",
     )
 
-    training_args = TrainingArguments(
-        output_dir=f"{model_checkpoint.split('/')[-1]}-finetuned-pubchem",
-        evaluation_strategy="steps",
-        learning_rate=6e-6,
-        lr_scheduler_type="linear",
-        weight_decay=0.1,
-        adam_beta1=0.9,
-        adam_beta2=0.95,
-        warmup_steps=500,
-        max_grad_norm=1.0,
-        eval_steps=1,
-        max_steps=10,
-        num_train_epochs=5,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-    )
-
     trainer = Trainer(
         model=model,
         args=training_args,
         # compute_metrics=compute_metrics,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
-        # callbacks=[aim_callback],
+        # callbacks=[aim_callback]
     )
 
     trainer.train()
