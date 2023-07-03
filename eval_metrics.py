@@ -27,37 +27,37 @@ def property_wise_perplexity(
     logits: torch.Tensor, labels: torch.Tensor, property_names
 ):
     # print(logits.shape, labels.shape)
-    # properties_perploxity_freq = {}
+    properties_perploxity_freq = {}
     properties_perploxity = {}
-    # for pred, target in zip(logits, labels):
-    #     for name in property_names:
-    #         prop_ids = torch.tensor(
-    #             galactica_tokenizer.encode('"' + name + '"'), device="cpu"
-    #         )
-    #         start_index = -1
-    #         end_index = -1
-    #         for i in range(len(target) - len(prop_ids)):
-    #             if torch.all(target[i : i + len(prop_ids)] == prop_ids):
-    #                 start_index = i + len(prop_ids) - 1
+    for pred, target in zip(logits, labels):
+        for name in property_names:
+            prop_ids = torch.tensor(
+                galactica_tokenizer.encode('"' + name + '"'), device="cpu"
+            )
+            start_index = -1
+            end_index = -1
+            for i in range(len(target) - len(prop_ids)):
+                if torch.all(target[i : i + len(prop_ids)] == prop_ids):  # noqa
+                    start_index = i + len(prop_ids) - 1
 
-    #         if start_index != -1:
-    #             for i in range(start_index + 2, len(target)):
-    #                 if galactica_tokenizer.encode(",")[0] == target[i].item():
-    #                     end_index = i
-    #                     break
+            if start_index != -1:
+                for i in range(start_index + 2, len(target)):
+                    if galactica_tokenizer.encode(",")[0] == target[i].item():
+                        end_index = i
+                        break
 
-    #         if start_index != -1 and end_index != -1:
-    #             if properties_perploxity.get(name) is None:
-    #                 properties_perploxity[name] = 0
-    #                 properties_perploxity_freq[name] = 0
-    #             properties_perploxity[name] += perplexity(
-    #                 pred[start_index:end_index].unsqueeze(0),
-    #                 target[start_index:end_index].unsqueeze(0),
-    #             )
-    #             properties_perploxity_freq[name] += 1
+            if start_index != -1 and end_index != -1:
+                if properties_perploxity.get(name) is None:
+                    properties_perploxity[name] = 0
+                    properties_perploxity_freq[name] = 0
+                properties_perploxity[name] += perplexity(
+                    pred[start_index:end_index].unsqueeze(0),
+                    target[start_index:end_index].unsqueeze(0),
+                )
+                properties_perploxity_freq[name] += 1
 
-    # for k, v in properties_perploxity.items():
-    #     properties_perploxity[k] = v / properties_perploxity_freq[k]
+    for k, v in properties_perploxity.items():
+        properties_perploxity[k] = v / properties_perploxity_freq[k]
 
     return properties_perploxity
 
