@@ -53,42 +53,20 @@ def group_texts(examples):
     return result
 
 
-def load_model(model_type: str, load_small_opt: bool = False):
+def load_model(load_small_opt: bool):
     if load_small_opt:
-        # opt_default_param_dict = {
-        #     "hidden_size" : 768,
-        #     "num_hidden_layers": 12,
-        #     "ffn_dim": 3072,
-        #     "max_position_embeddings": 2048,
-        #     "num_attention_heads": 12,
-        #     "word_embed_proj_dim": 768
-        # }
-        opt_default_param_dict = {
-            "hidden_size": 32,
-            "num_hidden_layers": 1,
-            "ffn_dim": 32,
-            "max_position_embeddings": 2048,
-            "num_attention_heads": 2,
-            "word_embed_proj_dim": 16,
-        }
-
-        small_opt = transformers.OPTForCausalLM(
+        return transformers.OPTForCausalLM(
             transformers.OPTConfig(
                 vocab_size=train_config["vocab_size"],
-                hidden_size=opt_default_param_dict["hidden_size"],
-                num_hidden_layers=opt_default_param_dict["num_hidden_layers"],
-                ffn_dim=opt_default_param_dict["ffn_dim"],
-                max_position_embeddings=opt_default_param_dict[
-                    "max_position_embeddings"
-                ],
-                num_attention_heads=opt_default_param_dict["num_attention_heads"],
-                word_embed_proj_dim=opt_default_param_dict["word_embed_proj_dim"],
+                hidden_size=16,
+                num_hidden_layers=1,
+                ffn_dim=16,
+                max_position_embeddings=2048,
+                num_attention_heads=1,
+                word_embed_proj_dim=16,
             )
         )
-        return small_opt
-
-    gal = AutoModelForCausalLM.from_pretrained(model_checkpoint)
-    return gal
+    return AutoModelForCausalLM.from_pretrained(model_checkpoint)
 
 
 if __name__ == "__main__":
@@ -143,8 +121,8 @@ if __name__ == "__main__":
 
     model_checkpoint = f"facebook/galactica-{model_type}"
 
-    model = load_model(model_type, load_small_opt)
-    print("number of parameters:", sum(p.numel() for p in model.parameters()))
+    model = load_model(load_small_opt)
+    # print("number of parameters:", sum(p.numel() for p in model.parameters()))
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
