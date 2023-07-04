@@ -9,6 +9,7 @@ from text_format_utils import generate_formatted_string
 import json
 import yaml
 import argparse
+import glob
 
 
 def process_str(str):
@@ -57,8 +58,29 @@ if __name__ == "__main__":
         help="the type of the model (depending on param size)",
     )
 
+    parser.add_argument(
+        "--training_data_dir",
+        type=str,
+        metavar="DT",
+        dest="training_data_dir",
+        required=True,
+        help="path to directory containing training data",
+    )
+    parser.add_argument(
+        "--valid_data_dir",
+        type=str,
+        metavar="VD",
+        dest="valid_data_dir",
+        required=True,
+        help="path to directory containing validation data",
+    )
+
     args = parser.parse_args()
     model_type = args.model_type
+    training_data_dir = args.training_data_dir
+    valid_data_dir = args.valid_data_dir
+    training_data_files = glob.glob(training_data_dir + "/*.jsonl")
+    valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
 
     model_checkpoint = f"facebook/galactica-{model_type}"
     block_size = 2048
@@ -88,7 +110,7 @@ if __name__ == "__main__":
 
     dataset = load_dataset(
         "text",
-        data_files={"train": "./train.jsonl", "validation": "./evaluation.jsonl"},
+        data_files={"train": training_data_files, "validation": valid_data_files},
         streaming=True,
     )
     dataset = dataset.map(process_str)
