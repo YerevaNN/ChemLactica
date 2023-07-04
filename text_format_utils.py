@@ -3,6 +3,11 @@ import time
 
 SPECIAL_TAGS = {"SMILES": {"start": "[START_SMILES] ", "end": " [END_SMILES]"}}
 
+def delete_empty_tags(compound_json):
+    for k,v in list(compound_json.items()):
+        if v == []:
+            del compound_json[k]
+    return compound_json
 
 def generate_formatted_string(compound_json):
     key_value_pairs = list()
@@ -33,6 +38,7 @@ def main():
     start_time = time.time()
     for i in range(100000):
         example = json.loads((string))
+        example = delete_empty_tags(example)
         generate_formatted_string((example))
     end_time = time.time()
     elapsed_time = end_time - start_time
