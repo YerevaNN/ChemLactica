@@ -14,9 +14,9 @@ class TestNetworkTraining(unittest.TestCase):
         if executed_prog.returncode != 0:
             raise Exception(
                 f"\n\tExit code: {executed_prog.returncode} \
-                  \n\tError_output: {executed_prog.stderr}."
+                  \n\tError output: {executed_prog.stderr}."
             )
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)
