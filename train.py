@@ -3,12 +3,13 @@ from transformers import AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 
-# from eval_metrics import compute_metrics
+from eval_metrics import compute_metrics
 from aim.hugging_face import AimCallback
 from text_format_utils import generate_formatted_string
 import json
 import yaml
 import argparse
+import sys
 
 
 def process_str(str):
@@ -33,10 +34,15 @@ def group_texts(examples):
     total_length = len(concatenated_examples[list(examples.keys())[0]])
     # We drop the small remainder,
     # we could add padding if the model supported it instead of this drop.
-    total_length = (total_length // block_size) * block_size
+    total_length = (total_length // train_config["block_size"]) * train_config[
+        "block_size"
+    ]
     # Split by chunks of max_len.
     result = {
-        k: [t[i : i + block_size] for i in range(0, total_length, block_size)]  # noqa
+        k: [
+            t[i : i + train_config["block_size"]]  # noqa
+            for i in range(0, total_length, train_config["block_size"])
+        ]  # noqa
         for k, t in concatenated_examples.items()
     }
     result["labels"] = result[
@@ -57,11 +63,30 @@ if __name__ == "__main__":
         help="the type of the model (depending on param size)",
     )
 
+    # parser.add_argument(
+    #     "--n_epochs",
+    #     type=int,
+    #     metavar="EP",
+    #     dest="n_epochs",
+    #     required=True,
+    #     help="the number of epochs to train",
+    # )
+
+    parser.add_argument(
+        "--max_steps",
+        type=int,
+        metavar="MS",
+        dest="max_steps",
+        required=True,
+        help="the number of steps to train (overrides the n_epochs)",
+    )
+
     args = parser.parse_args()
     model_type = args.model_type
+    # n_epochs = args.n_epochs
+    max_steps = args.max_steps
 
     model_checkpoint = f"facebook/galactica-{model_type}"
-    block_size = 2048
 
     with open("models_train_config.yaml", "r") as f_:
         train_config = yaml.full_load(f_)[model_type]
@@ -82,8 +107,7 @@ if __name__ == "__main__":
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
         eval_steps=1,
-        max_steps=10,
-        num_train_epochs=5,
+        max_steps=max_steps,
     )
 
     dataset = load_dataset(
@@ -106,10 +130,12 @@ if __name__ == "__main__":
     trainer = Trainer(
         model=model,
         args=training_args,
-        # compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
         # callbacks=[aim_callback]
     )
 
     trainer.train()
+
+    sys.exit(0)  # explositly set exit code to 0 when succesfully termitating

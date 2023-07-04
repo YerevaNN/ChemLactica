@@ -2,6 +2,7 @@
   adam_beta1: 0.9
   adam_beta2: 0.95
   batch_size: 1000000
+  block_size: 2048
   d_heads: 64
   d_model: 2048
   dropout_prob: 0.1
@@ -16,6 +17,7 @@
   adam_beta1: 0.9
   adam_beta2: 0.95
   batch_size: 4
+  block_size: 2048
   d_heads: 64
   d_model: 768
   dropout_prob: 0.1
@@ -30,6 +32,7 @@
   adam_beta1: 0.9
   adam_beta2: 0.95
   batch_size: 2000000
+  block_size: 2048
   d_heads: 128
   d_model: 4096
   dropout_prob: 0.1
