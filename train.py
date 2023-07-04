@@ -127,7 +127,7 @@ if __name__ == "__main__":
         warmup_steps=train_config["warmup_steps"],
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
-        eval_steps=1,
+        eval_steps=32,
         max_steps=max_steps,
     )
 
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
 
     aim_callback = AimCallback(
-        repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+        repo="/mnt/sxtn/chem/chemlactica_metadata/",
         experiment="experiment",
     )
 
@@ -154,7 +154,7 @@ if __name__ == "__main__":
         # compute_metrics=compute_metrics,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
-        # callbacks=[aim_callback]
+        callbacks=[aim_callback],
     )
 
     trainer.train()
