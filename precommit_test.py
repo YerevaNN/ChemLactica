@@ -5,7 +5,7 @@ import unittest
 class TestNetworkTraining(unittest.TestCase):
     def test_125m_model(self):
         executed_prog = subprocess.run(
-            "python3 train.py --model_type 125m --max_steps 1",
+            "python3 train.py --model_type 125m --max_steps 1 --load_small_opt true",
             shell=True,
             # stdout=subprocess.DEVNULL,
             # stderr=subprocess.DEVNULL,

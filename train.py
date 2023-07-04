@@ -189,6 +189,6 @@ if __name__ == "__main__":
         # callbacks=[aim_callback]
     )
 
-    # trainer.train()
+    trainer.train()
 
     sys.exit(0)  # explositly set exit code to 0 when succesfully termitating
