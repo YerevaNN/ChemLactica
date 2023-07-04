@@ -1,3 +1,4 @@
+import transformers
 from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments
@@ -52,6 +53,44 @@ def group_texts(examples):
     return result
 
 
+def load_model(model_type: str, load_small_opt: bool = False):
+    if load_small_opt:
+        # opt_default_param_dict = {
+        #     "hidden_size" : 768,
+        #     "num_hidden_layers": 12,
+        #     "ffn_dim": 3072,
+        #     "max_position_embeddings": 2048,
+        #     "num_attention_heads": 12,
+        #     "word_embed_proj_dim": 768
+        # }
+        opt_default_param_dict = {
+            "hidden_size": 32,
+            "num_hidden_layers": 1,
+            "ffn_dim": 32,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 2,
+            "word_embed_proj_dim": 16,
+        }
+
+        small_opt = transformers.OPTForCausalLM(
+            transformers.OPTConfig(
+                vocab_size=train_config["vocab_size"],
+                hidden_size=opt_default_param_dict["hidden_size"],
+                num_hidden_layers=opt_default_param_dict["num_hidden_layers"],
+                ffn_dim=opt_default_param_dict["ffn_dim"],
+                max_position_embeddings=opt_default_param_dict[
+                    "max_position_embeddings"
+                ],
+                num_attention_heads=opt_default_param_dict["num_attention_heads"],
+                word_embed_proj_dim=opt_default_param_dict["word_embed_proj_dim"],
+            )
+        )
+        return small_opt
+
+    gal = AutoModelForCausalLM.from_pretrained(model_checkpoint)
+    return gal
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="none")
 
@@ -82,17 +121,30 @@ if __name__ == "__main__":
         help="the number of steps to train (overrides the n_epochs)",
     )
 
+    parser.add_argument(
+        "--load_small_opt",
+        type=bool,
+        dest="load_small_opt",
+        required=False,
+        help="load small opt instead of Galactica (should be used in precommit_test.py only)",
+        default=False,
+    )
+
+    device = "cpu"
+
     args = parser.parse_args()
     model_type = args.model_type
     # n_epochs = args.n_epochs
     max_steps = args.max_steps
-
-    model_checkpoint = f"facebook/galactica-{model_type}"
+    load_small_opt = args.load_small_opt
 
     with open("models_train_config.yaml", "r") as f_:
         train_config = yaml.full_load(f_)[model_type]
 
-    model = AutoModelForCausalLM.from_pretrained(model_checkpoint)
+    model_checkpoint = f"facebook/galactica-{model_type}"
+
+    model = load_model(model_type, load_small_opt)
+    print("number of parameters:", sum(p.numel() for p in model.parameters()))
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
@@ -137,6 +189,6 @@ if __name__ == "__main__":
         # callbacks=[aim_callback]
     )
 
-    trainer.train()
+    # trainer.train()
 
     sys.exit(0)  # explositly set exit code to 0 when succesfully termitating

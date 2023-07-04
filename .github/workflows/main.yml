@@ -3,9 +3,11 @@ on:
   push:
     branches:
       - main
+      - devt
   pull_request:
     branches:
       - main
+      - devt
 jobs:
   test:
     name: Test
