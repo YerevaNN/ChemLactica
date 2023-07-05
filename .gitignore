@@ -164,5 +164,5 @@ cython_debug/
 *.jsonl
 # keep this files for GitHub envirnment to be able to test the code
 !.small_data/train/train.jsonl
-!.small_data/train/valid.jsonl
+!.small_data/valid/evaluation.jsonl
 .vscode/
