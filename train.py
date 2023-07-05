@@ -54,17 +54,17 @@ def group_texts(examples):
     return result
 
 
-def load_model(load_small_opt: bool):
-    if load_small_opt:
+def load_model(model_type: str):
+    if model_type == "small_opt":
         return transformers.OPTForCausalLM(
             transformers.OPTConfig(
                 vocab_size=train_config["vocab_size"],
-                hidden_size=16,
-                num_hidden_layers=1,
-                ffn_dim=16,
-                max_position_embeddings=2048,
-                num_attention_heads=1,
-                word_embed_proj_dim=16,
+                hidden_size=train_config["hidden_size"],
+                num_hidden_layers=train_config["num_hidden_layers"],
+                ffn_dim=train_config["ffn_dim"],
+                max_position_embeddings=train_config["max_position_embeddings"],
+                num_attention_heads=train_config["num_attention_heads"],
+                word_embed_proj_dim=train_config["word_embed_proj_dim"],
             )
         )
     return AutoModelForCausalLM.from_pretrained(model_checkpoint)
@@ -81,7 +81,6 @@ if __name__ == "__main__":
         required=True,
         help="the type of the model (depending on param size)",
     )
-
     parser.add_argument(
         "--training_data_dir",
         type=str,
@@ -98,16 +97,6 @@ if __name__ == "__main__":
         required=True,
         help="path to directory containing validation data",
     )
-
-    # parser.add_argument(
-    #     "--n_epochs",
-    #     type=int,
-    #     metavar="EP",
-    #     dest="n_epochs",
-    #     required=True,
-    #     help="the number of epochs to train",
-    # )
-
     parser.add_argument(
         "--max_steps",
         type=int,
@@ -116,35 +105,54 @@ if __name__ == "__main__":
         required=True,
         help="the number of steps to train (overrides the n_epochs)",
     )
-
     parser.add_argument(
-        "--load_small_opt",
-        type=bool,
-        dest="load_small_opt",
+        "--eval_steps",
+        type=int,
+        metavar="ES",
+        dest="eval_steps",
         required=False,
-        help="load small opt instead of Galactica (should be used in precommit_test.py only)",
+        help="the number of training steps after which to evaluate the model",
+        default=32,
+    )
+    parser.add_argument(
+        "--track",
+        type=bool,
+        metavar="TR",
+        dest="track",
+        required=False,
+        help="weather or not track the trainig using aim",
         default=False,
+    )
+    parser.add_argument(
+        "--eval_accumulation_steps",
+        type=int,
+        metavar="EAS",
+        dest="eval_accumulation_steps",
+        required=False,
+        help="the number of steps after which to move \
+            the prediction tensor from GPU to CPU during the evaluation \
+            (specified to avoid OOM errors)",
+        default=2,
     )
 
     args = parser.parse_args()
     model_type = args.model_type
     training_data_dir = args.training_data_dir
     valid_data_dir = args.valid_data_dir
+    max_steps = args.max_steps
+    eval_steps = args.eval_steps
+    track = args.track
+    eval_accumulation_steps = args.eval_accumulation_steps
+
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-
-    # n_epochs = args.n_epochs
-    max_steps = args.max_steps
-
-    model_checkpoint = f"facebook/galactica-{model_type}"
-    load_small_opt = args.load_small_opt
 
     with open("models_train_config.yaml", "r") as f_:
         train_config = yaml.full_load(f_)[model_type]
 
-    model_checkpoint = f"facebook/galactica-{model_type}"
+    model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
 
-    model = load_model(load_small_opt)
+    model = load_model(model_type)
     # print("number of parameters:", sum(p.numel() for p in model.parameters()))
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
@@ -160,8 +168,8 @@ if __name__ == "__main__":
         warmup_steps=train_config["warmup_steps"],
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
-        eval_accumulation_steps=1,
-        eval_steps=32,
+        eval_accumulation_steps=eval_accumulation_steps,
+        eval_steps=eval_steps,
         max_steps=max_steps,
     )
 
@@ -177,10 +185,14 @@ if __name__ == "__main__":
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
 
-    aim_callback = AimCallback(
-        repo="/mnt/sxtn/chem/chemlactica_metadata/",
-        experiment="experiment",
-    )
+    trainer_callback_list = []
+    if track:
+        trainer_callback_list.append(
+            AimCallback(
+                repo="/mnt/sxtn/chem/chemlactica_metadata/",
+                experiment="experiment",
+            )
+        )
 
     trainer = Trainer(
         model=model,
@@ -188,7 +200,7 @@ if __name__ == "__main__":
         compute_metrics=compute_metrics,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
-        # callbacks=[aim_callback],
+        callbacks=trainer_callback_list,
     )
 
     trainer.train()
