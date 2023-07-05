@@ -64,6 +64,7 @@ def property_wise_perplexity(
 
 def compute_metrics(eval_pred: transformers.EvalPrediction):
     # logits, labels = eval_pred.predictions, eval_pred.label_ids
+    # print(logits.shape, labels.shape)
 
     # logits, labels = torch.tensor(logits), torch.tensor(labels)
     # prop_wise_perp = property_wise_perplexity(

@@ -4,6 +4,7 @@ from transformers import AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 
+from eval_metrics import compute_metrics
 from aim.hugging_face import AimCallback
 from text_format_utils import generate_formatted_string, delete_empty_tags
 import json
@@ -159,6 +160,7 @@ if __name__ == "__main__":
         warmup_steps=train_config["warmup_steps"],
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
+        eval_accumulation_steps=1,
         eval_steps=32,
         max_steps=max_steps,
     )
@@ -183,6 +185,7 @@ if __name__ == "__main__":
     trainer = Trainer(
         model=model,
         args=training_args,
+        compute_metrics=compute_metrics,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
         # callbacks=[aim_callback],
