@@ -131,6 +131,8 @@ if __name__ == "__main__":
     valid_data_dir = args.valid_data_dir
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
+    print(training_data_files)
+    print(valid_data_files)
     # n_epochs = args.n_epochs
     max_steps = args.max_steps
 
