@@ -9,6 +9,7 @@ model_train_configs = {
         "d_heads": 64,
         "batch_size": 500000,
         "block_size": 2048,
+        "vocab_size": 50000,
         "max_learning_rate": 6e-4,
         "warmup_steps": 500,  # deviation from the paper
         "global_gradient_norm": 1.0,
@@ -25,6 +26,7 @@ model_train_configs = {
         "d_heads": 64,
         "batch_size": 1000000,
         "block_size": 2048,
+        "vocab_size": 50000,
         "max_learning_rate": 2e-4,
         "warmup_steps": 500,  # deviation from the paper
         "global_gradient_norm": 1.0,
@@ -41,6 +43,7 @@ model_train_configs = {
         "d_heads": 128,
         "batch_size": 2000000,
         "block_size": 2048,
+        "vocab_size": 50000,
         "max_learning_rate": 1.2e-4,
         "warmup_steps": 500,  # deviation from the paper
         "global_gradient_norm": 1.0,

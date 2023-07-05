@@ -63,29 +63,28 @@ def property_wise_perplexity(
 
 
 def compute_metrics(eval_pred: transformers.EvalPrediction):
-    logits, labels = eval_pred.predictions, eval_pred.label_ids
+    # logits, labels = eval_pred.predictions, eval_pred.label_ids
 
-    logits, labels = torch.tensor(logits, device="cpu"), torch.tensor(
-        labels, device="cpu"
-    )
-    prop_wise_perp = property_wise_perplexity(
-        logits,
-        labels,
-        [
-            "CID",
-            "SMILES",
-            "SAS",
-            "WEIGHT",
-            "TPSA",
-            # "CLOGP",
-            # "QED",
-            # "NUMHDONORS",
-            # "NUMHACCEPTORS",
-            # "NUMHETEROATOMS",
-            # "NUMROTATABLEBONDS",
-            # "NOCOUNT",
-            # "NHOHCOUNT",
-        ],
-    )
+    # logits, labels = torch.tensor(logits), torch.tensor(labels)
+    # prop_wise_perp = property_wise_perplexity(
+    #     logits,
+    #     labels,
+    #     [
+    #         "CID",
+    #         "SMILES",
+    #         "SAS",
+    #         "WEIGHT",
+    #         "TPSA",
+    #         # "CLOGP",
+    #         # "QED",
+    #         # "NUMHDONORS",
+    #         # "NUMHACCEPTORS",
+    #         # "NUMHETEROATOMS",
+    #         # "NUMROTATABLEBONDS",
+    #         # "NOCOUNT",
+    #         # "NHOHCOUNT",
+    #     ],
+    # )
     # print(prop_wise_perp)
-    return prop_wise_perp
+    # return prop_wise_perp
+    return {}

@@ -3,9 +3,12 @@ import unittest
 
 
 class TestNetworkTraining(unittest.TestCase):
-    def test_125m_model(self):
+    def test_small_opt_model(self):
         executed_prog = subprocess.run(
-            "python3 train.py --model_type 125m --max_steps 1",
+            "python3 train.py --model_type 125m --max_steps 1 \
+                --training_data_dir small_data/train \
+                --valid_data_dir small_data/valid \
+                --load_small_opt true",
             shell=True,
             # stdout=subprocess.DEVNULL,
             # stderr=subprocess.DEVNULL,

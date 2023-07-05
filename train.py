@@ -1,9 +1,9 @@
+import transformers
 from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 
-# from eval_metrics import compute_metrics
 from aim.hugging_face import AimCallback
 from text_format_utils import generate_formatted_string, delete_empty_tags
 import json
@@ -53,6 +53,22 @@ def group_texts(examples):
     return result
 
 
+def load_model(load_small_opt: bool):
+    if load_small_opt:
+        return transformers.OPTForCausalLM(
+            transformers.OPTConfig(
+                vocab_size=train_config["vocab_size"],
+                hidden_size=16,
+                num_hidden_layers=1,
+                ffn_dim=16,
+                max_position_embeddings=2048,
+                num_attention_heads=1,
+                word_embed_proj_dim=16,
+            )
+        )
+    return AutoModelForCausalLM.from_pretrained(model_checkpoint)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="none")
 
@@ -100,6 +116,15 @@ if __name__ == "__main__":
         help="the number of steps to train (overrides the n_epochs)",
     )
 
+    parser.add_argument(
+        "--load_small_opt",
+        type=bool,
+        dest="load_small_opt",
+        required=False,
+        help="load small opt instead of Galactica (should be used in precommit_test.py only)",
+        default=False,
+    )
+
     args = parser.parse_args()
     model_type = args.model_type
     training_data_dir = args.training_data_dir
@@ -108,12 +133,17 @@ if __name__ == "__main__":
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
     # n_epochs = args.n_epochs
     max_steps = args.max_steps
+
     model_checkpoint = f"facebook/galactica-{model_type}"
+    load_small_opt = args.load_small_opt
 
     with open("models_train_config.yaml", "r") as f_:
         train_config = yaml.full_load(f_)[model_type]
 
-    model = AutoModelForCausalLM.from_pretrained(model_checkpoint)
+    model_checkpoint = f"facebook/galactica-{model_type}"
+
+    model = load_model(load_small_opt)
+    # print("number of parameters:", sum(p.numel() for p in model.parameters()))
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
@@ -152,10 +182,9 @@ if __name__ == "__main__":
     trainer = Trainer(
         model=model,
         args=training_args,
-        # compute_metrics=compute_metrics,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
-        callbacks=[aim_callback],
+        # callbacks=[aim_callback],
     )
 
     trainer.train()

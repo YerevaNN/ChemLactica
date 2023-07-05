@@ -11,6 +11,7 @@
   max_learning_rate: 2.0e-05
   n_heads: 32
   n_layers: 24
+  vocab_size: 50000
   warmup_steps: 500
   weight_decay: 0.1
 125m:
@@ -26,6 +27,7 @@
   max_learning_rate: 5.9999999999999995e-05
   n_heads: 12
   n_layers: 12
+  vocab_size: 50000
   warmup_steps: 500
   weight_decay: 0.1
 6.7b:
@@ -41,5 +43,6 @@
   max_learning_rate: 1.2e-05
   n_heads: 32
   n_layers: 32
+  vocab_size: 50000
   warmup_steps: 500
   weight_decay: 0.1
