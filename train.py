@@ -48,9 +48,7 @@ def group_texts(examples):
         ]  # noqa
         for k, t in concatenated_examples.items()
     }
-    result["labels"] = result[
-        "input_ids"
-    ].copy()  # TODO: are not the targets shifted one to the right?
+    result["labels"] = result["input_ids"].copy()
     return result
 
 
@@ -122,6 +120,7 @@ if __name__ == "__main__":
         required=False,
         help="weather or not track the trainig using aim",
         default=False,
+        action=argparse.BooleanOptionalAction,
     )
     parser.add_argument(
         "--eval_accumulation_steps",
@@ -189,8 +188,8 @@ if __name__ == "__main__":
     if track:
         trainer_callback_list.append(
             AimCallback(
-                repo="/mnt/sxtn/chem/chemlactica_metadata/",
-                experiment="experiment",
+                repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+                experiment="testing on HDD",
             )
         )
 

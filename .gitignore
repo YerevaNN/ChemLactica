@@ -166,3 +166,6 @@ cython_debug/
 !.small_data/train/train.jsonl
 !.small_data/valid/evaluation.jsonl
 .vscode/
+
+# current checkpoint directories
+galactica-125m-finetuned-pubchem/
