@@ -4,7 +4,7 @@ from transformers import AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 
-from eval_metrics import compute_metrics
+from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from aim.hugging_face import AimCallback
 from text_format_utils import generate_formatted_string, delete_empty_tags
 import json
@@ -167,7 +167,7 @@ if __name__ == "__main__":
         warmup_steps=train_config["warmup_steps"],
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
-        eval_accumulation_steps=eval_accumulation_steps,
+        # eval_accumulation_steps=eval_accumulation_steps,
         eval_steps=eval_steps,
         max_steps=max_steps,
     )
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         trainer_callback_list.append(
             AimCallback(
                 repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
-                experiment="testing on HDD",
+                experiment="testing on HDD with compute metrics",
             )
         )
 
@@ -200,6 +200,7 @@ if __name__ == "__main__":
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["validation"],
         callbacks=trainer_callback_list,
+        preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
     trainer.train()
