@@ -18,7 +18,7 @@
 125m:
   adam_beta1: 0.9
   adam_beta2: 0.95
-  batch_size: 32
+  batch_size: 4
   block_size: 2048
   d_heads: 64
   d_model: 768
