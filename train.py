@@ -184,18 +184,6 @@ if __name__ == "__main__":
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
 
-    # sum_ = 0
-    # samples = 0
-    # for s in lm_datasets["validation"]:
-    #     sum_ += len(s["input_ids"])
-    #     samples += 1
-
-    # print(samples)
-
-    # print([tokenizer.decode(s) for s in tokenizer("1][NUMAROMATICRINGS 0")["input_ids"]])
-
-    # print("number of samples in valid ", samples, "tokens", sum_)
-
     trainer_callback_list = []
     if track:
         trainer_callback_list.append(
