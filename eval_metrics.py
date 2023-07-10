@@ -3,11 +3,13 @@ from transformers import AutoTokenizer
 import torch
 import torch.nn.functional as F
 from typing import List, Tuple
-import time
+import tqdm
 from multiprocessing import get_context
 
 galactica_model_checkpoint = "facebook/galactica-125m"
 galactica_tokenizer = AutoTokenizer.from_pretrained(galactica_model_checkpoint)
+
+pbar = None
 
 property_names = (
     # "name",
@@ -115,12 +117,15 @@ def process_property(entry):
 
 @torch.no_grad()
 def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
+    global pbar
     compute_device = "cpu"
     original_device = labels.device
-    start_time = time.time()
     batch_size = labels.size(0)
     logits = logits.view(-1, logits.shape[-1]).to(compute_device)
     labels = labels.view(-1).to(compute_device)
+
+    if pbar is None:
+        pbar = tqdm.tqdm(total=22384)
 
     metrics_tensor = torch.empty(
         batch_size * len(property_names), device=compute_device
@@ -139,12 +144,15 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
         ):
             metrics_tensor[i + 1] = value
 
+    pbar.update(batch_size)
+
     ret = metrics_tensor.view(batch_size, -1)
-    print(time.time() - start_time, "seconds")
+    # print(time.time() - start_time, "seconds")
     return ret.to(original_device)
 
 
 def compute_metrics(eval_pred: transformers.EvalPrediction):
+    global pbar
     logits, _ = eval_pred.predictions, eval_pred.label_ids
     # logits, labels = torch.tensor(logits), torch.tensor(labels)
     # prop_wise_perp = property_wise_perplexity(logits, labels, property_entries)
@@ -152,6 +160,7 @@ def compute_metrics(eval_pred: transformers.EvalPrediction):
     # return {"perplexity": perplexity(logits, labels), **prop_wise_perp}
     # print(logits.shape, labels.shape)
     # logits = preprocess_logits_for_metrics(logits, labels)
+    pbar = None
     logits_sum = logits.mean(axis=0)[: len(property_names)]
     prep = {property_names[i]: loss for i, loss in enumerate(logits_sum)}
     return prep
