@@ -177,12 +177,21 @@ if __name__ == "__main__":
         data_files={"train": training_data_files, "validation": valid_data_files},
         streaming=True,
     )
+
     dataset = dataset.map(process_str)
 
     tokenized_datasets = dataset.map(
         tokenize_function, batched=True, remove_columns=["text"]
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
+
+    # samples = 0
+    # for s in lm_datasets["validation"]:
+    # tokenizer.encode(s)
+    # break
+
+    # print([tokenizer.decode(s) for s in tokenizer.encode("[SMILES_START] ljknasd [SMILES_END]")]
+    # print(tokenizer.encode("[START_SMILES]"))
 
     trainer_callback_list = []
     if track:
