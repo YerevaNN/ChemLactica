@@ -4,6 +4,9 @@ import torch
 import torch.nn.functional as F
 from typing import List, Tuple
 import tqdm
+import evaluate
+
+acc_metric = evaluate.load("accuracy")
 
 galactica_model_checkpoint = "facebook/galactica-125m"
 galactica_tokenizer = AutoTokenizer.from_pretrained(galactica_model_checkpoint)
@@ -59,9 +62,6 @@ pbar = None
 
 @torch.no_grad()
 def perplexity(logits: torch.Tensor, labels: torch.Tensor):
-    logits = logits.view(-1, logits.shape[-1])
-    labels = labels.view(-1)
-
     comp_perp = 2 ** (
         F.cross_entropy(logits, labels, reduction="mean")
     )  # TODO: should the power base be exp or 2?
@@ -86,15 +86,13 @@ def process_property(start_ids, end_ids, start_brackets, end_brackets, logits, l
 
             if j < len(end_brackets):
                 end_index = end_brackets[j]
-                # print(galactica_tokenizer.decode(start_ids),
-                # galactica_tokenizer.decode(labels[start_index:end_index]))
                 property_perp += perplexity(
                     logits[start_index:end_index], labels[start_index:end_index]
                 )
                 property_count += 1
                 start_index = end_index = None
 
-    return property_perp / max(1, property_count)
+    return property_perp, property_count
 
 
 @torch.no_grad()
@@ -102,16 +100,17 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
     global pbar
     # global pol
     # start_time = time.time()
-    original_device = labels.device
     batch_size = labels.size(0)
-    logits = logits.view(-1, logits.shape[-1]).to(original_device)
-    labels = labels.view(-1).to(original_device)
+
+    logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
+    labels = labels[..., 1:].contiguous().view(-1)
 
     if pbar is None:
         pbar = tqdm.tqdm(total=22384)
 
-    metrics_tensor = torch.empty(batch_size * len(property_names), device=labels.device)
-    metrics_tensor[0] = perplexity(logits, labels)
+    metrics_tensor = torch.zeros(2, len(property_names), device=labels.device)
+    metrics_tensor[0][0] = perplexity(logits, labels)
+    metrics_tensor[1][0] = 1
 
     start_brackets = torch.where(labels == galactica_tokenizer.encode("[")[0])[0].to(
         labels.device
@@ -120,14 +119,14 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
         labels.device
     )
     smiles_start_brackets = torch.where(
-        labels == galactica_tokenizer.encode("[START_SMILES] ")[0]
+        labels == galactica_tokenizer.encode("[START_SMILES]")[0]
     )[0].to(labels.device)
     smiles_end_brackets = torch.where(
-        labels == galactica_tokenizer.encode(" [END_SMILES]")[0]
+        labels == galactica_tokenizer.encode("[END_SMILES]")[0]
     )[0].to(labels.device)
 
     for i, (name, start_ids, end_ids) in enumerate(property_entries[1:], start=1):
-        metrics_tensor[i] += process_property(
+        property_perp, property_count = process_property(
             start_ids.to(labels.device),
             end_ids.to(labels.device),
             start_brackets if name != "SMILES" else smiles_start_brackets,
@@ -136,23 +135,25 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
             labels,
         )
 
+        metrics_tensor[0][i] = property_perp
+        metrics_tensor[1][i] = property_count
+
     pbar.update(batch_size)
 
-    ret = metrics_tensor.view(batch_size, -1)
-    # print(time.time() - start_time, "seconds")
-    return ret
+    return metrics_tensor
 
 
 def compute_metrics(eval_pred: transformers.EvalPrediction):
     global pbar
-    logits, _ = eval_pred.predictions, eval_pred.label_ids
-    # logits, labels = torch.tensor(logits), torch.tensor(labels)
-    # prop_wise_perp = property_wise_perplexity(logits, labels, property_entries)
+    logits, _ = torch.tensor(eval_pred.predictions), torch.tensor(eval_pred.label_ids)
 
-    # return {"perplexity": perplexity(logits, labels), **prop_wise_perp}
-    # print(logits.shape, labels.shape)
-    # logits = preprocess_logits_for_metrics(logits, labels)
     pbar = None
-    logits_sum = logits.mean(axis=0)[: len(property_names)]
-    prep = {property_names[i]: loss for i, loss in enumerate(logits_sum)}
+    properties_perp = logits[::2].sum(axis=0)
+    properties_count = logits[1::2].sum(axis=0)
+    properties_count = torch.max(torch.ones_like(properties_count), properties_count)
+    # # print(properties_perp, properties_count)
+    prep = {
+        property_names[i]: loss
+        for i, loss in enumerate(properties_perp / properties_count)
+    }
     return prep

@@ -167,7 +167,6 @@ if __name__ == "__main__":
         warmup_steps=train_config["warmup_steps"],
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
-        # eval_accumulation_steps=eval_accumulation_steps,
         eval_steps=eval_steps,
         max_steps=max_steps,
     )
@@ -187,6 +186,11 @@ if __name__ == "__main__":
 
     # samples = 0
     # for s in lm_datasets["validation"]:
+    #     print(tokenizer.decode(s["input_ids"]))
+    #     break
+    # pre, loss = model(**s)
+    # print(pre, loss)
+    # break
     # tokenizer.encode(s)
     # break
 
@@ -198,7 +202,7 @@ if __name__ == "__main__":
         trainer_callback_list.append(
             AimCallback(
                 repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
-                experiment="testing on HDD with compute metrics",
+                experiment="train with HDD",
             )
         )
 
