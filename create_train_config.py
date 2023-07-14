@@ -18,6 +18,7 @@ model_train_configs = {
         "adam_beta2": 0.95,
         "weight_decay": 0.1,
         "dropout_prob": 0.1,
+        "eval_step": 256,
         "learning_rate_decay": 0.1,
     },
     "1.3b": {
@@ -82,7 +83,7 @@ model_train_configs = {
 model_train_configs["125m"]["batch_size"] = 4
 
 for key in model_train_configs.keys():
-    model_train_configs[key]["max_learning_rate"] *= 0.1
+    model_train_configs[key]["max_learning_rate"] *= 0.08
 
 
 with open("models_train_config.yaml", "w") as f_:
