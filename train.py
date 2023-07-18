@@ -5,15 +5,13 @@ from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from aim.hugging_face import AimCallback
 from text_format_utils import generate_formatted_string, delete_empty_tags
 import json
 import yaml
 import argparse
 import glob
 import sys
-import hashlib
-import os
+from callbacks import CustomAimCallback
 
 
 def process_str(str):
@@ -110,9 +108,16 @@ if __name__ == "__main__":
         type=int,
         metavar="ES",
         dest="eval_steps",
-        required=False,
+        required=True,
         help="the number of training steps after which to evaluate the model",
-        default=32,
+    )
+    parser.add_argument(
+        "--save_steps",
+        type=int,
+        metavar="SS",
+        dest="save_steps",
+        required=True,
+        help="the number of steps to save a model checkpoint",
     )
     parser.add_argument(
         "--experiment_name",
@@ -140,6 +145,7 @@ if __name__ == "__main__":
     valid_data_dir = args.valid_data_dir
     max_steps = args.max_steps
     eval_steps = args.eval_steps
+    save_steps = args.save_steps
     experiment_name = args.experiment_name
     track = args.track
 
@@ -149,15 +155,22 @@ if __name__ == "__main__":
     with open("models_train_config.yaml", "r") as f_:
         train_config = yaml.full_load(f_)[model_type]
 
-    model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
-    experiment_name_hash = hashlib.md5(experiment_name.encode("utf-8")).hexdigest()
-    checkpoint_dir = f"/mnt/sxtn/chem/ChemLactica/checkpoints/ \
-                        galactica-{model_type}/{experiment_name_hash}"
-
-    if os.path.isfile(checkpoint_dir) and experiment_name != "none":
-        raise Exception(
-            f"The experiment name '{experiment_name}' already exists, please use a different one."
+    experiment_hash = "none"
+    trainer_callback_list = []
+    if track:
+        aim_callback = CustomAimCallback(
+            checkpoints_dict_name="checkpoints_hashes",
+            repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+            experiment=experiment_name,
         )
+        experiment_hash = aim_callback._run_hash
+        trainer_callback_list.append(aim_callback)
+
+    model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
+    checkpoint_dir = (
+        "/mnt/sxtn/chem/ChemLactica/checkpoints/"
+        + f"galactica-{model_type}/{experiment_hash}"
+    )
 
     model = load_model(model_type)
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
@@ -176,6 +189,7 @@ if __name__ == "__main__":
         evaluation_strategy="steps",
         eval_steps=eval_steps,
         max_steps=max_steps,
+        save_steps=save_steps,
     )
 
     dataset = load_dataset(
@@ -190,14 +204,6 @@ if __name__ == "__main__":
         tokenize_function, batched=True, remove_columns=["text"]
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
-
-    trainer_callback_list = []
-    if track:
-        aim_callback = AimCallback(
-            repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
-            experiment=experiment_name,
-        )
-        trainer_callback_list.append(aim_callback)
 
     trainer = Trainer(
         model=model,

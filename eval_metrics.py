@@ -70,8 +70,6 @@ PropertyEntry = namedtuple(
     "PropertyEntry", ["name", "start_idx", "start_token_len", "prop_idx"]
 )
 
-pbar = None
-
 
 @torch.no_grad()
 def perplexity(logits: torch.Tensor, labels: torch.Tensor, base=2):
@@ -117,10 +115,12 @@ def process_property(start_ids, end_ids, start_brackets, end_brackets, logits, l
     return property_perp, property_count
 
 
+pbar = None
+
+
 @torch.no_grad()
 def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
     global pbar
-
     batch_size = labels.size(0)
 
     logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
