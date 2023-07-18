@@ -12,6 +12,8 @@ import yaml
 import argparse
 import glob
 import sys
+import hashlib
+import os
 
 
 def process_str(str):
@@ -45,7 +47,7 @@ def group_texts(examples):
         k: [
             t[i : i + train_config["block_size"]]  # noqa
             for i in range(0, total_length, train_config["block_size"])
-        ]  # noqa
+        ]
         for k, t in concatenated_examples.items()
     }
     result["labels"] = result["input_ids"].copy()
@@ -113,6 +115,15 @@ if __name__ == "__main__":
         default=32,
     )
     parser.add_argument(
+        "--experiment_name",
+        type=str,
+        metavar="EN",
+        dest="experiment_name",
+        required=False,
+        help="the name of the experiment",
+        default="none",
+    )
+    parser.add_argument(
         "--track",
         type=bool,
         metavar="TR",
@@ -122,17 +133,6 @@ if __name__ == "__main__":
         default=False,
         action=argparse.BooleanOptionalAction,
     )
-    parser.add_argument(
-        "--eval_accumulation_steps",
-        type=int,
-        metavar="EAS",
-        dest="eval_accumulation_steps",
-        required=False,
-        help="the number of steps after which to move \
-            the prediction tensor from GPU to CPU during the evaluation \
-            (specified to avoid OOM errors)",
-        default=2,
-    )
 
     args = parser.parse_args()
     model_type = args.model_type
@@ -140,8 +140,8 @@ if __name__ == "__main__":
     valid_data_dir = args.valid_data_dir
     max_steps = args.max_steps
     eval_steps = args.eval_steps
+    experiment_name = args.experiment_name
     track = args.track
-    eval_accumulation_steps = args.eval_accumulation_steps
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
@@ -150,13 +150,20 @@ if __name__ == "__main__":
         train_config = yaml.full_load(f_)[model_type]
 
     model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
+    experiment_name_hash = hashlib.md5(experiment_name.encode("utf-8")).hexdigest()
+    checkpoint_dir = f"/mnt/sxtn/chem/ChemLactica/checkpoints/ \
+                        galactica-{model_type}/{experiment_name_hash}"
+
+    if os.path.isfile(checkpoint_dir) and experiment_name != "none":
+        raise Exception(
+            f"The experiment name '{experiment_name}' already exists, please use a different one."
+        )
 
     model = load_model(model_type)
-    # print("number of parameters:", sum(p.numel() for p in model.parameters()))
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
-        output_dir=f"{model_checkpoint.split('/')[-1]}-finetuned-pubchem",
+        output_dir=checkpoint_dir,
         per_device_train_batch_size=train_config["batch_size"],
         per_device_eval_batch_size=train_config["batch_size"],
         learning_rate=train_config["max_learning_rate"],
@@ -184,27 +191,13 @@ if __name__ == "__main__":
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
 
-    # samples = 0
-    # for s in lm_datasets["validation"]:
-    #     print(tokenizer.decode(s["input_ids"]))
-    #     break
-    # pre, loss = model(**s)
-    # print(pre, loss)
-    # break
-    # tokenizer.encode(s)
-    # break
-
-    # print([tokenizer.decode(s) for s in tokenizer.encode("[SMILES_START] ljknasd [SMILES_END]")]
-    # print(tokenizer.encode("[START_SMILES]"))
-
     trainer_callback_list = []
     if track:
-        trainer_callback_list.append(
-            AimCallback(
-                repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
-                experiment="train with HDD",
-            )
+        aim_callback = AimCallback(
+            repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+            experiment=experiment_name,
         )
+        trainer_callback_list.append(aim_callback)
 
     trainer = Trainer(
         model=model,
