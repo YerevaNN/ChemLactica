@@ -5,13 +5,13 @@ from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from aim.hugging_face import AimCallback
 from text_format_utils import generate_formatted_string, delete_empty_tags
 import json
 import yaml
 import argparse
 import glob
 import sys
+from callbacks import CustomAimCallback
 
 
 def process_str(str):
@@ -45,7 +45,7 @@ def group_texts(examples):
         k: [
             t[i : i + train_config["block_size"]]  # noqa
             for i in range(0, total_length, train_config["block_size"])
-        ]  # noqa
+        ]
         for k, t in concatenated_examples.items()
     }
     result["labels"] = result["input_ids"].copy()
@@ -108,9 +108,43 @@ if __name__ == "__main__":
         type=int,
         metavar="ES",
         dest="eval_steps",
-        required=False,
+        required=True,
         help="the number of training steps after which to evaluate the model",
-        default=32,
+    )
+    parser.add_argument(
+        "--save_steps",
+        type=int,
+        metavar="SS",
+        dest="save_steps",
+        required=True,
+        help="the number of steps to save a model checkpoint",
+    )
+    parser.add_argument(
+        "--experiment_name",
+        type=str,
+        metavar="EN",
+        dest="experiment_name",
+        required=False,
+        help="the name of the experiment",
+        default="none",
+    )
+    parser.add_argument(
+        "--track_dir",
+        type=str,
+        metavar="ATD",
+        dest="track_dir",
+        required=False,
+        help="aim track directory",
+        default="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+    )
+    parser.add_argument(
+        "--checkpoints_root_dir",
+        type=str,
+        metavar="CSD",
+        dest="checkpoints_root_dir",
+        required=False,
+        help="directory where to save checkpoints",
+        default="/mnt/sxtn/chem/ChemLactica/checkpoints",
     )
     parser.add_argument(
         "--track",
@@ -122,17 +156,6 @@ if __name__ == "__main__":
         default=False,
         action=argparse.BooleanOptionalAction,
     )
-    parser.add_argument(
-        "--eval_accumulation_steps",
-        type=int,
-        metavar="EAS",
-        dest="eval_accumulation_steps",
-        required=False,
-        help="the number of steps after which to move \
-            the prediction tensor from GPU to CPU during the evaluation \
-            (specified to avoid OOM errors)",
-        default=2,
-    )
 
     args = parser.parse_args()
     model_type = args.model_type
@@ -140,8 +163,11 @@ if __name__ == "__main__":
     valid_data_dir = args.valid_data_dir
     max_steps = args.max_steps
     eval_steps = args.eval_steps
+    save_steps = args.save_steps
+    experiment_name = args.experiment_name
     track = args.track
-    eval_accumulation_steps = args.eval_accumulation_steps
+    track_dir = args.track_dir
+    checkpoints_root_dir = args.checkpoints_root_dir
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
@@ -149,14 +175,25 @@ if __name__ == "__main__":
     with open("models_train_config.yaml", "r") as f_:
         train_config = yaml.full_load(f_)[model_type]
 
+    experiment_hash = "none"
+    trainer_callback_list = []
+    if track:
+        aim_callback = CustomAimCallback(
+            checkpoints_dict_name="checkpoints_hashes",
+            repo=track_dir,
+            experiment=experiment_name,
+        )
+        experiment_hash = aim_callback._run_hash
+        trainer_callback_list.append(aim_callback)
+
     model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
+    checkpoints_dir = checkpoints_root_dir + f"galactica-{model_type}/{experiment_hash}"
 
     model = load_model(model_type)
-    # print("number of parameters:", sum(p.numel() for p in model.parameters()))
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
-        output_dir=f"{model_checkpoint.split('/')[-1]}-finetuned-pubchem",
+        output_dir=checkpoints_dir,
         per_device_train_batch_size=train_config["batch_size"],
         per_device_eval_batch_size=train_config["batch_size"],
         learning_rate=train_config["max_learning_rate"],
@@ -169,6 +206,7 @@ if __name__ == "__main__":
         evaluation_strategy="steps",
         eval_steps=eval_steps,
         max_steps=max_steps,
+        save_steps=save_steps,
     )
 
     dataset = load_dataset(
@@ -183,28 +221,6 @@ if __name__ == "__main__":
         tokenize_function, batched=True, remove_columns=["text"]
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
-
-    # samples = 0
-    # for s in lm_datasets["validation"]:
-    #     print(tokenizer.decode(s["input_ids"]))
-    #     break
-    # pre, loss = model(**s)
-    # print(pre, loss)
-    # break
-    # tokenizer.encode(s)
-    # break
-
-    # print([tokenizer.decode(s) for s in tokenizer.encode("[SMILES_START] ljknasd [SMILES_END]")]
-    # print(tokenizer.encode("[START_SMILES]"))
-
-    trainer_callback_list = []
-    if track:
-        trainer_callback_list.append(
-            AimCallback(
-                repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
-                experiment="train with HDD",
-            )
-        )
 
     trainer = Trainer(
         model=model,

@@ -169,3 +169,4 @@ cython_debug/
 
 # current checkpoint directories
 galactica-125m-finetuned-pubchem/
+galactica-small_opt/
