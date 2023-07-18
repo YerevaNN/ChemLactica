@@ -12,6 +12,7 @@ import argparse
 import glob
 import sys
 from callbacks import CustomAimCallback
+import os
 
 
 def process_str(str):
@@ -171,8 +172,13 @@ if __name__ == "__main__":
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
+    absolute_path = os.path.dirname(os.path.abspath(__file__))
+    print(absolute_path)
+    relative_path = "config/models_train_config.yaml"
 
-    with open("models_train_config.yaml", "r") as f_:
+    full_path = os.path.join(absolute_path, relative_path)
+
+    with open(full_path, "r") as f_:
         train_config = yaml.full_load(f_)[model_type]
 
     experiment_hash = "none"
