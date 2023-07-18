@@ -129,6 +129,24 @@ if __name__ == "__main__":
         default="none",
     )
     parser.add_argument(
+        "--track_dir",
+        type=str,
+        metavar="ATD",
+        dest="track_dir",
+        required=False,
+        help="aim track directory",
+        default="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+    )
+    parser.add_argument(
+        "--checkpoints_root_dir",
+        type=str,
+        metavar="CSD",
+        dest="checkpoints_root_dir",
+        required=False,
+        help="directory where to save checkpoints",
+        default="/mnt/sxtn/chem/ChemLactica/checkpoints",
+    )
+    parser.add_argument(
         "--track",
         type=bool,
         metavar="TR",
@@ -148,6 +166,8 @@ if __name__ == "__main__":
     save_steps = args.save_steps
     experiment_name = args.experiment_name
     track = args.track
+    track_dir = args.track_dir
+    checkpoints_root_dir = args.checkpoints_root_dir
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
@@ -160,23 +180,20 @@ if __name__ == "__main__":
     if track:
         aim_callback = CustomAimCallback(
             checkpoints_dict_name="checkpoints_hashes",
-            repo="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+            repo=track_dir,
             experiment=experiment_name,
         )
         experiment_hash = aim_callback._run_hash
         trainer_callback_list.append(aim_callback)
 
     model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
-    checkpoint_dir = (
-        "/mnt/sxtn/chem/ChemLactica/checkpoints/"
-        + f"galactica-{model_type}/{experiment_hash}"
-    )
+    checkpoints_dir = checkpoints_root_dir + f"galactica-{model_type}/{experiment_hash}"
 
     model = load_model(model_type)
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
-        output_dir=checkpoint_dir,
+        output_dir=checkpoints_dir,
         per_device_train_batch_size=train_config["batch_size"],
         per_device_eval_batch_size=train_config["batch_size"],
         learning_rate=train_config["max_learning_rate"],

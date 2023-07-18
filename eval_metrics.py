@@ -3,11 +3,12 @@ from transformers import AutoTokenizer
 import torch
 import torch.nn.functional as F
 from typing import List, Tuple
-import tqdm
 import math
+from utils import ProgressBar
 from collections import namedtuple
 
-# acc_metric = evaluate.load("accuracy")
+
+ProgressBar.set_total(22384)
 
 galactica_model_checkpoint = "facebook/galactica-125m"
 galactica_tokenizer = AutoTokenizer.from_pretrained(galactica_model_checkpoint)
@@ -126,8 +127,8 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
     logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
     labels = labels[..., 1:].contiguous().view(-1)
 
-    if pbar is None:
-        pbar = tqdm.tqdm(total=22384)
+    if ProgressBar.get_instance() is None:
+        ProgressBar()
 
     metrics_tensor = torch.zeros(2, len(property_names), device=labels.device)
     metrics_tensor[0][0] = perplexity(logits, labels)
@@ -199,7 +200,7 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
     #     metrics_tensor[0][i] = property_perp
     #     metrics_tensor[1][i] = property_count
 
-    pbar.update(batch_size)
+    ProgressBar.get_instance().update(batch_size)
 
     return metrics_tensor
 
@@ -208,7 +209,7 @@ def compute_metrics(eval_pred: transformers.EvalPrediction):
     global pbar
     logits, _ = torch.tensor(eval_pred.predictions), torch.tensor(eval_pred.label_ids)
 
-    pbar = None
+    ProgressBar.delete_instance()
     properties_perp = logits[::2].sum(axis=0)
     properties_count = logits[1::2].sum(axis=0)
     properties_count = torch.max(torch.ones_like(properties_count), properties_count)

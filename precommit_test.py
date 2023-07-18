@@ -9,7 +9,9 @@ class TestNetworkTraining(unittest.TestCase):
                 --training_data_dir .small_data/train \
                 --valid_data_dir .small_data/valid \
                 --max_steps 1 \
-                --eval_steps 1",
+                --eval_steps 1 \
+                --save_steps 1 \
+                --checkpoints_root_dir ./",
             shell=True,
             # stdout=subprocess.DEVNULL,
             # stderr=subprocess.DEVNULL,
