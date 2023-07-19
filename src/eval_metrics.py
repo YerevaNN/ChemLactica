@@ -84,44 +84,8 @@ def perplexity(logits: torch.Tensor, labels: torch.Tensor, base=2):
     return comp_perp.item()
 
 
-def process_property(start_ids, end_ids, start_brackets, end_brackets, logits, labels):
-    # be cautious, if the property is not detected in the sequence it will get 0 perplexity
-    property_perp = 0.0
-    property_count = 0
-
-    start_index = end_index = None
-
-    for i, s in enumerate(start_brackets):
-        if i + len(start_ids) < len(start_brackets) and torch.all(
-            labels[s : s + len(start_ids)] == start_ids  # noqa
-        ):
-            start_index = s + len(start_ids)
-            j = i
-            while j < len(end_brackets) and end_brackets[j] < start_index:
-                j += 1
-
-            if j < len(end_brackets):
-                end_index = end_brackets[j]
-                assert start_index < end_index
-                property_perp += perplexity(
-                    logits[start_index:end_index], labels[start_index:end_index]
-                )
-                print(
-                    galactica_tokenizer.decode(start_ids),
-                    galactica_tokenizer.decode(labels[start_index:end_index]),
-                )
-                property_count += 1
-                start_index = end_index = None
-
-    return property_perp, property_count
-
-
-pbar = None
-
-
 @torch.no_grad()
 def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
-    global pbar
     batch_size = labels.size(0)
 
     logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
@@ -172,41 +136,12 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
             )
             metrics_tensor[1][prop_idx] += 1
 
-    # start_brackets = torch.where(labels == text_to_ids["["][0])[0].to(
-    #     labels.device
-    # )
-    # end_brackets = torch.where(labels == text_to_ids["]"][0])[0].to(
-    #     labels.device
-    # )
-    # smiles_start_brackets = torch.where(
-    #     labels == text_to_ids["[START_SMILES]"][0]
-    # )[0].to(labels.device)
-    # smiles_end_brackets = torch.where(
-    #     labels == text_to_ids["[END_SMILES]"][0]
-    # )[0].to(labels.device)
-
-    # for i, (name, start_ids, end_ids) in enumerate(property_entries[1:], start=1):
-    #     property_perp, property_count = process_property(
-    #         start_ids.to(labels.device),
-    #         end_ids.to(labels.device),
-    #         # start_brackets if name != "SMILES" else smiles_start_brackets,
-    #         # end_brackets if name != "SMILES" else smiles_end_brackets,
-    #         start_brackets,
-    #         end_brackets,
-    #         logits,
-    #         labels,
-    #     )
-
-    #     metrics_tensor[0][i] = property_perp
-    #     metrics_tensor[1][i] = property_count
-
     ProgressBar.get_instance().update(batch_size)
 
     return metrics_tensor
 
 
 def compute_metrics(eval_pred: transformers.EvalPrediction):
-    global pbar
     logits, _ = torch.tensor(eval_pred.predictions), torch.tensor(eval_pred.label_ids)
 
     ProgressBar.delete_instance()

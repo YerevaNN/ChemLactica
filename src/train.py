@@ -12,6 +12,7 @@ import argparse
 import glob
 import sys
 from callbacks import CustomAimCallback
+import os
 
 
 def process_str(str):
@@ -171,25 +172,35 @@ if __name__ == "__main__":
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
+    absolute_path = os.path.dirname(os.path.abspath(__file__))
+    print(absolute_path)
+    relative_path = "config/models_train_config.yaml"
 
-    with open("models_train_config.yaml", "r") as f_:
+    full_path = os.path.join(absolute_path, relative_path)
+
+    with open(full_path, "r") as f_:
         train_config = yaml.full_load(f_)[model_type]
 
     experiment_hash = "none"
+
+    model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
+    model = load_model(model_type)
+
     trainer_callback_list = []
     if track:
         aim_callback = CustomAimCallback(
             checkpoints_dict_name="checkpoints_hashes",
             repo=track_dir,
             experiment=experiment_name,
+            model=model,
         )
         experiment_hash = aim_callback._run_hash
         trainer_callback_list.append(aim_callback)
 
-    model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
-    checkpoints_dir = checkpoints_root_dir + f"galactica-{model_type}/{experiment_hash}"
+    checkpoints_dir = os.path.join(
+        checkpoints_root_dir, f"galactica-{model_type}/{experiment_hash}"
+    )
 
-    model = load_model(model_type)
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
@@ -221,6 +232,15 @@ if __name__ == "__main__":
         tokenize_function, batched=True, remove_columns=["text"]
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
+
+    # train_count = 0
+    # for sample in lm_datasets["train"]:
+    #     train_count += 1
+    # valid_count = 0
+    # for sample in lm_datasets["validation"]:
+    #     valid_count += 1
+
+    # print("train", train_count, "valid", valid_count)
 
     trainer = Trainer(
         model=model,
