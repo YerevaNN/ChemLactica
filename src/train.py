@@ -193,7 +193,9 @@ if __name__ == "__main__":
         trainer_callback_list.append(aim_callback)
 
     model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
-    checkpoints_dir = checkpoints_root_dir + f"galactica-{model_type}/{experiment_hash}"
+    checkpoints_dir = os.path.join(
+        checkpoints_root_dir, f"galactica-{model_type}/{experiment_hash}"
+    )
 
     model = load_model(model_type)
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
@@ -227,6 +229,15 @@ if __name__ == "__main__":
         tokenize_function, batched=True, remove_columns=["text"]
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
+
+    # train_count = 0
+    # for sample in lm_datasets["train"]:
+    #     train_count += 1
+    # valid_count = 0
+    # for sample in lm_datasets["validation"]:
+    #     valid_count += 1
+
+    # print("train", train_count, "valid", valid_count)
 
     trainer = Trainer(
         model=model,
