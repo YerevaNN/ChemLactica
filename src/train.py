@@ -182,22 +182,25 @@ if __name__ == "__main__":
         train_config = yaml.full_load(f_)[model_type]
 
     experiment_hash = "none"
+
+    model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
+    model = load_model(model_type)
+
     trainer_callback_list = []
     if track:
         aim_callback = CustomAimCallback(
             checkpoints_dict_name="checkpoints_hashes",
             repo=track_dir,
             experiment=experiment_name,
+            model=model,
         )
         experiment_hash = aim_callback._run_hash
         trainer_callback_list.append(aim_callback)
 
-    model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, f"galactica-{model_type}/{experiment_hash}"
     )
 
-    model = load_model(model_type)
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
