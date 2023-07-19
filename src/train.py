@@ -121,6 +121,14 @@ if __name__ == "__main__":
         help="the number of steps to save a model checkpoint",
     )
     parser.add_argument(
+        "--blocksize",
+        type=int,
+        dest="blocksize",
+        required=False,
+        default=2048,
+        help="the number of count of checkpoint a model checkpoint",
+    )
+    parser.add_argument(
         "--experiment_name",
         type=str,
         metavar="EN",
@@ -167,6 +175,7 @@ if __name__ == "__main__":
     save_steps = args.save_steps
     experiment_name = args.experiment_name
     track = args.track
+    blocksize = args.blocksize
     track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
 
@@ -193,7 +202,9 @@ if __name__ == "__main__":
             repo=track_dir,
             experiment=experiment_name,
             model=model,
+            blocksize=2048
         )
+        
         experiment_hash = aim_callback._run_hash
         trainer_callback_list.append(aim_callback)
 
