@@ -1,8 +1,5 @@
 import transformers
-from typing import Optional
-from transformers import AutoTokenizer
-from transformers import AutoModelForCausalLM
-from transformers import Trainer, TrainingArguments
+from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
@@ -14,6 +11,7 @@ import glob
 import sys
 from callbacks import CustomAimCallback
 import os
+from custom_trainer import CustomTrainer
 
 
 def process_str(str):
@@ -257,13 +255,6 @@ if __name__ == "__main__":
     #     valid_count += 1
 
     # print("train", train_count, "valid", valid_count)
-    class CustomTrainer(Trainer):
-        def save_model(
-            self, output_dir: Optional[str] = None, _internal_call: bool = False
-        ):
-            self.model = self.model.reverse_bettertransformer()
-            super().save_model(output_dir)
-
     trainer = CustomTrainer(
         model=model,
         args=training_args,
