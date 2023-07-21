@@ -194,6 +194,9 @@ if __name__ == "__main__":
 
     model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
     model = load_model(model_type)
+    model = (
+        model.to_bettertransformer()
+    )  # Converts the model to use PyTorch’s native attention implementation
 
     trainer_callback_list = []
     if track:
@@ -202,9 +205,9 @@ if __name__ == "__main__":
             repo=track_dir,
             experiment=experiment_name,
             model=model,
-            blocksize=2048
+            blocksize=2048,
         )
-        
+
         experiment_hash = aim_callback._run_hash
         trainer_callback_list.append(aim_callback)
 
@@ -229,7 +232,7 @@ if __name__ == "__main__":
         eval_steps=eval_steps,
         max_steps=max_steps,
         save_steps=save_steps,
-        dataloader_pin_memory=True
+        dataloader_pin_memory=True,
     )
 
     dataset = load_dataset(
