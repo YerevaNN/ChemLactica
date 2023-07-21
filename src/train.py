@@ -229,6 +229,7 @@ if __name__ == "__main__":
         eval_steps=eval_steps,
         max_steps=max_steps,
         save_steps=save_steps,
+        dataloader_pin_memory=True
     )
 
     dataset = load_dataset(
