@@ -36,10 +36,8 @@ class CustomAimCallback(AimCallback):
                 file_path
             )
         self._run[self._checkpoints_dict_name] = checkpoints_dict
-
-    def on_train_begin(self, args, state, control, **kwargs):
-        super().on_train_begin(args, state, control, **kwargs)
-        self.start_time = time.time()
+    def on_step_begin(self, args, state, control, **kwargs):
+        self.start_time = time.time()    
 
     def on_step_end(self, args, state, control, **kwargs):
         # Get batch size (first dimension of inputs)
@@ -62,5 +60,4 @@ class CustomAimCallback(AimCallback):
         elapsed_time = time.time() - self.start_time  # Calculate words per second
         words_per_second = num_words / elapsed_time
         self.experiment.track(words_per_second, name="words per second")
-        words_per_batch = num_words / batch_size
-        self.experiment.track(words_per_batch, name="words per batch")
+    
