@@ -1,56 +1,16 @@
 import transformers
-from transformers import AutoTokenizer
-from transformers import AutoModelForCausalLM
-from transformers import Trainer, TrainingArguments
+from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from text_format_utils import generate_formatted_string, delete_empty_tags
-import json
 import yaml
 import argparse
 import glob
 import sys
 from callbacks import CustomAimCallback
 import os
-
-
-def process_str(str):
-    # it's wierd workaround but works for now
-    # st = str["text"].replace("\\", "")
-    # print('ST IS    :   ',st)
-    compound = json.loads(json.loads((str["text"])))
-    str["text"] = delete_empty_tags(compound)
-    str["text"] = generate_formatted_string(compound)
-    # print(str['text'])
-    # print('***************')
-    # print(type(str['text']))
-    return str
-
-
-def tokenize_function(examples):
-    return tokenizer(examples["text"])
-
-
-def group_texts(examples):
-    # Concatenate all texts.
-    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
-    total_length = len(concatenated_examples[list(examples.keys())[0]])
-    # We drop the small remainder,
-    # we could add padding if the model supported it instead of this drop.
-    total_length = (total_length // train_config["block_size"]) * train_config[
-        "block_size"
-    ]
-    # Split by chunks of max_len.
-    result = {
-        k: [
-            t[i : i + train_config["block_size"]]  # noqa
-            for i in range(0, total_length, train_config["block_size"])
-        ]
-        for k, t in concatenated_examples.items()
-    }
-    result["labels"] = result["input_ids"].copy()
-    return result
+from custom_trainer import CustomTrainer
+from dataset_utils import process_dataset
 
 
 def load_model(model_type: str):
@@ -204,6 +164,9 @@ if __name__ == "__main__":
     model_checkpoint = f"facebook/galactica-{model_config}"
     model = load_model(from_pretrained)
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+    model = (
+        model.to_bettertransformer()
+    )  # Converts the model to use PyTorch’s native attention implementation
 
     trainer_callback_list = []
     if track:
@@ -237,6 +200,7 @@ if __name__ == "__main__":
         eval_steps=eval_steps,
         max_steps=max_steps,
         save_steps=save_steps,
+        dataloader_pin_memory=True,
     )
 
     dataset = load_dataset(
@@ -245,19 +209,16 @@ if __name__ == "__main__":
         streaming=True,
     )
 
-    dataset = dataset.map(process_str)
-
-    tokenized_datasets = dataset.map(
-        tokenize_function, batched=True, remove_columns=["text"]
+    processed_dataset = process_dataset(
+        dataset=dataset, tokenizer=tokenizer, train_config=train_config
     )
-    lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
 
-    trainer = Trainer(
+    trainer = CustomTrainer(
         model=model,
         args=training_args,
         compute_metrics=compute_metrics,
-        train_dataset=lm_datasets["train"],
-        eval_dataset=lm_datasets["validation"],
+        train_dataset=processed_dataset["train"],
+        eval_dataset=processed_dataset["validation"],
         callbacks=trainer_callback_list,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
