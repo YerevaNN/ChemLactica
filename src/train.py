@@ -30,6 +30,27 @@ def load_model(from_pretrained: str):
     return AutoModelForCausalLM.from_pretrained(from_pretrained)
 
 
+def group_texts(examples):
+    # Concatenate all texts.
+    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+    total_length = len(concatenated_examples[list(examples.keys())[0]])
+    # We drop the small remainder,
+    # we could add padding if the model supported it instead of this drop.
+    total_length = (total_length // train_config["block_size"]) * train_config[
+        "block_size"
+    ]
+    # Split by chunks of max_len.
+    result = {
+        k: [
+            t[i : i + train_config["block_size"]]  # noqa
+            for i in range(0, total_length, train_config["block_size"])
+        ]
+        for k, t in concatenated_examples.items()
+    }
+    result["labels"] = result["input_ids"].copy()
+    return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="none")
 
@@ -228,6 +249,13 @@ if __name__ == "__main__":
         dataset=dataset, tokenizer=tokenizer, train_config=train_config
     )
 
+    # 45637
+
+    # samples = 0
+    # for _ in processed_dataset["validation"]:
+    #     samples += 1
+    # print("Number of samples", samples)
+
     trainer = CustomTrainer(
         model=model,
         args=training_args,
@@ -238,6 +266,6 @@ if __name__ == "__main__":
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
-    trainer.train()
+    # trainer.train()
 
     sys.exit(0)  # explositly set exit code to 0 when succesfully termitating

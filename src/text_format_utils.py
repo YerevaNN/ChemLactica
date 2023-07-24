@@ -31,9 +31,14 @@ def format_key_value(key, value):
         start = SPECIAL_TAGS[key]["start"]
         end = SPECIAL_TAGS[key]["end"]
         return f"{start}{value}{end}"
-    else:
-        upper_key = key.upper()
-        return f"[{upper_key} {value}]"
+
+    start = f"[{key.upper()}"
+    end = "]"
+
+    if type(value) == list:
+        value = f"[{''.join([format_key_value(k, v) for e in value for k, v in e.items()])}]"
+
+    return f"{start} {value}{end}"
 
 
 def main():

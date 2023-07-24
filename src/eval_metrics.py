@@ -92,6 +92,10 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
 
     logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
     labels = labels[..., 1:].contiguous().view(-1)
+
+    # print("input:", CustomTokenizer.get_instance().decode(labels))
+    print(batch_size)
+
     property_entries = get_property_entries()
 
     if ProgressBar.get_instance() is None:
