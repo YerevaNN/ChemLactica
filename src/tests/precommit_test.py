@@ -16,13 +16,17 @@ class TestNetworkTraining(unittest.TestCase):
             script_path, "..", "..", ".small_data", "valid"
         )
         executed_prog = subprocess.run(
-            f"python3 {train_script_path} --model_type small_opt \
+            f"python3 {train_script_path} \
+                --from_pretrained small_opt \
+                --model_config small_opt \
                 --training_data_dir {training_data_dir_path} \
                 --valid_data_dir {valid_data_dir_path} \
                 --max_steps 1 \
                 --eval_steps 1 \
                 --save_steps 1 \
-                --checkpoints_root_dir ./",
+                --tokenizer 125m \
+                --checkpoints_root_dir ./ \
+                --tokenizer_checkpoint facebook/galactica-125m ",
             shell=True,
             # stdout=subprocess.DEVNULL,
             # stderr=subprocess.DEVNULL,

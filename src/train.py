@@ -13,8 +13,8 @@ from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 
 
-def load_model(model_type: str):
-    if model_type == "small_opt":
+def load_model(from_pretrained: str):
+    if from_pretrained == "small_opt":
         return transformers.OPTForCausalLM(
             transformers.OPTConfig(
                 vocab_size=train_config["vocab_size"],
@@ -26,19 +26,27 @@ def load_model(model_type: str):
                 word_embed_proj_dim=train_config["word_embed_proj_dim"],
             )
         )
-    return AutoModelForCausalLM.from_pretrained(model_checkpoint)
+    return AutoModelForCausalLM.from_pretrained(from_pretrained)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="none")
 
     parser.add_argument(
-        "--model_type",
+        "--from_pretrained",
         type=str,
-        metavar="MT",
-        dest="model_type",
+        metavar="FP",
+        dest="from_pretrained",
         required=True,
-        help="the type of the model (depending on param size)",
+        help="the path to the model dir",
+    )
+    parser.add_argument(
+        "--model_config",
+        type=str,
+        metavar="MC",
+        dest="model_config",
+        required=True,
+        help="the galactica configuration to use",
     )
     parser.add_argument(
         "--training_data_dir",
@@ -125,9 +133,19 @@ if __name__ == "__main__":
         default=False,
         action=argparse.BooleanOptionalAction,
     )
+    parser.add_argument(
+        "--tokenizer_checkpoint",
+        type=str,
+        metavar="TC",
+        dest="tokenizer_checkpoint",
+        required=False,
+        help="tokenizer checkpoint name",
+        default=None,
+    )
 
     args = parser.parse_args()
-    model_type = args.model_type
+    from_pretrained = args.from_pretrained
+    model_config = args.model_config
     training_data_dir = args.training_data_dir
     valid_data_dir = args.valid_data_dir
     max_steps = args.max_steps
@@ -138,6 +156,9 @@ if __name__ == "__main__":
     blocksize = args.blocksize
     track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
+    tokenizer_checkpoint = (
+        args.tokenizer_checkpoint if args.tokenizer_checkpoint else from_pretrained
+    )
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
@@ -148,12 +169,13 @@ if __name__ == "__main__":
     full_path = os.path.join(absolute_path, relative_path)
 
     with open(full_path, "r") as f_:
-        train_config = yaml.full_load(f_)[model_type]
+        full_file = yaml.full_load(f_)
+        train_config = full_file[model_config]
 
     experiment_hash = "none"
 
-    model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
-    model = load_model(model_type)
+    model = load_model(from_pretrained)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
     model = (
         model.to_bettertransformer()
     )  # Converts the model to use PyTorch’s native attention implementation
@@ -172,10 +194,8 @@ if __name__ == "__main__":
         trainer_callback_list.append(aim_callback)
 
     checkpoints_dir = os.path.join(
-        checkpoints_root_dir, f"galactica-{model_type}/{experiment_hash}"
+        checkpoints_root_dir, from_pretrained, experiment_hash
     )
-
-    tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,

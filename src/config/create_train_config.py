@@ -3,7 +3,6 @@ import yaml
 
 model_train_configs = {
     "125m": {
-        "name_suffix": "125m",
         "n_layers": 12,
         "d_model": 768,
         "n_heads": 12,
@@ -22,7 +21,6 @@ model_train_configs = {
         "learning_rate_decay": 0.1,
     },
     "1.3b": {
-        "name_suffix": "1.3b",
         "n_layers": 24,
         "d_model": 2048,
         "n_heads": 32,
@@ -40,7 +38,6 @@ model_train_configs = {
         "learning_rate_decay": 0.1,
     },
     "6.7b": {
-        "name_suffix": "6.7b",
         "n_layers": 32,
         "d_model": 4096,
         "n_heads": 32,
@@ -58,7 +55,6 @@ model_train_configs = {
         "learning_rate_decay": 0.1,
     },
     "small_opt": {
-        "name_suffix": "125m",
         "hidden_size": 16,
         "num_hidden_layers": 1,
         "ffn_dim": 16,
