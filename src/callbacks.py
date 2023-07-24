@@ -61,4 +61,6 @@ class CustomAimCallback(AimCallback):
         # Calculate time taken for this step
         elapsed_time = time.time() - self.start_time  # Calculate words per second
         words_per_second = num_words / elapsed_time
-        self.experiment.track(words_per_second, name="words_per_second")
+        self.experiment.track(words_per_second, name="words per second")
+        words_per_batch = num_words / batch_size
+        self.experiment.track(words_per_batch, name="words per batch")
