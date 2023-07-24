@@ -11,6 +11,7 @@ from callbacks import CustomAimCallback
 import os
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
+from utils import CustomTokenizer
 
 
 def load_model(from_pretrained: str):
@@ -175,7 +176,9 @@ if __name__ == "__main__":
     experiment_hash = "none"
 
     model = load_model(from_pretrained)
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
+    tokenizer = CustomTokenizer(
+        instance=AutoTokenizer.from_pretrained(tokenizer_checkpoint)
+    ).get_instance()
     model = (
         model.to_bettertransformer()
     )  # Converts the model to use PyTorch’s native attention implementation

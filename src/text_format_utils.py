@@ -1,11 +1,8 @@
 import random
 import time
-from transformers import AutoTokenizer
+from utils import CustomTokenizer
 
 SPECIAL_TAGS = {"SMILES": {"start": "[START_SMILES] ", "end": " [END_SMILES]"}}
-
-galactica_model_checkpoint = "facebook/galactica-125m"
-galactica_tokenizer = AutoTokenizer.from_pretrained(galactica_model_checkpoint)
 
 
 def delete_empty_tags(compound_json):
@@ -16,14 +13,16 @@ def delete_empty_tags(compound_json):
 
 
 def generate_formatted_string(compound_json):
-    key_value_pairs = list()
+    key_value_pairs = []
     if random.random() < 0.5:
         key = "SMILES"
         key_value_pairs.append(format_key_value(key, compound_json[key]))
         del compound_json["SMILES"]
     for key in random.sample(list(compound_json.keys()), len(compound_json.keys())):
         key_value_pairs.append(format_key_value(key, compound_json[key]))
-    compound_formatted_string = "<s>" + "".join(key_value_pairs) + "</s>"
+    compound_formatted_string = (
+        "".join(key_value_pairs) + CustomTokenizer.get_instance().eos_token
+    )
     return compound_formatted_string
 
 

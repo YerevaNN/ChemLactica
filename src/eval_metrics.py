@@ -1,17 +1,18 @@
 import transformers
-from transformers import AutoTokenizer
 import torch
 import torch.nn.functional as F
 from typing import List, Tuple
 import math
-from utils import ProgressBar
+from utils import ProgressBar, CustomTokenizer
 from collections import namedtuple
 
 
 ProgressBar.set_total(22384)
 
-galactica_model_checkpoint = "facebook/galactica-125m"
-galactica_tokenizer = AutoTokenizer.from_pretrained(galactica_model_checkpoint)
+
+PropertyEntry = namedtuple(
+    "PropertyEntry", ["name", "start_idx", "start_token_len", "prop_idx"]
+)
 
 property_names = (
     # "name",
@@ -48,28 +49,29 @@ property_names = (
     "SYNONYMS",
 )
 
-text_to_ids = {
-    v: torch.tensor(galactica_tokenizer.encode(v), dtype=torch.int32)
-    for v in ["[START_SMILES]", "[END_SMILES]", "[", "]", "<pad>"]
-}
 
-property_entries: List[Tuple] = [
-    (
-        n,
-        torch.tensor(galactica_tokenizer.encode(f"[{n}"), dtype=torch.int32),
-        text_to_ids["]"],
+def construct_prop_entries():
+    property_entries: List[Tuple] = [
+        (
+            n,
+            torch.tensor(
+                CustomTokenizer.get_instance().encode(f"[{n}"), dtype=torch.int32
+            ),
+            CustomTokenizer.precomuted_ids["]"],
+        )
+        for n in property_names
+    ]
+
+    property_entries[1] = (
+        "SMILES",
+        CustomTokenizer.precomuted_ids["[START_SMILES]"],
+        CustomTokenizer.precomuted_ids["[END_SMILES]"],
     )
-    for n in property_names
-]
-property_entries[1] = (
-    "SMILES",
-    text_to_ids["[START_SMILES]"],
-    text_to_ids["[END_SMILES]"],
-)
+    return property_entries
 
-PropertyEntry = namedtuple(
-    "PropertyEntry", ["name", "start_idx", "start_token_len", "prop_idx"]
-)
+
+def get_property_entries():
+    return getattr(get_property_entries, "property_entires", construct_prop_entries())
 
 
 @torch.no_grad()
@@ -78,7 +80,7 @@ def perplexity(logits: torch.Tensor, labels: torch.Tensor, base=2):
     labels = labels.view(-1)
 
     loss = F.cross_entropy(logits, labels, reduction="none")
-    pad_mask = labels != text_to_ids["<pad>"][0]
+    pad_mask = labels != CustomTokenizer.precomuted_ids["<pad>"][0]
     loss = loss * pad_mask  # ignore pad tokens
     comp_perp = base ** (loss.sum() / pad_mask.sum() / math.log(2))
     return comp_perp.item()
@@ -90,6 +92,7 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
 
     logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
     labels = labels[..., 1:].contiguous().view(-1)
+    property_entries = get_property_entries()
 
     if ProgressBar.get_instance() is None:
         ProgressBar()
@@ -100,7 +103,8 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
 
     start_brackets = torch.where(
         torch.bitwise_or(
-            labels == text_to_ids["["][0], labels == text_to_ids["[START_SMILES]"][0]
+            labels == CustomTokenizer.precomuted_ids["["][0],
+            labels == CustomTokenizer.precomuted_ids["[START_SMILES]"][0],
         )
     )[0].to(labels.device)
     start_brackets = torch.cat(

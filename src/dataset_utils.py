@@ -8,14 +8,9 @@ def tokenize_function(examples, tokenizer):
 
 def process_str(str):
     # it's wierd workaround but works for now
-    # st = str["text"].replace("\\", "")
-    # print('ST IS    :   ',st)
     compound = json.loads(json.loads((str["text"])))
     str["text"] = delete_empty_tags(compound)
     str["text"] = generate_formatted_string(compound)
-    # print(str['text'])
-    # print('***************')
-    # print(type(str['text']))
     return str
 
 

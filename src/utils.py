@@ -1,4 +1,28 @@
 import tqdm
+import torch
+
+
+class CustomTokenizer:
+    __instance = None
+    precomuted_ids = {}
+
+    def __init__(self, instance):
+        if CustomTokenizer.__instance is not None:
+            raise Exception(f"There can only be one instance of {__class__.__name__}")
+        CustomTokenizer.__instance = instance
+
+        CustomTokenizer.__instance.bos_token = "<s>"
+        CustomTokenizer.__instance.bos_token_id = 0
+        CustomTokenizer.__instance.eos_token = "</s>"
+        CustomTokenizer.__instance.eos_token_id = 2
+        CustomTokenizer.precomuted_ids = {
+            v: torch.tensor(CustomTokenizer.__instance.encode(v), dtype=torch.int32)
+            for v in ["[START_SMILES]", "[END_SMILES]", "[", "]", "<pad>"]
+        }
+
+    @staticmethod
+    def get_instance():
+        return CustomTokenizer.__instance
 
 
 class ProgressBar(tqdm.tqdm):
