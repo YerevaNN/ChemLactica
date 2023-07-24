@@ -73,12 +73,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="none")
 
     parser.add_argument(
-        "--model_type",
+        "--from_pretrained",
         type=str,
-        metavar="MT",
-        dest="model_type",
+        metavar="FP",
+        dest="from_pretrained",
         required=True,
-        help="the type of the model (depending on param size)",
+        help="the path to the model dir",
+    )
+    parser.add_argument(
+        "--model_config",
+        type=str,
+        metavar="MC",
+        dest="model_config",
+        required=True,
+        help="the galactica configuration to use",
     )
     parser.add_argument(
         "--training_data_dir",
@@ -167,7 +175,8 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    model_type = args.model_type
+    from_pretrained = args.from_pretrained
+    model_config = args.model_config
     training_data_dir = args.training_data_dir
     valid_data_dir = args.valid_data_dir
     max_steps = args.max_steps
@@ -188,12 +197,13 @@ if __name__ == "__main__":
     full_path = os.path.join(absolute_path, relative_path)
 
     with open(full_path, "r") as f_:
-        train_config = yaml.full_load(f_)[model_type]
+        train_config = yaml.full_load(f_)[model_config]
 
     experiment_hash = "none"
 
-    model_checkpoint = f"facebook/galactica-{train_config['name_suffix']}"
-    model = load_model(model_type)
+    model_checkpoint = f"facebook/galactica-{model_config}"
+    model = load_model(from_pretrained)
+    tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     trainer_callback_list = []
     if track:
@@ -202,17 +212,15 @@ if __name__ == "__main__":
             repo=track_dir,
             experiment=experiment_name,
             model=model,
-            blocksize=2048
+            blocksize=2048,
         )
-        
+
         experiment_hash = aim_callback._run_hash
         trainer_callback_list.append(aim_callback)
 
     checkpoints_dir = os.path.join(
-        checkpoints_root_dir, f"galactica-{model_type}/{experiment_hash}"
+        checkpoints_root_dir, from_pretrained, experiment_hash
     )
-
-    tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,
@@ -243,15 +251,6 @@ if __name__ == "__main__":
         tokenize_function, batched=True, remove_columns=["text"]
     )
     lm_datasets = tokenized_datasets.map(group_texts, batched=True, batch_size=1000)
-
-    # train_count = 0
-    # for sample in lm_datasets["train"]:
-    #     train_count += 1
-    # valid_count = 0
-    # for sample in lm_datasets["validation"]:
-    #     valid_count += 1
-
-    # print("train", train_count, "valid", valid_count)
 
     trainer = Trainer(
         model=model,

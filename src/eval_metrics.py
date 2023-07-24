@@ -129,13 +129,10 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
         start_idx += start_token_len
         end_idx -= 1
         if start_idx < end_idx:
-            # print(name, galactica_tokenizer.decode(labels[start_idx:end_idx]))
             metrics_tensor[0][prop_idx] += perplexity(
                 logits[start_idx:end_idx], labels[start_idx:end_idx]
             )
             metrics_tensor[1][prop_idx] += 1
-        else:
-            metrics_tensor[0][prop_idx] += 0
 
     ProgressBar.get_instance().update(batch_size)
 
