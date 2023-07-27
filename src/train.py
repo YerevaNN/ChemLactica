@@ -125,12 +125,12 @@ if __name__ == "__main__":
         default="/mnt/sxtn/chem/ChemLactica/checkpoints",
     )
     parser.add_argument(
-        "--track",
+        "--no_track",
         type=bool,
-        metavar="TR",
-        dest="track",
+        metavar="NT",
+        dest="no_track",
         required=False,
-        help="weather or not track the trainig using aim",
+        help="whether or not track the training using aim",
         default=False,
         action=argparse.BooleanOptionalAction,
     )
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     eval_steps = args.eval_steps
     save_steps = args.save_steps
     experiment_name = args.experiment_name
-    track = args.track
+    no_track = args.no_track
     blocksize = args.blocksize
     track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
@@ -184,7 +184,7 @@ if __name__ == "__main__":
     )  # Converts the model to use PyTorch’s native attention implementation
 
     trainer_callback_list = []
-    if track:
+    if not no_track:
         aim_callback = CustomAimCallback(
             checkpoints_dict_name="checkpoints_hashes",
             repo=track_dir,
