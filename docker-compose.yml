@@ -1,0 +1,15 @@
+version: '3'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ${TRAINING_DATA_DIR}:${TRAINING_DATA_DIR}
+      - ${VALID_DATA_DIR}:${VALID_DATA_DIR}
+      - ${TRACK_DIR}:${TRACK_DIR}
+    environment:
+      - TRAINING_DATA_DIR
+      - VALID_DATA_DIR
+      - TRACK_DIR
+    command: ["python3", "src/train.py", "--model_type", "125m", "--training_data_dir", "${TRAINING_DATA_DIR}", "--valid_data_dir", "${VALID_DATA_DIR}", "--max_steps", "131072", "--eval_steps", "1024", "--save_steps", "128", "--experiment_name", "\"myname\"", "--track_dir", "${TRACK_DIR}"]
