@@ -211,7 +211,7 @@ if __name__ == "__main__":
             repo=track_dir,
             experiment=experiment_name,
             model=model,
-            blocksize=2048,
+            blocksize=train_config["block_size"],
         )
 
         experiment_hash = aim_callback._run_hash
@@ -249,13 +249,6 @@ if __name__ == "__main__":
         dataset=dataset, tokenizer=tokenizer, train_config=train_config
     )
 
-    # 45637
-
-    # samples = 0
-    # for _ in processed_dataset["validation"]:
-    #     samples += 1
-    # print("Number of samples", samples)
-
     trainer = CustomTrainer(
         model=model,
         args=training_args,
@@ -266,6 +259,6 @@ if __name__ == "__main__":
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
-    # trainer.train()
+    trainer.train()
 
     sys.exit(0)  # explositly set exit code to 0 when succesfully termitating
