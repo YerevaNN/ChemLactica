@@ -237,6 +237,7 @@ if __name__ == "__main__":
         save_steps=save_steps,
         dataloader_pin_memory=True,
         torch_compile=True,
+        dataloader_num_workers=8,
     )
 
     dataset = load_dataset(

@@ -55,7 +55,7 @@ def process_dataset(dataset, tokenizer, train_config):
     lm_datasets = tokenized_datasets.map(
         group_texts,
         batched=True,
-        batch_size=1000,
+        batch_size=100,
         fn_kwargs={"train_config": train_config},
     )
     return lm_datasets
