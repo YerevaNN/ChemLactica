@@ -153,7 +153,6 @@ if __name__ == "__main__":
         required=False,
         help="whether or not track the training using aim",
         default=False,
-        action=argparse.BooleanOptionalAction,
     )
     parser.add_argument(
         "--tokenizer_checkpoint",
