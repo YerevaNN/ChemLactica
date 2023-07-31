@@ -77,6 +77,7 @@ model_train_configs = {
 
 # manual changes
 model_train_configs["125m"]["batch_size"] = 4
+model_train_configs["1.3b"]["batch_size"] = 1
 
 for key in model_train_configs.keys():
     model_train_configs[key]["max_learning_rate"] *= 0.08

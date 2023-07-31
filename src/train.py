@@ -9,7 +9,8 @@ import glob
 import sys
 from callbacks import CustomAimCallback
 import os
-from custom_trainer import CustomTrainer
+
+# from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from utils import CustomTokenizer
 
@@ -179,10 +180,10 @@ if __name__ == "__main__":
     tokenizer = CustomTokenizer(
         instance=AutoTokenizer.from_pretrained(tokenizer_checkpoint)
     ).get_instance()
-    model = (
-        model.to_bettertransformer()
-    )  # Converts the model to use PyTorch’s native attention implementation
-
+    # model = (
+    #     model.to_bettertransformer()
+    # )  # Converts the model to use PyTorch’s native attention implementation
+    print("batch size", train_config["batch_size"])
     trainer_callback_list = []
     if track:
         aim_callback = CustomAimCallback(
@@ -227,8 +228,7 @@ if __name__ == "__main__":
     processed_dataset = process_dataset(
         dataset=dataset, tokenizer=tokenizer, train_config=train_config
     )
-
-    trainer = CustomTrainer(
+    trainer = transformers.Trainer(
         model=model,
         args=training_args,
         compute_metrics=compute_metrics,
