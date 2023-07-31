@@ -4,6 +4,7 @@ aim-ui==3.17.5
 aimrecords==0.0.7
 aimrocks==0.4.0
 aiofiles==23.1.0
+tqdm
 aiohttp==3.8.4
 aiosignal==1.3.1
 alembic==1.11.1
@@ -12,19 +13,14 @@ async-timeout==4.0.2
 attrs==23.1.0
 backoff==2.2.1
 base58==2.0.1
-boltons @ file:///croot/boltons_1677628692245/work
 brotlipy==0.7.0
 cachetools==5.3.1
 certifi==2023.7.22
-cffi @ file:///croot/cffi_1670423208954/work
 cfgv==3.3.1
 charset-normalizer==3.1.0
 click==8.1.3
 cmake==3.26.4
 coloredlogs==15.0.1
-conda @ file:///croot/conda_1685025188142/work
-conda-package-handling @ file:///croot/conda-package-handling_1685024767917/work
-conda_package_streaming @ file:///croot/conda-package-streaming_1685019673878/work
 cryptography==41.0.1
 datasets==2.13.0
 dill==0.3.6
@@ -41,7 +37,6 @@ h11==0.14.0
 huggingface-hub==0.15.1
 humanfriendly==10.0
 identify==2.5.24
-idna @ file:///croot/idna_1666125576474/work
 importlib-metadata==6.8.0
 importlib-resources==6.0.0
 Jinja2==3.1.2
@@ -80,16 +75,12 @@ protobuf==3.20.3
 psutil==5.9.5
 py3nvml==0.2.7
 pyarrow==12.0.1
-pycosat @ file:///croot/pycosat_1666805502580/work
-pycparser @ file:///tmp/build/80754af9/pycparser_1636541352034/work
 pydantic==1.10.9
 pyOpenSSL==23.2.0
-PySocks @ file:///tmp/build/80754af9/pysocks_1605305779399/work
 python-dateutil==2.8.2
 pytz==2023.3
 PyYAML==6.0
 regex==2023.6.3
-requests @ file:///croot/requests_1690400202158/work
 responses==0.18.0
 RestrictedPython==6.0
 ruamel.yaml==0.17.32
@@ -106,9 +97,7 @@ starlette==0.27.0
 sympy==1.12
 threadpoolctl==3.1.0
 tokenizers==0.13.3
-toolz @ file:///croot/toolz_1667464077321/work
 torch==2.0.1
-tqdm @ file:///croot/tqdm_1679561862951/work
 transformers==4.30.2
 triton==2.0.0
 typing_extensions==4.6.3
