@@ -1,8 +1,8 @@
+from config.create_train_config import model_train_configs
 import transformers
 from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-import yaml
 import argparse
 import glob
 import sys
@@ -28,6 +28,27 @@ def load_model(from_pretrained: str):
             )
         )
     return AutoModelForCausalLM.from_pretrained(from_pretrained)
+
+
+def group_texts(examples):
+    # Concatenate all texts.
+    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+    total_length = len(concatenated_examples[list(examples.keys())[0]])
+    # We drop the small remainder,
+    # we could add padding if the model supported it instead of this drop.
+    total_length = (total_length // train_config["block_size"]) * train_config[
+        "block_size"
+    ]
+    # Split by chunks of max_len.
+    result = {
+        k: [
+            t[i : i + train_config["block_size"]]  # noqa
+            for i in range(0, total_length, train_config["block_size"])
+        ]
+        for k, t in concatenated_examples.items()
+    }
+    result["labels"] = result["input_ids"].copy()
+    return result
 
 
 if __name__ == "__main__":
@@ -125,14 +146,13 @@ if __name__ == "__main__":
         default="/mnt/sxtn/chem/ChemLactica/checkpoints",
     )
     parser.add_argument(
-        "--track",
+        "--no_track",
         type=bool,
-        metavar="TR",
-        dest="track",
+        metavar="NT",
+        dest="no_track",
         required=False,
-        help="weather or not track the trainig using aim",
+        help="whether or not track the training using aim",
         default=False,
-        action=argparse.BooleanOptionalAction,
     )
     parser.add_argument(
         "--tokenizer_checkpoint",
@@ -153,7 +173,7 @@ if __name__ == "__main__":
     eval_steps = args.eval_steps
     save_steps = args.save_steps
     experiment_name = args.experiment_name
-    track = args.track
+    no_track = args.no_track
     blocksize = args.blocksize
     track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
@@ -165,13 +185,8 @@ if __name__ == "__main__":
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
     absolute_path = os.path.dirname(os.path.abspath(__file__))
     print(absolute_path)
-    relative_path = "config/models_train_config.yaml"
 
-    full_path = os.path.join(absolute_path, relative_path)
-
-    with open(full_path, "r") as f_:
-        full_file = yaml.full_load(f_)
-        train_config = full_file[model_config]
+    train_config = model_train_configs[model_config]
 
     experiment_hash = "none"
 
@@ -184,13 +199,13 @@ if __name__ == "__main__":
     # )  # Converts the model to use PyTorch’s native attention implementation
 
     trainer_callback_list = []
-    if track:
+    if not no_track:
         aim_callback = CustomAimCallback(
             checkpoints_dict_name="checkpoints_hashes",
             repo=track_dir,
             experiment=experiment_name,
             model=model,
-            blocksize=2048,
+            blocksize=train_config["block_size"],
         )
 
         experiment_hash = aim_callback._run_hash
@@ -216,6 +231,8 @@ if __name__ == "__main__":
         max_steps=max_steps,
         save_steps=save_steps,
         dataloader_pin_memory=True,
+        torch_compile=True,
+        dataloader_num_workers=8,
     )
 
     dataset = load_dataset(

@@ -7,7 +7,7 @@ from utils import ProgressBar, CustomTokenizer
 from collections import namedtuple
 
 
-ProgressBar.set_total(22384)
+ProgressBar.set_total(45637)
 
 
 PropertyEntry = namedtuple(
@@ -92,6 +92,10 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
 
     logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
     labels = labels[..., 1:].contiguous().view(-1)
+
+    # print("input:", CustomTokenizer.get_instance().decode(labels))
+    # print(batch_size)
+
     property_entries = get_property_entries()
 
     if ProgressBar.get_instance() is None:
@@ -150,7 +154,7 @@ def compute_metrics(eval_pred: transformers.EvalPrediction):
     properties_perp = logits[::2].sum(axis=0)
     properties_count = logits[1::2].sum(axis=0)
     properties_count = torch.max(torch.ones_like(properties_count), properties_count)
-    # # print(properties_perp, properties_count)
+
     prep = {
         property_names[i]: loss
         for i, loss in enumerate(properties_perp / properties_count)
