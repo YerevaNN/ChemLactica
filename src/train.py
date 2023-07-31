@@ -1,7 +1,6 @@
 import transformers
 from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
-
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import yaml
 import argparse
@@ -183,7 +182,7 @@ if __name__ == "__main__":
     # model = (
     #     model.to_bettertransformer()
     # )  # Converts the model to use PyTorch’s native attention implementation
-    print("batch size", train_config["batch_size"])
+
     trainer_callback_list = []
     if track:
         aim_callback = CustomAimCallback(

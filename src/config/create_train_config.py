@@ -25,7 +25,7 @@ model_train_configs = {
         "d_model": 2048,
         "n_heads": 32,
         "d_heads": 64,
-        "batch_size": 1000000,
+        "batch_size": 1,
         "block_size": 2048,
         "vocab_size": 50000,
         "max_learning_rate": 2e-4,
@@ -83,5 +83,5 @@ for key in model_train_configs.keys():
     model_train_configs[key]["max_learning_rate"] *= 0.08
 
 
-with open("models_train_config.yaml", "w") as f_:
+with open("src/config/models_train_config.yaml", "w") as f_:
     yaml.dump(model_train_configs, f_)
