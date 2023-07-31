@@ -8,3 +8,4 @@ class CustomTrainer(Trainer):
     ):
         self.model = self.model.reverse_bettertransformer()
         super().save_model(output_dir)
+        self.model = self.model.to_bettertransformer()

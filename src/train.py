@@ -31,6 +31,27 @@ def load_model(from_pretrained: str):
     return AutoModelForCausalLM.from_pretrained(from_pretrained)
 
 
+def group_texts(examples):
+    # Concatenate all texts.
+    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+    total_length = len(concatenated_examples[list(examples.keys())[0]])
+    # We drop the small remainder,
+    # we could add padding if the model supported it instead of this drop.
+    total_length = (total_length // train_config["block_size"]) * train_config[
+        "block_size"
+    ]
+    # Split by chunks of max_len.
+    result = {
+        k: [
+            t[i : i + train_config["block_size"]]  # noqa
+            for i in range(0, total_length, train_config["block_size"])
+        ]
+        for k, t in concatenated_examples.items()
+    }
+    result["labels"] = result["input_ids"].copy()
+    return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="none")
 
@@ -133,7 +154,6 @@ if __name__ == "__main__":
         required=False,
         help="whether or not track the training using aim",
         default=False,
-        action=argparse.BooleanOptionalAction,
     )
     parser.add_argument(
         "--tokenizer_checkpoint",
@@ -193,7 +213,7 @@ if __name__ == "__main__":
             repo=track_dir,
             experiment=experiment_name,
             model=model,
-            blocksize=2048,
+            blocksize=train_config["block_size"],
         )
 
         experiment_hash = aim_callback._run_hash
@@ -219,6 +239,8 @@ if __name__ == "__main__":
         max_steps=max_steps,
         save_steps=save_steps,
         dataloader_pin_memory=True,
+        torch_compile=True,
+        dataloader_num_workers=8,
     )
 
     dataset = load_dataset(

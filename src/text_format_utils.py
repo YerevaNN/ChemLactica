@@ -27,13 +27,25 @@ def generate_formatted_string(compound_json):
 
 
 def format_key_value(key, value):
-    if key in SPECIAL_TAGS:
-        start = SPECIAL_TAGS[key]["start"]
-        end = SPECIAL_TAGS[key]["end"]
-        return f"{start}{value}{end}"
+    formatted_string = ""
+    if key == "related":
+        for pair in value:
+            formatted_string += f"[SIMILAR {pair['similarity']} {pair['SMILES']}]"
+    elif key == "experimental":
+        for pair in value:
+            formatted_string += f"[{pair['PROPERTY_NAME']} {pair['PROPERTY_VALUE']}]"
+    elif key == "synonyms":
+        for val in value:
+            formatted_string += f"[SYNONYM {val['name']}]"
     else:
-        upper_key = key.upper()
-        return f"[{upper_key} {value}]"
+        if key in SPECIAL_TAGS:
+            start = SPECIAL_TAGS[key]["start"]
+            end = SPECIAL_TAGS[key]["end"]
+            return f"{start}{value}{end}"
+        formatted_string = f"[{key.upper()} {value}]"
+        return formatted_string
+
+    return formatted_string
 
 
 def main():

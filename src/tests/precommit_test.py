@@ -21,9 +21,9 @@ class TestNetworkTraining(unittest.TestCase):
                 --model_config small_opt \
                 --training_data_dir {training_data_dir_path} \
                 --valid_data_dir {valid_data_dir_path} \
-                --max_steps 1 \
-                --eval_steps 1 \
-                --save_steps 1 \
+                --max_steps 4 \
+                --eval_steps 2 \
+                --save_steps 2 \
                 --tokenizer 125m \
                 --checkpoints_root_dir ./ \
                 --tokenizer_checkpoint facebook/galactica-125m "
