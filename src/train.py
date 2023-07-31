@@ -1,9 +1,9 @@
+from config.create_train_config import model_train_configs
 import transformers
 from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-import yaml
 import argparse
 import glob
 import sys
@@ -185,13 +185,8 @@ if __name__ == "__main__":
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
     absolute_path = os.path.dirname(os.path.abspath(__file__))
     print(absolute_path)
-    relative_path = "config/models_train_config.yaml"
 
-    full_path = os.path.join(absolute_path, relative_path)
-
-    with open(full_path, "r") as f_:
-        full_file = yaml.full_load(f_)
-        train_config = full_file[model_config]
+    train_config = model_train_configs[model_config]
 
     experiment_hash = "none"
 
