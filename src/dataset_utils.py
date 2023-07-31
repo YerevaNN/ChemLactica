@@ -2,6 +2,7 @@ import json
 from utils import CustomTokenizer
 from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
+from transformers import AutoTokenizer
 
 
 def tokenize_function(examples, tokenizer):
@@ -43,6 +44,8 @@ def group_texts(examples, train_config):
         # for k, t in concatenated_examples.items()
     }
     result["labels"] = result["input_ids"].copy()
+    # pprint(result)
+    # print(CustomTokenizer.get_instance().decode(result["input_ids"]))
     return result
 
 
@@ -54,7 +57,9 @@ def process_dataset(dataset, tokenizer, train_config):
         batched=True,
         batch_size=100,
         remove_columns=["text"],
-        fn_kwargs={"tokenizer": tokenizer},
+        fn_kwargs={
+            "tokenizer": AutoTokenizer.from_pretrained("facebook/galactica-125m")
+        },
     )
     lm_datasets = tokenized_datasets.map(
         group_texts,
