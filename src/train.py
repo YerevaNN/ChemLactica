@@ -12,6 +12,7 @@ import os
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from utils import CustomTokenizer
+import torch
 
 
 def load_model(from_pretrained: str):
@@ -176,6 +177,8 @@ if __name__ == "__main__":
     experiment_hash = "none"
 
     model = load_model(from_pretrained)
+    device = torch.device("cpu")
+    model = model.to(device)
     tokenizer = CustomTokenizer(
         instance=AutoTokenizer.from_pretrained(tokenizer_checkpoint)
     ).get_instance()
