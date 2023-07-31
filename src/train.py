@@ -9,9 +9,34 @@ import glob
 import sys
 from callbacks import CustomAimCallback
 import os
+import time
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from utils import CustomTokenizer
+from torch.utils.data import IterableDataset
+
+
+# this is bad way of checking the speed of the dataloaders, should be refactored in the future
+def test_dataloader_speed(
+    iter_dataset: IterableDataset, max_num_of_samples: int = 100000
+):
+    total_time = 0
+    start_time = time.time()
+    num_of_samples = 0
+
+    for _ in iter_dataset:
+        if num_of_samples == max_num_of_samples:
+            break
+        num_of_samples += 1
+        total_time += time.time() - start_time
+        start_time = time.time()
+
+    print(
+        f"Total time for {num_of_samples} is {total_time}s, "
+        + "the average time for a batch "
+        + f"(calculated over {num_of_samples} samples) "
+        + f"is {total_time / num_of_samples}s."
+    )
 
 
 def load_model(from_pretrained: str):
@@ -68,7 +93,7 @@ if __name__ == "__main__":
         metavar="MC",
         dest="model_config",
         required=True,
-        help="the galactica configuration to use",
+        help="the model configuration to use",
     )
     parser.add_argument(
         "--training_data_dir",
@@ -248,6 +273,8 @@ if __name__ == "__main__":
     processed_dataset = process_dataset(
         dataset=dataset, tokenizer=tokenizer, train_config=train_config
     )
+
+    # test_dataloader_speed(processed_dataset["validation"])
 
     trainer = CustomTrainer(
         model=model,

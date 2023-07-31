@@ -70,10 +70,17 @@ def construct_prop_entries():
     return property_entries
 
 
+"""
+    the point of this function is to construct the property_entries list specified in the
+    construct_prop_entries function once and return the already created instance when requested.
+"""
+
+
 def get_property_entries():
-    return getattr(get_property_entries, "property_entires", construct_prop_entries())
+    return getattr(get_property_entries, "property_entries", construct_prop_entries())
 
 
+# TODO: add overflow error handling here
 @torch.no_grad()
 def perplexity(logits: torch.Tensor, labels: torch.Tensor, base=2):
     logits = logits.view(-1, logits.shape[-1])
