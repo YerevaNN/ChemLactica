@@ -43,7 +43,7 @@ dependencies:
   - zlib=1.2.13=h5eee18b_0
   - zstandard=0.19.0=py311h5eee18b_0
   - pip:
-      - accelerate==0.20.3
+      - accelerate==0.21.0
       - aim==3.17.5
       - aim-ui==3.17.5
       - aimrecords==0.0.7
@@ -65,6 +65,7 @@ dependencies:
       - coloredlogs==15.0.1
       - cryptography==41.0.1
       - datasets==2.13.0
+      - deepspeed==0.10.0
       - dill==0.3.6
       - distlib==0.3.6
       - evaluate==0.4.0
@@ -75,6 +76,7 @@ dependencies:
       - greenlet==2.0.2
       - grpcio==1.56.0
       - h11==0.14.0
+      - hjson==3.1.0
       - huggingface-hub==0.15.1
       - humanfriendly==10.0
       - identify==2.5.24
@@ -88,6 +90,7 @@ dependencies:
       - multidict==6.0.4
       - multiprocess==0.70.14
       - networkx==3.1
+      - ninja==1.11.1
       - nodeenv==1.8.0
       - numpy==1.25.0
       - nvidia-cublas-cu11==11.10.3.66
@@ -101,7 +104,7 @@ dependencies:
       - nvidia-cusparse-cu11==11.7.4.91
       - nvidia-nccl-cu11==2.14.3
       - nvidia-nvtx-cu11==11.7.91
-      - optimum==1.9.1
+      - optimum==1.10.1
       - packaging==23.1
       - pandas==2.0.2
       - pillow==9.5.0
@@ -109,6 +112,7 @@ dependencies:
       - pre-commit==3.3.3
       - protobuf==3.20.3
       - psutil==5.9.5
+      - py-cpuinfo==9.0.0
       - py3nvml==0.2.7
       - pyarrow==12.0.1
       - pydantic==1.10.9
@@ -132,7 +136,7 @@ dependencies:
       - threadpoolctl==3.1.0
       - tokenizers==0.13.3
       - torch==2.0.1
-      - transformers==4.30.2
+      - transformers==4.31.0
       - triton==2.0.0
       - typing-extensions==4.6.3
       - tzdata==2023.3
