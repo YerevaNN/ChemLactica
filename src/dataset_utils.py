@@ -1,6 +1,7 @@
 import json
 from utils import CustomTokenizer
 from text_format_utils import generate_formatted_string, delete_empty_tags
+import torch
 
 
 def tokenize_function(examples, tokenizer):
@@ -18,11 +19,11 @@ def process_str(str):
 def group_texts(examples, train_config):
     # Concatenate all texts.
     concatenated_examples = {
-        "input_ids": sum(
-            examples["input_ids"], [CustomTokenizer.get_instance().eos_token_id]
+        "input_ids": torch.as_tensor(
+            sum(examples["input_ids"], [CustomTokenizer.get_instance().eos_token_id])
         ),
-        "token_type_ids": sum(examples["token_type_ids"], [0]),
-        "attention_mask": sum(examples["attention_mask"], [1]),
+        "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
+        "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),
     }
 
     total_length = len(concatenated_examples[list(examples.keys())[0]])
@@ -38,6 +39,8 @@ def group_texts(examples, train_config):
             for i in range(0, total_length, train_config["block_size"])
         ]
         for k, t in concatenated_examples.items()
+        # k : t[:total_length].view(-1, train_config["block_size"])
+        # for k, t in concatenated_examples.items()
     }
     result["labels"] = result["input_ids"].copy()
     return result
@@ -49,6 +52,7 @@ def process_dataset(dataset, tokenizer, train_config):
     tokenized_datasets = dataset.map(
         tokenize_function,
         batched=True,
+        batch_size=100,
         remove_columns=["text"],
         fn_kwargs={"tokenizer": tokenizer},
     )
