@@ -178,7 +178,6 @@ if __name__ == "__main__":
         required=False,
         help="whether or not track the training using aim",
         default=False,
-        action=argparse.BooleanOptionalAction,
     )
     parser.add_argument(
         "--tokenizer_checkpoint",
@@ -262,6 +261,8 @@ if __name__ == "__main__":
         max_steps=max_steps,
         save_steps=save_steps,
         dataloader_pin_memory=True,
+        torch_compile=True,
+        dataloader_num_workers=8,
     )
 
     dataset = load_dataset(
