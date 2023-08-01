@@ -1,6 +1,6 @@
 from config.create_train_config import model_train_configs
 import transformers
-from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM
+from transformers import TrainingArguments, AutoModelForCausalLM
 from datasets import load_dataset
 
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
@@ -9,34 +9,8 @@ import glob
 import sys
 from callbacks import CustomAimCallback
 import os
-import time
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
-from utils import CustomTokenizer
-from torch.utils.data import IterableDataset
-
-
-# this is bad way of checking the speed of the dataloaders, should be refactored in the future
-def test_dataloader_speed(
-    iter_dataset: IterableDataset, max_num_of_samples: int = 100000
-):
-    total_time = 0
-    start_time = time.time()
-    num_of_samples = 0
-
-    for _ in iter_dataset:
-        if num_of_samples == max_num_of_samples:
-            break
-        num_of_samples += 1
-        total_time += time.time() - start_time
-        start_time = time.time()
-
-    print(
-        f"Total time for {num_of_samples} is {total_time}s, "
-        + "the average time for a batch "
-        + f"(calculated over {num_of_samples} samples) "
-        + f"is {total_time / num_of_samples}s."
-    )
 
 
 def load_model(from_pretrained: str):
@@ -171,23 +145,35 @@ if __name__ == "__main__":
         default="/mnt/sxtn/chem/ChemLactica/checkpoints",
     )
     parser.add_argument(
-        "--no_track",
-        type=bool,
-        metavar="NT",
-        dest="no_track",
-        required=False,
-        help="whether or not track the training using aim",
-        default=False,
-    )
-    parser.add_argument(
         "--tokenizer_checkpoint",
         type=str,
         metavar="TC",
         dest="tokenizer_checkpoint",
-        required=False,
         help="tokenizer checkpoint name",
         default=None,
     )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        metavar="NW",
+        dest="num_workers",
+        required=False,
+        help="number of processes to use",
+        default=0,
+    )
+    parser.add_argument(
+        "--track",
+        action="store_true",
+        dest="track",
+        help="whether or not track the training using aim",
+    )
+    parser.add_argument(
+        "--no-track",
+        action="store_false",
+        dest="track",
+        help="whether or not track the training using aim",
+    )
+    parser.set_defaults(track=True)
 
     args = parser.parse_args()
     from_pretrained = args.from_pretrained
@@ -198,10 +184,12 @@ if __name__ == "__main__":
     eval_steps = args.eval_steps
     save_steps = args.save_steps
     experiment_name = args.experiment_name
-    no_track = args.no_track
+    track = args.track
     blocksize = args.blocksize
     track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
+    num_workers = args.num_workers
+
     tokenizer_checkpoint = (
         args.tokenizer_checkpoint if args.tokenizer_checkpoint else from_pretrained
     )
@@ -216,15 +204,12 @@ if __name__ == "__main__":
     experiment_hash = "none"
 
     model = load_model(from_pretrained)
-    tokenizer = CustomTokenizer(
-        instance=AutoTokenizer.from_pretrained(tokenizer_checkpoint)
-    ).get_instance()
     model = (
         model.to_bettertransformer()
     )  # Converts the model to use PyTorch’s native attention implementation
 
     trainer_callback_list = []
-    if not no_track:
+    if track:
         aim_callback = CustomAimCallback(
             checkpoints_dict_name="checkpoints_hashes",
             repo=track_dir,
@@ -255,9 +240,11 @@ if __name__ == "__main__":
         eval_steps=eval_steps,
         max_steps=max_steps,
         save_steps=save_steps,
+        # gradient_accumulation_steps=4,
+        dataloader_drop_last=True,
         dataloader_pin_memory=True,
         torch_compile=True,
-        dataloader_num_workers=8,
+        dataloader_num_workers=num_workers,
     )
 
     dataset = load_dataset(
@@ -267,10 +254,8 @@ if __name__ == "__main__":
     )
 
     processed_dataset = process_dataset(
-        dataset=dataset, tokenizer=tokenizer, train_config=train_config
+        dataset=dataset, train_config=train_config, process_batch_sizes=(10000, 10000)
     )
-
-    # test_dataloader_speed(processed_dataset["validation"])
 
     trainer = CustomTrainer(
         model=model,
