@@ -1,6 +1,7 @@
 import time
 import argparse
 import glob
+import logging
 
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -11,28 +12,37 @@ from transformers.data.data_collator import DataCollatorWithPadding
 from transformers.trainer_pt_utils import IterableDatasetShard
 
 
+logging.basicConfig(
+    filename="dataloader_benchmark.log",
+    level=logging.INFO,
+    format="%(levelname)s: " "%(message)s",
+)
+
+
 def test_dataloader_speed(dl: DataLoader, config, max_num_of_samples: int = None):
-    print("Testing the dataloader speed.")
+    logging.info("\tTesting the dataloader speed.")
     total_time = 0
     start_time = time.time()
-    num_of_samples = 0
+    num_of_batches = 0
 
     for _ in dl:
-        if max_num_of_samples is not None and num_of_samples == max_num_of_samples:
+        if max_num_of_samples is not None and num_of_batches == max_num_of_samples:
             break
-        num_of_samples += 1
+        num_of_batches += 1
         total_time += time.time() - start_time
         start_time = time.time()
 
-    print(
-        f"Total time for {num_of_samples} is {total_time}s, "
+    logging.info(
+        f"\tTotal time for {max(1, num_of_batches)} "
+        + "batches (batch_size: {config['batch_size']}) is {total_time}s, "
         + "the average time for a batch "
-        + f"(calculated over {num_of_samples} samples) "
-        + f"is {total_time / num_of_samples}s."
+        + f"(calculated over {max(1, num_of_batches)} batches) "
+        + f"is {total_time / max(1, num_of_batches)}s."
     )
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     parser = argparse.ArgumentParser(description="dataloader speed testing parser")
 
     parser.add_argument(
@@ -59,11 +69,20 @@ if __name__ == "__main__":
         required=True,
         help="batch size",
     )
+    parser.add_argument(
+        "--process_batch_size",
+        type=int,
+        metavar="PBS",
+        dest="process_batch_size",
+        required=True,
+        help="process batch size",
+    )
 
     args = parser.parse_args()
     data_dir = args.data_dir
     num_workers = args.num_workers
     batch_size = args.batch_size
+    process_batch_size = args.process_batch_size
 
     config = {
         "block_size": 2048,
@@ -71,7 +90,12 @@ if __name__ == "__main__":
         "dataloader_pin_memory": True,
         "torch_compile": True,
         "num_workers": num_workers,
+        "process_batch_size": process_batch_size,
     }
+
+    logging.info("Params:")
+    for key, value in config.items():
+        logging.info(f"\t{key}: {value}")
 
     tokenizer = CustomTokenizer(
         instance=AutoTokenizer.from_pretrained("facebook/galactica-125m")
@@ -87,7 +111,12 @@ if __name__ == "__main__":
     )
 
     processed_dataset = process_dataset(
-        dataset=dataset, train_config=config, process_batch_sizes=(10000, 10000)
+        dataset=dataset,
+        train_config=config,
+        process_batch_sizes=(
+            config["process_batch_size"],
+            config["process_batch_size"],
+        ),
     )
 
     args = TrainingArguments(
@@ -100,20 +129,23 @@ if __name__ == "__main__":
         dataloader_drop_last=True,
     )
 
-    processed_dataset["data"] = IterableDatasetShard(
-        processed_dataset["data"],
-        batch_size=config["batch_size"],
-        drop_last=args.dataloader_drop_last,
-        num_processes=args.world_size,
-        process_index=args.process_index,
-    )
+    if args.world_size > 1:
+        processed_dataset["data"] = IterableDatasetShard(
+            processed_dataset["data"],
+            batch_size=config["batch_size"],
+            drop_last=args.dataloader_drop_last,
+            num_processes=args.world_size,
+            process_index=args.process_index,
+        )
 
     dataloader = DataLoader(
         processed_dataset["data"],
         batch_size=config["batch_size"],
+        drop_last=args.dataloader_drop_last,
         num_workers=args.dataloader_num_workers,
         collate_fn=data_collator,
         pin_memory=args.dataloader_pin_memory,
     )
 
     test_dataloader_speed(dataloader, config, max_num_of_samples=10000)
+    logging.info(f"finished (took {time.time() - start_time}).")
