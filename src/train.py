@@ -1,5 +1,5 @@
 import transformers
-from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM
+from transformers import TrainingArguments, AutoModelForCausalLM
 from datasets import load_dataset
 
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
@@ -11,7 +11,6 @@ from callbacks import CustomAimCallback
 import os
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
-from utils import CustomTokenizer
 
 
 def load_model(from_pretrained: str):
@@ -154,6 +153,15 @@ if __name__ == "__main__":
         default=None,
     )
     parser.add_argument(
+        "--num_workers",
+        type=int,
+        metavar="NW",
+        dest="num_workers",
+        required=False,
+        help="number of processes to use",
+        default=0,
+    )
+    parser.add_argument(
         "--track",
         action="store_true",
         dest="track",
@@ -180,6 +188,8 @@ if __name__ == "__main__":
     blocksize = args.blocksize
     track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
+    num_workers = args.num_workers
+
     tokenizer_checkpoint = (
         args.tokenizer_checkpoint if args.tokenizer_checkpoint else from_pretrained
     )
@@ -199,9 +209,6 @@ if __name__ == "__main__":
     experiment_hash = "none"
 
     model = load_model(from_pretrained)
-    tokenizer = CustomTokenizer(
-        instance=AutoTokenizer.from_pretrained(tokenizer_checkpoint)
-    ).get_instance()
     model = (
         model.to_bettertransformer()
     )  # Converts the model to use PyTorch’s native attention implementation
@@ -242,7 +249,7 @@ if __name__ == "__main__":
         dataloader_drop_last=True,
         dataloader_pin_memory=True,
         torch_compile=True,
-        dataloader_num_workers=0,
+        dataloader_num_workers=num_workers,
     )
 
     dataset = load_dataset(
@@ -251,7 +258,9 @@ if __name__ == "__main__":
         streaming=True,
     )
 
-    processed_dataset = process_dataset(dataset=dataset, train_config=train_config)
+    processed_dataset = process_dataset(
+        dataset=dataset, train_config=train_config, process_batch_sizes=(10000, 10000)
+    )
 
     trainer = CustomTrainer(
         model=model,

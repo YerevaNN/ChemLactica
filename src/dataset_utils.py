@@ -2,15 +2,14 @@ import json
 from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
-# from transformers import AutoTokenizer
 from utils import CustomTokenizer
 
 
 def tokenize_function(examples):
-    # tokenizer = AutoTokenizer.from_pretrained("facebook/galactica-125m")
-    # return tokenizer(examples["text"])
-    a = list([[1 for _ in range(100)] for _ in range(100)])
-    return {"input_ids": a, "token_type_ids": a, "attention_mask": a}
+    tokenizer = CustomTokenizer.get_instance()
+    return tokenizer(examples["text"])
+    # a = list([[1 for _ in range(100)] for _ in range(100)])
+    # return {"input_ids": a, "token_type_ids": a, "attention_mask": a}
 
 
 def process_str(str):

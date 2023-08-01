@@ -6,9 +6,8 @@ import logging
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from dataset_utils import process_dataset
-from utils import CustomTokenizer
-from transformers import AutoTokenizer, TrainingArguments
-from transformers.data.data_collator import DataCollatorWithPadding
+from transformers import TrainingArguments
+from transformers.data.data_collator import default_data_collator
 from transformers.trainer_pt_utils import IterableDatasetShard
 
 
@@ -29,6 +28,7 @@ def test_dataloader_speed(dl: DataLoader, config, max_num_of_samples: int = None
         if max_num_of_samples is not None and num_of_batches == max_num_of_samples:
             break
         num_of_batches += 1
+        print(num_of_batches, f"speed {time.time() - start_time}s")
         total_time += time.time() - start_time
         start_time = time.time()
 
@@ -97,10 +97,7 @@ if __name__ == "__main__":
     for key, value in config.items():
         logging.info(f"\t{key}: {value}")
 
-    tokenizer = CustomTokenizer(
-        instance=AutoTokenizer.from_pretrained("facebook/galactica-125m")
-    ).get_instance()
-    data_collator = DataCollatorWithPadding(tokenizer)
+    data_collator = default_data_collator
 
     data_files = glob.glob(data_dir + "/*.jsonl")
 
@@ -132,7 +129,7 @@ if __name__ == "__main__":
     if args.world_size > 1:
         processed_dataset["data"] = IterableDatasetShard(
             processed_dataset["data"],
-            batch_size=config["batch_size"],
+            batch_size=config["process_batch_size"],
             drop_last=args.dataloader_drop_last,
             num_processes=args.world_size,
             process_index=args.process_index,
@@ -147,5 +144,12 @@ if __name__ == "__main__":
         pin_memory=args.dataloader_pin_memory,
     )
 
-    test_dataloader_speed(dataloader, config, max_num_of_samples=10000)
+    # num_samples = 0
+    # for s in processed_dataset["data"]:
+    #     # print(s["input_ids"].shape)
+    #     num_samples += 1
+
+    # print(num_samples)
+
+    test_dataloader_speed(dataloader, config, max_num_of_samples=20)
     logging.info(f"finished (took {time.time() - start_time}).")
