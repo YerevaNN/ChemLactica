@@ -1,10 +1,15 @@
 import json
-from utils import CustomTokenizer
 from text_format_utils import generate_formatted_string, delete_empty_tags
+import torch
+
+from utils import CustomTokenizer
 
 
-def tokenize_function(examples, tokenizer):
+def tokenize_function(examples):
+    tokenizer = CustomTokenizer.get_instance()
     return tokenizer(examples["text"])
+    # a = list([[1 for _ in range(100)] for _ in range(100)])
+    # return {"input_ids": a, "token_type_ids": a, "attention_mask": a}
 
 
 def process_str(str):
@@ -18,11 +23,11 @@ def process_str(str):
 def group_texts(examples, train_config):
     # Concatenate all texts.
     concatenated_examples = {
-        "input_ids": sum(
-            examples["input_ids"], [CustomTokenizer.get_instance().eos_token_id]
+        "input_ids": torch.as_tensor(
+            sum(examples["input_ids"], [CustomTokenizer.eos_token_id])
         ),
-        "token_type_ids": sum(examples["token_type_ids"], [0]),
-        "attention_mask": sum(examples["attention_mask"], [1]),
+        "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
+        "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),
     }
 
     total_length = len(concatenated_examples[list(examples.keys())[0]])
@@ -38,24 +43,26 @@ def group_texts(examples, train_config):
             for i in range(0, total_length, train_config["block_size"])
         ]
         for k, t in concatenated_examples.items()
+        # k : t[:total_length].view(-1, train_config["block_size"])
+        # for k, t in concatenated_examples.items()
     }
     result["labels"] = result["input_ids"].copy()
     return result
 
 
-def process_dataset(dataset, tokenizer, train_config):
+def process_dataset(dataset, train_config, process_batch_sizes: tuple):
     dataset = dataset.map(process_str)
 
     tokenized_datasets = dataset.map(
         tokenize_function,
         batched=True,
+        batch_size=process_batch_sizes[0],
         remove_columns=["text"],
-        fn_kwargs={"tokenizer": tokenizer},
     )
     lm_datasets = tokenized_datasets.map(
         group_texts,
         batched=True,
-        batch_size=100,
+        batch_size=process_batch_sizes[1],
         fn_kwargs={"train_config": train_config},
     )
     return lm_datasets
