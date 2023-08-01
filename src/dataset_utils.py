@@ -1,12 +1,16 @@
 import json
-from utils import CustomTokenizer
 from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
-from transformers import AutoTokenizer
+
+# from transformers import AutoTokenizer
+from utils import CustomTokenizer
 
 
-def tokenize_function(examples, tokenizer):
-    return tokenizer(examples["text"])
+def tokenize_function(examples):
+    # tokenizer = AutoTokenizer.from_pretrained("facebook/galactica-125m")
+    # return tokenizer(examples["text"])
+    a = list([[1 for _ in range(100)] for _ in range(100)])
+    return {"input_ids": a, "token_type_ids": a, "attention_mask": a}
 
 
 def process_str(str):
@@ -21,7 +25,7 @@ def group_texts(examples, train_config):
     # Concatenate all texts.
     concatenated_examples = {
         "input_ids": torch.as_tensor(
-            sum(examples["input_ids"], [CustomTokenizer.get_instance().eos_token_id])
+            sum(examples["input_ids"], [CustomTokenizer.eos_token_id])
         ),
         "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
         "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),
@@ -44,27 +48,22 @@ def group_texts(examples, train_config):
         # for k, t in concatenated_examples.items()
     }
     result["labels"] = result["input_ids"].copy()
-    # pprint(result)
-    # print(CustomTokenizer.get_instance().decode(result["input_ids"]))
     return result
 
 
-def process_dataset(dataset, tokenizer, train_config):
+def process_dataset(dataset, train_config, process_batch_sizes: tuple):
     dataset = dataset.map(process_str)
 
     tokenized_datasets = dataset.map(
         tokenize_function,
         batched=True,
-        batch_size=100,
+        batch_size=process_batch_sizes[0],
         remove_columns=["text"],
-        fn_kwargs={
-            "tokenizer": AutoTokenizer.from_pretrained("facebook/galactica-125m")
-        },
     )
     lm_datasets = tokenized_datasets.map(
         group_texts,
         batched=True,
-        batch_size=100,
+        batch_size=process_batch_sizes[1],
         fn_kwargs={"train_config": train_config},
     )
     return lm_datasets

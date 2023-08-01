@@ -238,9 +238,11 @@ if __name__ == "__main__":
         eval_steps=eval_steps,
         max_steps=max_steps,
         save_steps=save_steps,
+        # gradient_accumulation_steps=4,
+        dataloader_drop_last=True,
         dataloader_pin_memory=True,
         torch_compile=True,
-        dataloader_num_workers=1,
+        dataloader_num_workers=0,
     )
 
     dataset = load_dataset(
@@ -249,9 +251,7 @@ if __name__ == "__main__":
         streaming=True,
     )
 
-    processed_dataset = process_dataset(
-        dataset=dataset, tokenizer=tokenizer, train_config=train_config
-    )
+    processed_dataset = process_dataset(dataset=dataset, train_config=train_config)
 
     trainer = CustomTrainer(
         model=model,
