@@ -1,4 +1,5 @@
 from config.create_train_config import model_train_configs
+import torch
 import transformers
 from transformers import TrainingArguments, AutoModelForCausalLM
 from datasets import load_dataset
@@ -207,9 +208,16 @@ if __name__ == "__main__":
     # model = (
     #     model.to_bettertransformer()
     # )  # Converts the model to use PyTorch’s native attention implementation
+    # BetterTransfomer has some unresolved conflicts with fsdp
+
+    # Not sure if this will not cause issues like initializing two distributed groups
+    # comment out to run without accelerate
+    torch.distributed.init_process_group()
 
     trainer_callback_list = []
-    if track:
+    if track and (
+        not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
+    ):
         aim_callback = CustomAimCallback(
             checkpoints_dict_name="checkpoints_hashes",
             repo=track_dir,
@@ -243,7 +251,9 @@ if __name__ == "__main__":
         # gradient_accumulation_steps=4,
         dataloader_drop_last=True,
         dataloader_pin_memory=True,
-        torch_compile=True,
+        # torch_compile=True,
+        # # torch_compile requires to set use_orig_params=true
+        # which has some conflict with saving checkpoints
         dataloader_num_workers=num_workers,
     )
 
@@ -256,6 +266,8 @@ if __name__ == "__main__":
     processed_dataset = process_dataset(
         dataset=dataset, train_config=train_config, process_batch_sizes=(100, 100)
     )
+    # CustomTrainer has been replaced since BetterTransformer is still
+    # not compatible with this commit
     trainer = transformers.Trainer(
         model=model,
         args=training_args,
