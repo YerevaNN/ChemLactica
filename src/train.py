@@ -9,8 +9,8 @@ import glob
 import sys
 from callbacks import CustomAimCallback
 import os
-
-# from custom_trainer import CustomTrainer
+from optimum.bettertransformer import BetterTransformer
+from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 
 
@@ -205,9 +205,8 @@ if __name__ == "__main__":
     experiment_hash = "none"
 
     model = load_model(from_pretrained)
-    # model = (
-    #     model.to_bettertransformer()
-    # )  # Converts the model to use PyTorch’s native attention implementation
+    model = BetterTransformer.transform(model)
+    # Converts the model to use PyTorch’s native attention implementation
     # BetterTransfomer has some unresolved conflicts with fsdp
 
     # Not sure if this will not cause issues like initializing two distributed groups
@@ -268,7 +267,7 @@ if __name__ == "__main__":
     )
     # CustomTrainer has been replaced since BetterTransformer is still
     # not compatible with this commit
-    trainer = transformers.Trainer(
+    trainer = CustomTrainer(
         model=model,
         args=training_args,
         compute_metrics=compute_metrics,

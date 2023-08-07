@@ -1,16 +1,14 @@
 from aim.hugging_face import AimCallback
 import os
-import hashlib
+
+# import hashlib
 
 # import torch
 import time
 
 
 def calc_hash_for_binary_file(path):
-    with open(path, "rb") as _file:
-        file_content = _file.read()
-        hex_hash = hashlib.md5(file_content).hexdigest()
-        return hex_hash
+    return "a28319dfhh"
 
 
 class CustomAimCallback(AimCallback):
