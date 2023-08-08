@@ -2,6 +2,7 @@ from config.create_train_config import model_train_configs
 import transformers
 from transformers import TrainingArguments, AutoModelForCausalLM
 from datasets import load_dataset
+import torch
 
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
@@ -267,6 +268,19 @@ if __name__ == "__main__":
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
-    trainer.train()
+    with torch.profiler.profile(
+        activities=[
+            torch.profiler.ProfilerActivity.CPU,
+            torch.profiler.ProfilerActivity.CUDA,
+        ],
+        schedule=torch.profiler.schedule(
+            skip_first=3, wait=1, warmup=1, active=2, repeat=2
+        ),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler("hf-training-trainer"),
+        profile_memory=True,
+        with_stack=True,
+        record_shapes=True,
+    ) as prof:
+        trainer.train()
 
     sys.exit(0)  # explositly set exit code to 0 when succesfully termitating

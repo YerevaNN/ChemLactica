@@ -3,6 +3,7 @@ import os
 import hashlib
 import torch
 import time
+from transformers import TrainerCallback
 
 
 def calc_hash_for_binary_file(path):
@@ -36,8 +37,9 @@ class CustomAimCallback(AimCallback):
                 file_path
             )
         self._run[self._checkpoints_dict_name] = checkpoints_dict
+
     def on_step_begin(self, args, state, control, **kwargs):
-        self.start_time = time.time()    
+        self.start_time = time.time()
 
     def on_step_end(self, args, state, control, **kwargs):
         # Get batch size (first dimension of inputs)
@@ -60,4 +62,11 @@ class CustomAimCallback(AimCallback):
         elapsed_time = time.time() - self.start_time  # Calculate words per second
         words_per_second = num_words / elapsed_time
         self.experiment.track(words_per_second, name="words per second")
-    
+
+
+class ProfCallback(TrainerCallback):
+    def __init__(self, prof):
+        self.prof = prof
+
+    def on_step_end(self, args, state, control, **kwargs):
+        self.prof.step()
