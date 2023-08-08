@@ -18,4 +18,8 @@ RUN /usr/bin/python -m pip install --upgrade pip
 RUN pip install -r $APP_HOME/requirements.txt
 
 # Make run commands use the new environment
-CMD ["python3","-m","unittest", "src/tests/precommit_test.py"]
+# CMD ["python3","-m","unittest", "src/tests/precommit_test.py"]
+CMD ["export", 'CUDA_VISIBLE_DEVICES="0, 1"']
+CMD ["nvidia-smi"]
+CMD ["export", "TOKENIZERS_PARALLELISM=false"]
+CMD ["python3", "src/train.py", "--from_pretrained", "facebook/galactica-125m", "--model_config", "125m",  "--training_data_dir", ".small_data/train", "--valid_data_dir", ".small_data/valid", "--max_steps", "10", "--eval_steps", "10", "--save_steps", "10", "--experiment_name", "gal125m_dockertest", "--checkpoints_root_dir", "./checkpoints", "--track_dir", "./aim"]

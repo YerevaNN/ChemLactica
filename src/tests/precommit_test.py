@@ -26,8 +26,8 @@ class TestNetworkTraining(unittest.TestCase):
                 --save_steps 2 \
                 --tokenizer 125m \
                 --checkpoints_root_dir ./ \
-                --tokenizer_checkpoint facebook/galactica-125m "
-            "--track_dir ./",
+                --tokenizer_checkpoint facebook/galactica-125m \
+                --track_dir ./",
             shell=True,
             # stdout=subprocess.DEVNULL,
             # stderr=subprocess.DEVNULL,
