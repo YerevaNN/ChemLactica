@@ -170,3 +170,5 @@ cython_debug/
 # current checkpoint directories
 galactica-125m-finetuned-pubchem/
 small_opt/
+experiment.hash
+/checkpoints

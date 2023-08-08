@@ -1,11 +1,12 @@
 from config.create_train_config import model_train_configs
-import torch
+import torch.distributed as dist
 import transformers
 from transformers import TrainingArguments, AutoModelForCausalLM
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
 import glob
+import time
 import sys
 from callbacks import CustomAimCallback
 import os
@@ -211,22 +212,29 @@ if __name__ == "__main__":
 
     # Not sure if this will not cause issues like initializing two distributed groups
     # comment out to run without accelerate
-    torch.distributed.init_process_group()
+    dist.init_process_group()
 
     trainer_callback_list = []
-    if track and (
-        not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
-    ):
-        aim_callback = CustomAimCallback(
-            checkpoints_dict_name="checkpoints_hashes",
-            repo=track_dir,
-            experiment=experiment_name,
-            model=model,
-            blocksize=train_config["block_size"],
-        )
+    if track:
+        if dist.is_initialized():
+            if dist.get_rank() == 0:
+                aim_callback = CustomAimCallback(
+                    checkpoints_dict_name="checkpoints_hashes",
+                    repo=track_dir,
+                    experiment=experiment_name,
+                    model=model,
+                    blocksize=train_config["block_size"],
+                )
 
-        experiment_hash = aim_callback._run_hash
-        trainer_callback_list.append(aim_callback)
+                experiment_hash = aim_callback._run_hash
+                trainer_callback_list.append(aim_callback)
+                with open("experiment.hash", "w") as file:
+                    file.write(experiment_hash)
+            else:
+                time.sleep(4)
+                with open("experiment.hash", "r") as file:
+                    experiment_hash = file.readlines()[0]
+    print(f"experiment hash on rank {dist.get_rank()}: ", experiment_hash)
 
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, from_pretrained, experiment_hash
