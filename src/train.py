@@ -8,7 +8,7 @@ from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
 import glob
 import sys
-from callbacks import CustomAimCallback
+from callbacks import CustomAimCallback, ProfCallback
 import os
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
@@ -175,6 +175,19 @@ if __name__ == "__main__":
         help="whether or not track the training using aim",
     )
     parser.set_defaults(track=True)
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        dest="profile",
+        help="whether or not profile the training",
+    )
+    parser.add_argument(
+        "--no-profile",
+        action="store_false",
+        dest="profile",
+        help="whether or not profile the training",
+    )
+    parser.set_defaults(profile=False)
 
     args = parser.parse_args()
     from_pretrained = args.from_pretrained
@@ -185,7 +198,8 @@ if __name__ == "__main__":
     eval_steps = args.eval_steps
     save_steps = args.save_steps
     experiment_name = args.experiment_name
-    track = args.track
+    do_track = args.track
+    do_profile = args.profile
     blocksize = args.blocksize
     track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
@@ -209,8 +223,8 @@ if __name__ == "__main__":
         model.to_bettertransformer()
     )  # Converts the model to use PyTorch’s native attention implementation
 
-    trainer_callback_list = []
-    if track:
+    trainer_callback_dict = {}
+    if do_track:
         aim_callback = CustomAimCallback(
             checkpoints_dict_name="checkpoints_hashes",
             repo=track_dir,
@@ -220,7 +234,25 @@ if __name__ == "__main__":
         )
 
         experiment_hash = aim_callback._run_hash
-        trainer_callback_list.append(aim_callback)
+        trainer_callback_dict["aim_callback"] = aim_callback
+
+    if do_profile:
+        prof = torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ],
+            schedule=torch.profiler.schedule(
+                skip_first=3, wait=1, warmup=1, active=2, repeat=2
+            ),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(
+                f"logs/{experiment_hash}"
+            ),
+            profile_memory=True,
+            with_stack=True,
+            record_shapes=True,
+        )
+        trainer_callback_dict["profiller_callback"] = ProfCallback(prof)
 
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, from_pretrained, experiment_hash
@@ -264,23 +296,11 @@ if __name__ == "__main__":
         compute_metrics=compute_metrics,
         train_dataset=processed_dataset["train"],
         eval_dataset=processed_dataset["validation"],
-        callbacks=trainer_callback_list,
+        callbacks=list(trainer_callback_dict.values()),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
-    with torch.profiler.profile(
-        activities=[
-            torch.profiler.ProfilerActivity.CPU,
-            torch.profiler.ProfilerActivity.CUDA,
-        ],
-        schedule=torch.profiler.schedule(
-            skip_first=3, wait=1, warmup=1, active=2, repeat=2
-        ),
-        on_trace_ready=torch.profiler.tensorboard_trace_handler("hf-training-trainer"),
-        profile_memory=True,
-        with_stack=True,
-        record_shapes=True,
-    ) as prof:
+    with trainer_callback_dict["profiller_callback"].prof as prof:
         trainer.train()
 
     sys.exit(0)  # explositly set exit code to 0 when succesfully termitating

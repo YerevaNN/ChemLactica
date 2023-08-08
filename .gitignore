@@ -6,7 +6,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-checkpoints/
 # C extensions
 *.so
 
@@ -171,3 +170,8 @@ cython_debug/
 # current checkpoint directories
 galactica-125m-finetuned-pubchem/
 small_opt/
+
+checkpoints/
+
+# tensorboard log file
+logs/

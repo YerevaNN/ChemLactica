@@ -53,11 +53,13 @@ class CustomAimCallback(AimCallback):
         self.experiment.track(self.embedding_norm_1, name="embedding l1 norm")
         self.experiment.track(self.embedding_norm_2, name="embedding l2 norm")
 
-        batch_size = (
+        per_device_batch_size = (
             args.per_device_train_batch_size
         )  # kwargs['model_inputs']['input_ids'].shape[0]
         # Calculate tokens in batch
-        num_words = batch_size * self.blocksize  # args.blocksize
+        num_gpus = torch.cuda.device_count()
+        total_batch_size = num_gpus * per_device_batch_size
+        num_words = total_batch_size * self.blocksize  # args.blocksize
         # Calculate time taken for this step
         elapsed_time = time.time() - self.start_time  # Calculate words per second
         words_per_second = num_words / elapsed_time
