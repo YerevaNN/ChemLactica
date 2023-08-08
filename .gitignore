@@ -1,5 +1,8 @@
 # Aim experiment metadata
-.aim/
+aim/
+
+# Profiling log files
+profiling/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -172,6 +175,3 @@ galactica-125m-finetuned-pubchem/
 small_opt/
 
 checkpoints/
-
-# tensorboard log file
-logs/

@@ -12,6 +12,7 @@ from callbacks import CustomAimCallback, ProfCallback
 import os
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
+from contextlib import nullcontext
 
 
 def load_model(from_pretrained: str):
@@ -128,15 +129,6 @@ if __name__ == "__main__":
         default="none",
     )
     parser.add_argument(
-        "--track_dir",
-        type=str,
-        metavar="ATD",
-        dest="track_dir",
-        required=False,
-        help="aim track directory",
-        default="/mnt/sxtn/chem/ChemLactica/metadata/aim",
-    )
-    parser.add_argument(
         "--checkpoints_root_dir",
         type=str,
         metavar="CSD",
@@ -176,6 +168,15 @@ if __name__ == "__main__":
     )
     parser.set_defaults(track=True)
     parser.add_argument(
+        "--track_dir",
+        type=str,
+        metavar="TD",
+        dest="track_dir",
+        required=False,
+        help="aim track directory",
+        default="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+    )
+    parser.add_argument(
         "--profile",
         action="store_true",
         dest="profile",
@@ -186,6 +187,15 @@ if __name__ == "__main__":
         action="store_false",
         dest="profile",
         help="whether or not profile the training",
+    )
+    parser.add_argument(
+        "--profile_dir",
+        type=str,
+        metavar="PD",
+        dest="profile_dir",
+        required=False,
+        help="profiling directory",
+        default="/mnt/sxtn/chem/ChemLactica/metadata/profiling",
     )
     parser.set_defaults(profile=False)
 
@@ -198,12 +208,15 @@ if __name__ == "__main__":
     eval_steps = args.eval_steps
     save_steps = args.save_steps
     experiment_name = args.experiment_name
-    do_track = args.track
-    do_profile = args.profile
     blocksize = args.blocksize
-    track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
     num_workers = args.num_workers
+    do_track = args.track
+    track_dir = args.track_dir
+    do_profile = args.profile
+    profile_dir = args.profile_dir
+
+    print(profile_dir)
 
     tokenizer_checkpoint = (
         args.tokenizer_checkpoint if args.tokenizer_checkpoint else from_pretrained
@@ -246,7 +259,7 @@ if __name__ == "__main__":
                 skip_first=3, wait=1, warmup=1, active=2, repeat=2
             ),
             on_trace_ready=torch.profiler.tensorboard_trace_handler(
-                f"logs/{experiment_hash}"
+                os.path.join(profile_dir, experiment_hash)
             ),
             profile_memory=True,
             with_stack=True,
@@ -300,7 +313,11 @@ if __name__ == "__main__":
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
-    with trainer_callback_dict["profiller_callback"].prof as prof:
+    with (
+        trainer_callback_dict["profiller_callback"].prof
+        if do_profile
+        else nullcontext()
+    ) as prof:
         trainer.train()
 
     sys.exit(0)  # explositly set exit code to 0 when succesfully termitating
