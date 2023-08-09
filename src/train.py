@@ -211,7 +211,6 @@ if __name__ == "__main__":
 
     # Not sure if this will not cause issues like initializing two distributed groups
     # comment out to run without accelerate
-    print(model)
 
     dist.init_process_group()
 
@@ -229,15 +228,15 @@ if __name__ == "__main__":
 
             experiment_hash = aim_callback._run_hash
             trainer_callback_list.append(aim_callback)
-            # with open("experiment.hash", "w") as file:
-            #     file.write(experiment_hash)
-            # else:
-            #     time.sleep(4)
-            #     with open("experiment.hash", "r") as file:
-            #         experiment_hash = file.readlines()[0]
-            aim_callback._run["process_id"] = dist.get_rank()
-            experiment_hash += str(dist.get_rank())
-    print(f"experiment hash on rank {dist.get_rank()}: ", experiment_hash)
+        # with open("experiment.hash", "w") as file:
+        #     file.write(experiment_hash)
+        # else:
+        #     time.sleep(4)
+        #     with open("experiment.hash", "r") as file:
+        #         experiment_hash = file.readlines()[0]
+        # aim_callback._run["process_id"] = dist.get_rank()
+    #         experiment_hash += str(dist.get_rank())
+    # print(f"experiment hash on rank {dist.get_rank()}: ", experiment_hash)
 
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, from_pretrained, experiment_hash
@@ -265,6 +264,7 @@ if __name__ == "__main__":
         # # torch_compile requires to set use_orig_params=true
         # which has some conflict with saving checkpoints
         dataloader_num_workers=num_workers,
+        logging_steps=eval_steps // 2,
     )
 
     dataset = load_dataset(
