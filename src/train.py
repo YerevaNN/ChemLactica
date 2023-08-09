@@ -234,9 +234,8 @@ if __name__ == "__main__":
         #     time.sleep(4)
         #     with open("experiment.hash", "r") as file:
         #         experiment_hash = file.readlines()[0]
-        # aim_callback._run["process_id"] = dist.get_rank()
-    #         experiment_hash += str(dist.get_rank())
-    # print(f"experiment hash on rank {dist.get_rank()}: ", experiment_hash)
+        aim_callback._run["process_id"] = dist.get_rank()
+    print(f"experiment hash on rank {dist.get_rank()}: ", experiment_hash)
 
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, from_pretrained, experiment_hash
