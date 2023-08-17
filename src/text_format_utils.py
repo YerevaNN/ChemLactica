@@ -18,10 +18,12 @@ def generate_formatted_string(compound_json):
         key = "SMILES"
         key_value_pairs.append(format_key_value(key, compound_json[key]))
         del compound_json["SMILES"]
-    for key in random.sample(list(compound_json.keys()), len(compound_json.keys())):
+    keys = list(compound_json.keys())
+    for key in random.sample(keys, len(keys)):
         key_value_pairs.append(format_key_value(key, compound_json[key]))
     compound_formatted_string = "".join(key_value_pairs) + CustomTokenizer.eos_token
     return compound_formatted_string
+    # return str(compound_json)
 
 
 def format_key_value(key, value):

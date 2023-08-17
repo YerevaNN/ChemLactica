@@ -9,7 +9,6 @@ import argparse
 import glob
 import sys
 from callbacks import CustomAimCallback, WPSCounterCallback
-import aim
 import os
 from optimum.bettertransformer import BetterTransformer
 from custom_trainer import CustomTrainer
@@ -204,8 +203,6 @@ if __name__ == "__main__":
 
     train_config = model_train_configs[model_config]
 
-    experiment_hash = "none"
-
     model = load_model(from_pretrained)
     model = BetterTransformer.transform(model)
     # Converts the model to use PyTorch’s native attention implementation
@@ -217,6 +214,8 @@ if __name__ == "__main__":
     dist.init_process_group()
 
     trainer_callback_list = {}
+    experiment_hash = "none"
+    communication_list = [experiment_hash]
     if track:
         if dist.is_initialized():
             if dist.get_rank() == 0:
@@ -232,8 +231,6 @@ if __name__ == "__main__":
 
                 experiment_hash = aim_callback._run_hash
                 communication_list = [experiment_hash]
-            else:
-                communication_list = [None]
 
     dist.broadcast_object_list(communication_list, src=0)
     experiment_hash = communication_list[0]

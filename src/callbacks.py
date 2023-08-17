@@ -1,8 +1,7 @@
 from transformers.trainer_callback import TrainerCallback
 from aim.hugging_face import AimCallback
 import os
-
-# import hashlib
+import hashlib
 
 import torch.distributed as dist
 import time
@@ -67,7 +66,7 @@ class WPSCounterCallback(TrainerCallback):
         self._start_time = None
 
     def on_step_begin(self, args, state, control, model, **kwargs):
-        if dist.get_rank() == 0:
+        if dist.get_rank() == 0 and self._aim_run is not None:
             if self._start_time is not None:
                 batch_size = args.per_device_train_batch_size
                 # Calculate tokens in batch
