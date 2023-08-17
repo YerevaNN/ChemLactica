@@ -44,9 +44,6 @@ property_names = (
     "NUMALIPHATICHETEROCYCLES",
     "NUMALIPHATICCARBOCYCLES",
     "IUPAC",
-    "RELATED",
-    "EXPERIMENTAL",
-    "SYNONYMS",
 )
 
 
