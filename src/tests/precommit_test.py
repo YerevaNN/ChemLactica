@@ -15,6 +15,7 @@ class TestNetworkTraining(unittest.TestCase):
         valid_data_dir_path = os.path.join(
             script_path, "..", "..", ".small_data", "valid"
         )
+        os.makedirs("checkpoints")
         train_command = f"python3 {train_script_path} \
                 --from_pretrained small_opt \
                 --model_config small_opt \
@@ -24,7 +25,7 @@ class TestNetworkTraining(unittest.TestCase):
                 --eval_steps 5 \
                 --save_steps 5 \
                 --tokenizer 125m \
-                --checkpoints_root_dir ./ \
+                --checkpoints_root_dir ./checkpoints \
                 --tokenizer_checkpoint facebook/galactica-125m \
                 --track \
                 --track_dir ./aim"
