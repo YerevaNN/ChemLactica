@@ -22,6 +22,7 @@ class CustomAimCallback(AimCallback):
         self.activations_norm = 0
         self._run[self._checkpoints_dict_name] = {}
         self.blocksize = blocksize
+        self.start_time = None
 
     def on_save(self, args, state, control=None, **kwargs):
         checkpoint_dir = os.path.join(
@@ -37,6 +38,17 @@ class CustomAimCallback(AimCallback):
         self._run[self._checkpoints_dict_name] = checkpoints_dict
 
     def on_step_begin(self, args, state, control, **kwargs):
+
+        if self.start_time is not None:
+            batch_size = args.per_device_train_batch_size
+            # Calculate tokens in batch
+            num_words = batch_size * self.blocksize # args.blocksize
+            # Calculate time taken for this step
+            elapsed_time = time.time() - self.start_time
+            # Calculate words per second
+            words_per_second = num_words / elapsed_time
+            self.experiment.track(words_per_second, name="words per second")
+
         self.start_time = time.time()
 
     def on_step_end(self, args, state, control, **kwargs):
@@ -47,20 +59,11 @@ class CustomAimCallback(AimCallback):
         # self.embedding_norm_2 = torch.linalg.norm(
         #     self.model.get_input_embeddings().weight, ord=2
         # )
-        self.embedding_norm_1, self.embedding_norm_2 = (
-            0,
-            0,
-        )  # embedding norm should be modified to work with fsdp wrapped model
+        # self.embedding_norm_1, self.embedding_norm_2 = (
+        #     0,
+        #     0,
+        # )  # embedding norm should be modified to work with fsdp wrapped model
 
-        self.experiment.track(self.embedding_norm_1, name="embedding l1 norm")
-        self.experiment.track(self.embedding_norm_2, name="embedding l2 norm")
-
-        batch_size = (
-            args.per_device_train_batch_size
-        )  # kwargs['model_inputs']['input_ids'].shape[0]
-        # Calculate tokens in batch
-        num_words = batch_size * self.blocksize  # args.blocksize
-        # Calculate time taken for this step
-        elapsed_time = time.time() - self.start_time  # Calculate words per second
-        words_per_second = num_words / elapsed_time
-        self.experiment.track(words_per_second, name="words per second")
+        # self.experiment.track(self.embedding_norm_1, name="embedding l1 norm")
+        # self.experiment.track(self.embedding_norm_2, name="embedding l2 norm")
+        pass

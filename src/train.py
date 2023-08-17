@@ -275,8 +275,7 @@ if __name__ == "__main__":
     processed_dataset = process_dataset(
         dataset=dataset, train_config=train_config, process_batch_sizes=(1000, 1000)
     )
-    # CustomTrainer has been replaced since BetterTransformer is still
-    # not compatible with this commit
+
     trainer = CustomTrainer(
         model=model,
         args=training_args,
