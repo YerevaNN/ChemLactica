@@ -1,5 +1,6 @@
 from config.create_train_config import model_train_configs
 import torch.distributed as dist
+import torch
 import transformers
 from transformers import TrainingArguments, AutoModelForCausalLM
 from datasets import load_dataset
@@ -7,7 +8,8 @@ from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
 import glob
 import sys
-from callbacks import CustomAimCallback
+from callbacks import CustomAimCallback, WPSCounterCallback
+import aim
 import os
 from optimum.bettertransformer import BetterTransformer
 from custom_trainer import CustomTrainer
@@ -214,28 +216,34 @@ if __name__ == "__main__":
 
     dist.init_process_group()
 
-    trainer_callback_list = []
+    trainer_callback_list = {}
     if track:
         if dist.is_initialized():
-            # if dist.get_rank() == 0:
-            aim_callback = CustomAimCallback(
-                checkpoints_dict_name="checkpoints_hashes",
-                repo=track_dir,
-                experiment=experiment_name,
-                model=model,
-                blocksize=train_config["block_size"],
-            )
+            if dist.get_rank() == 0:
+                aim_callback = CustomAimCallback(
+                    checkpoints_dict_name="checkpoints_hashes",
+                    repo=track_dir,
+                    experiment=experiment_name,
+                    model=model,
+                    blocksize=train_config["block_size"]
+                )
 
-            experiment_hash = aim_callback._run_hash
-            trainer_callback_list.append(aim_callback)
-        # with open("experiment.hash", "w") as file:
-        #     file.write(experiment_hash)
-        # else:
-        #     time.sleep(4)
-        #     with open("experiment.hash", "r") as file:
-        #         experiment_hash = file.readlines()[0]
-        aim_callback._run["process_id"] = dist.get_rank()
-    print(f"experiment hash on rank {dist.get_rank()}: ", experiment_hash)
+                trainer_callback_list["aim_callback"] = aim_callback
+
+                experiment_hash = aim_callback._run_hash
+                communication_list = [experiment_hash]
+            else:
+                communication_list = [None]
+
+    dist.broadcast_object_list(communication_list, src=0)
+    experiment_hash = communication_list[0]
+
+    wps_counter_callback = WPSCounterCallback(
+        train_config["block_size"],
+        trainer_callback_list.get("aim_callback")._run
+        if trainer_callback_list.get("aim_callback") is not None else None
+    )
+    trainer_callback_list["wps_counter_callback"] = wps_counter_callback
 
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, from_pretrained, experiment_hash
@@ -282,7 +290,7 @@ if __name__ == "__main__":
         compute_metrics=compute_metrics,
         train_dataset=processed_dataset["train"],
         eval_dataset=processed_dataset["validation"],
-        callbacks=trainer_callback_list,
+        callbacks=list(trainer_callback_list.values()),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
