@@ -35,9 +35,10 @@ class CustomAimCallback(AimCallback):
         checkpoints_dict[state.global_step] = {}
         for file_name in os.listdir(checkpoint_dir):
             file_path = os.path.join(checkpoint_dir, file_name)
-            checkpoints_dict[state.global_step][file_name] = calc_hash_for_binary_file(
-                file_path
-            )
+            if os.path.isfile(file_path):
+                checkpoints_dict[state.global_step][file_name] = calc_hash_for_binary_file(
+                    file_path
+                )
         self._run[self._checkpoints_dict_name] = checkpoints_dict
 
     def on_step_end(self, args, state, control, **kwargs):
@@ -78,3 +79,11 @@ class WPSCounterCallback(TrainerCallback):
                 self._aim_run.track(words_per_second, name=f"words per second")
 
             self._start_time = time.time()
+
+
+class ProfCallback(TrainerCallback):
+    def __init__(self, prof):
+        self.prof = prof
+
+    def on_step_end(self, args, state, control, **kwargs):
+        self.prof.step()

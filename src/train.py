@@ -8,11 +8,12 @@ from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
 import glob
 import sys
-from callbacks import CustomAimCallback, WPSCounterCallback
+from callbacks import CustomAimCallback, WPSCounterCallback, ProfCallback
 import os
 from optimum.bettertransformer import BetterTransformer
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
+from contextlib import nullcontext
 
 
 def load_model(from_pretrained: str):
@@ -176,6 +177,28 @@ if __name__ == "__main__":
         help="whether or not track the training using aim",
     )
     parser.set_defaults(track=True)
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        dest="profile",
+        help="whether or not profile the training",
+    )
+    parser.add_argument(
+        "--no-profile",
+        action="store_false",
+        dest="profile",
+        help="whether or not profile the training",
+    )
+    parser.add_argument(
+        "--profile_dir",
+        type=str,
+        metavar="PD",
+        dest="profile_dir",
+        required=False,
+        help="profiling directory",
+        default="/mnt/sxtn/chem/ChemLactica/metadata/profiling",
+    )
+    parser.set_defaults(profile=False)
 
     args = parser.parse_args()
     from_pretrained = args.from_pretrained
@@ -187,6 +210,8 @@ if __name__ == "__main__":
     save_steps = args.save_steps
     experiment_name = args.experiment_name
     track = args.track
+    profile = args.profile
+    profile_dir = args.profile_dir
     blocksize = args.blocksize
     track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
@@ -213,7 +238,7 @@ if __name__ == "__main__":
 
     dist.init_process_group()
 
-    trainer_callback_list = {}
+    trainer_callback_dict = {}
     experiment_hash = "none"
     communication_list = [experiment_hash]
     if track:
@@ -227,20 +252,38 @@ if __name__ == "__main__":
                     blocksize=train_config["block_size"]
                 )
 
-                trainer_callback_list["aim_callback"] = aim_callback
+                trainer_callback_dict["aim_callback"] = aim_callback
 
                 experiment_hash = aim_callback._run_hash
                 communication_list = [experiment_hash]
+
+    if profile:
+        prof = torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ],
+            schedule=torch.profiler.schedule(
+                skip_first=3, wait=1, warmup=1, active=2, repeat=2
+            ),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(
+                os.path.join(profile_dir, experiment_hash)
+            ),
+            profile_memory=True,
+            with_stack=True,
+            record_shapes=True,
+        )
+        trainer_callback_dict["profiller_callback"] = ProfCallback(prof)
 
     dist.broadcast_object_list(communication_list, src=0)
     experiment_hash = communication_list[0]
 
     wps_counter_callback = WPSCounterCallback(
         train_config["block_size"],
-        trainer_callback_list.get("aim_callback")._run
-        if trainer_callback_list.get("aim_callback") is not None else None
+        trainer_callback_dict.get("aim_callback")._run
+        if trainer_callback_dict.get("aim_callback") is not None else None
     )
-    trainer_callback_list["wps_counter_callback"] = wps_counter_callback
+    trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, from_pretrained, experiment_hash
@@ -269,6 +312,7 @@ if __name__ == "__main__":
         # which has some conflict with saving checkpoints
         dataloader_num_workers=num_workers,
         logging_steps=eval_steps // 2,
+        gradient_checkpointing=False
     )
 
     dataset = load_dataset(
@@ -287,10 +331,13 @@ if __name__ == "__main__":
         compute_metrics=compute_metrics,
         train_dataset=processed_dataset["train"],
         eval_dataset=processed_dataset["validation"],
-        callbacks=list(trainer_callback_list.values()),
+        callbacks=list(trainer_callback_dict.values()),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
-    trainer.train()
+    prof_context_manager = trainer_callback_dict.get("profiller_callback").prof if trainer_callback_dict.get("profiller_callback") is not None else nullcontext()
+
+    with prof_context_manager as prof:
+        trainer.train()
 
     sys.exit(0)  # explositly set exit code to 0 when succesfully termitating
