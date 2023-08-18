@@ -153,7 +153,6 @@ if __name__ == "__main__":
         metavar="TC",
         dest="tokenizer_checkpoint",
         help="tokenizer checkpoint name",
-        default=None,
     )
     parser.add_argument(
         "--num_workers",
@@ -216,10 +215,7 @@ if __name__ == "__main__":
     track_dir = args.track_dir
     checkpoints_root_dir = args.checkpoints_root_dir
     num_workers = args.num_workers
-
-    tokenizer_checkpoint = (
-        args.tokenizer_checkpoint if args.tokenizer_checkpoint else from_pretrained
-    )
+    tokenizer_checkpoint = args.tokenizer_checkpoint
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
