@@ -318,7 +318,7 @@ if __name__ == "__main__":
     )
 
     processed_dataset = process_dataset(
-        dataset=dataset, train_config=train_config, process_batch_sizes=(1000, 1000)
+        dataset=dataset, train_config=train_config, process_batch_sizes=(100, 100)
     )
 
     trainer = CustomTrainer(
