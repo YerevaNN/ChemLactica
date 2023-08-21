@@ -14,6 +14,12 @@ from optimum.bettertransformer import BetterTransformer
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from contextlib import nullcontext
+import random
+import numpy
+
+torch.manual_seed(42)
+random.seed(42)
+numpy.random.seed(42)
 
 
 def load_model(from_pretrained: str):
@@ -30,27 +36,6 @@ def load_model(from_pretrained: str):
             )
         )
     return AutoModelForCausalLM.from_pretrained(from_pretrained)
-
-
-def group_texts(examples):
-    # Concatenate all texts.
-    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
-    total_length = len(concatenated_examples[list(examples.keys())[0]])
-    # We drop the small remainder,
-    # we could add padding if the model supported it instead of this drop.
-    total_length = (total_length // train_config["block_size"]) * train_config[
-        "block_size"
-    ]
-    # Split by chunks of max_len.
-    result = {
-        k: [
-            t[i : i + train_config["block_size"]]  # noqa
-            for i in range(0, total_length, train_config["block_size"])
-        ]
-        for k, t in concatenated_examples.items()
-    }
-    result["labels"] = result["input_ids"].copy()
-    return result
 
 
 if __name__ == "__main__":
@@ -71,6 +56,13 @@ if __name__ == "__main__":
         dest="model_config",
         required=True,
         help="the model configuration to use",
+    )
+    parser.add_argument(
+        "--tokenizer_checkpoint",
+        type=str,
+        metavar="TC",
+        dest="tokenizer_checkpoint",
+        help="tokenizer checkpoint name",
     )
     parser.add_argument(
         "--training_data_dir",
@@ -130,15 +122,6 @@ if __name__ == "__main__":
         default="none",
     )
     parser.add_argument(
-        "--track_dir",
-        type=str,
-        metavar="ATD",
-        dest="track_dir",
-        required=False,
-        help="aim track directory",
-        default="/mnt/sxtn/chem/ChemLactica/metadata/aim",
-    )
-    parser.add_argument(
         "--checkpoints_root_dir",
         type=str,
         metavar="CSD",
@@ -146,13 +129,6 @@ if __name__ == "__main__":
         required=False,
         help="directory where to save checkpoints",
         default="/mnt/sxtn/chem/ChemLactica/checkpoints",
-    )
-    parser.add_argument(
-        "--tokenizer_checkpoint",
-        type=str,
-        metavar="TC",
-        dest="tokenizer_checkpoint",
-        help="tokenizer checkpoint name",
     )
     parser.add_argument(
         "--num_workers",
@@ -176,6 +152,15 @@ if __name__ == "__main__":
         help="whether or not track the training using aim",
     )
     parser.set_defaults(track=True)
+    parser.add_argument(
+        "--track_dir",
+        type=str,
+        metavar="TD",
+        dest="track_dir",
+        required=False,
+        help="aim track directory",
+        default="/mnt/sxtn/chem/ChemLactica/metadata/aim",
+    )
     parser.add_argument(
         "--profile",
         action="store_true",
@@ -202,6 +187,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     from_pretrained = args.from_pretrained
     model_config = args.model_config
+    tokenizer_checkpoint = args.tokenizer_checkpoint
     training_data_dir = args.training_data_dir
     valid_data_dir = args.valid_data_dir
     max_steps = args.max_steps
@@ -211,11 +197,14 @@ if __name__ == "__main__":
     track = args.track
     profile = args.profile
     profile_dir = args.profile_dir
-    blocksize = args.blocksize
-    track_dir = args.track_dir
+    # blocksize = args.blocksize
     checkpoints_root_dir = args.checkpoints_root_dir
     num_workers = args.num_workers
-    tokenizer_checkpoint = args.tokenizer_checkpoint
+    
+    do_track = args.track
+    track_dir = args.track_dir
+    do_profile = args.profile
+    profile_dir = args.profile_dir
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
@@ -225,19 +214,18 @@ if __name__ == "__main__":
     train_config = model_train_configs[model_config]
 
     model = load_model(from_pretrained)
-    model = BetterTransformer.transform(model)
     # Converts the model to use PyTorch’s native attention implementation
-    # BetterTransfomer has some unresolved conflicts with fsdp
+    model = BetterTransformer.transform(model)
 
     # Not sure if this will not cause issues like initializing two distributed groups
     # comment out to run without accelerate
-
     dist.init_process_group()
+    print(f"Process {dist.get_rank()} running...")
 
     trainer_callback_dict = {}
     experiment_hash = "none"
     communication_list = [experiment_hash]
-    if track:
+    if do_track:
         if dist.is_initialized():
             if dist.get_rank() == 0:
                 aim_callback = CustomAimCallback(
@@ -253,7 +241,35 @@ if __name__ == "__main__":
                 experiment_hash = aim_callback._run_hash
                 communication_list = [experiment_hash]
 
-    if profile:
+    if do_profile:
+        prof = torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ],
+            schedule=torch.profiler.schedule(
+                skip_first=3, wait=1, warmup=1, active=2, repeat=2
+            ),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(
+                os.path.join(profile_dir, experiment_hash)
+            ),
+            profile_memory=True,
+            with_stack=True,
+            record_shapes=True,
+        )
+
+    dist.broadcast_object_list(communication_list, src=0)
+    experiment_hash = communication_list[0]
+    print(f"Process {dist.get_rank()} aim hash: {experiment_hash}")
+
+    wps_counter_callback = WPSCounterCallback(
+        train_config["block_size"],
+        trainer_callback_dict.get("aim_callback")._run
+        if trainer_callback_dict.get("aim_callback") is not None else None
+    )
+    trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
+
+    if do_profile:
         prof = torch.profiler.profile(
             activities=[
                 torch.profiler.ProfilerActivity.CPU,
@@ -270,16 +286,6 @@ if __name__ == "__main__":
             record_shapes=True,
         )
         trainer_callback_dict["profiller_callback"] = ProfCallback(prof)
-
-    dist.broadcast_object_list(communication_list, src=0)
-    experiment_hash = communication_list[0]
-
-    wps_counter_callback = WPSCounterCallback(
-        train_config["block_size"],
-        trainer_callback_dict.get("aim_callback")._run
-        if trainer_callback_dict.get("aim_callback") is not None else None
-    )
-    trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, from_pretrained, experiment_hash

@@ -5,6 +5,7 @@ import hashlib
 
 import torch.distributed as dist
 import time
+from transformers import TrainerCallback
 
 
 def calc_hash_for_binary_file(path):
@@ -41,7 +42,10 @@ class CustomAimCallback(AimCallback):
                 )
         self._run[self._checkpoints_dict_name] = checkpoints_dict
 
-    def on_step_end(self, args, state, control, **kwargs):
+    # def on_step_begin(self, args, state, control, **kwargs):
+    #     self.start_time = time.time()
+
+    # def on_step_end(self, args, state, control, **kwargs):
         # Get batch size (first dimension of inputs)
         # self.embedding_norm_1 = torch.linalg.norm(
         #     self.model.get_input_embeddings().weight, ord=1
@@ -56,7 +60,7 @@ class CustomAimCallback(AimCallback):
 
         # self.experiment.track(self.embedding_norm_1, name="embedding l1 norm")
         # self.experiment.track(self.embedding_norm_2, name="embedding l2 norm")
-        pass
+        # pass
 
 
 class WPSCounterCallback(TrainerCallback):
@@ -70,7 +74,7 @@ class WPSCounterCallback(TrainerCallback):
         if dist.get_rank() == 0 and self._aim_run is not None:
             if self._start_time is not None:
                 batch_size = args.per_device_train_batch_size
-                # Calculate tokens in batch
+                # Calculate tokens in batch 
                 num_words = batch_size * self._block_size * args.world_size
                 # Calculate time taken for this step
                 elapsed_time = time.time() - self._start_time
