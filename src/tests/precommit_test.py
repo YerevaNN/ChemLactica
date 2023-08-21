@@ -21,13 +21,13 @@ class TestNetworkTraining(unittest.TestCase):
                 --model_config small_opt \
                 --training_data_dir {training_data_dir_path} \
                 --valid_data_dir {valid_data_dir_path} \
+                --tokenizer_checkpoint facebook/galactica-125m \
                 --max_steps 4 \
                 --eval_steps 2 \
                 --save_steps 2 \
                 --tokenizer 125m \
-                --checkpoints_root_dir ./ \
-                --tokenizer_checkpoint facebook/galactica-125m "
-            "--track_dir ./",
+                --checkpoints_root_dir ../checkpoints/ \
+                --track_dir ../aim/",
             shell=True,
             # stdout=subprocess.DEVNULL,
             # stderr=subprocess.DEVNULL,
@@ -38,6 +38,11 @@ class TestNetworkTraining(unittest.TestCase):
                 f"\n\tExit code: {executed_prog.returncode} \
                   \n\tError output: {executed_prog.stderr}."
             )
+
+
+class TestFSDPNetworkReproducibility(unittest.TestCase):
+    def test_network_reproducibility(self):
+        pass
 
 
 if __name__ == "__main__":
