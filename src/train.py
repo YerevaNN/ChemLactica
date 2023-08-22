@@ -6,7 +6,6 @@ from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
 import glob
-import sys
 from callbacks import CustomAimCallback, WPSCounterCallback, ProfCallback
 import os
 from utils import load_model
@@ -40,6 +39,9 @@ def train(
     profile,
     profile_dir,
 ):
+    if not valid_batch_size:
+        valid_batch_size = train_batch_size
+
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
     absolute_path = os.path.dirname(os.path.abspath(__file__))
@@ -104,9 +106,7 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
-    checkpoints_dir = os.path.join(
-        checkpoints_root_dir, from_pretrained, experiment_hash
-    )
+    checkpoints_dir = os.path.join(checkpoints_root_dir, experiment_hash)
 
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,
@@ -162,7 +162,7 @@ def train(
     with prof_context_manager as prof:
         trainer.train()
 
-    sys.exit(0)  # explositly set exit code to 0 when succesfully termitating
+    return trainer
 
 
 if __name__ == "__main__":
