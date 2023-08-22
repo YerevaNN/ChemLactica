@@ -1,6 +1,23 @@
 import tqdm
 import torch
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import transformers
+
+
+def load_model(from_pretrained: str, train_config):
+    if from_pretrained == "small_opt":
+        return transformers.OPTForCausalLM(
+            transformers.OPTConfig(
+                vocab_size=train_config["vocab_size"],
+                hidden_size=train_config["hidden_size"],
+                num_hidden_layers=train_config["num_hidden_layers"],
+                ffn_dim=train_config["ffn_dim"],
+                max_position_embeddings=train_config["max_position_embeddings"],
+                num_attention_heads=train_config["num_attention_heads"],
+                word_embed_proj_dim=train_config["word_embed_proj_dim"],
+            )
+        )
+    return AutoModelForCausalLM.from_pretrained(from_pretrained)
 
 
 class CustomTokenizer:
