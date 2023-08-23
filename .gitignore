@@ -175,3 +175,5 @@ galactica-125m-finetuned-pubchem/
 small_opt/
 
 checkpoints/
+
+.aim/
