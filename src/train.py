@@ -140,8 +140,14 @@ def train(
     )
 
     processed_dataset = process_dataset(
-        dataset=dataset, train_config=train_config, process_batch_sizes=(100, 100)
+        dataset=dataset, train_config=train_config, process_batch_sizes=(10, 10)
     )
+
+    samples = 0
+    for s in processed_dataset["train"]:
+        samples += 1
+
+    print("Number of train samples ", samples)
 
     trainer = CustomTrainer(
         model=model,
@@ -184,13 +190,6 @@ if __name__ == "__main__":
         required=True,
         help="the model configuration to use",
     )
-    # parser.add_argument(
-    #     "--tokenizer_checkpoint",
-    #     type=str,
-    #     metavar="TC",
-    #     dest="tokenizer_checkpoint",
-    #     help="tokenizer checkpoint name",
-    # )
     parser.add_argument(
         "--training_data_dir",
         type=str,
