@@ -107,6 +107,7 @@ def train(
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
     trainer_callback_dict["epoch_callback"] = EpochCallback()
+    # trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
 
     checkpoints_dir = os.path.join(checkpoints_root_dir, experiment_hash)
 
