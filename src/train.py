@@ -6,7 +6,7 @@ from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
 import glob
-from callbacks import CustomAimCallback, WPSCounterCallback, ProfCallback
+from callbacks import CustomAimCallback, WPSCounterCallback, ProfCallback, EpochCallback
 import os
 from utils import load_model
 from optimum.bettertransformer import BetterTransformer
@@ -106,6 +106,8 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
+    trainer_callback_dict["epoch_callback"] = EpochCallback()
+
     checkpoints_dir = os.path.join(checkpoints_root_dir, experiment_hash)
 
     training_args = TrainingArguments(
@@ -142,12 +144,6 @@ def train(
     processed_dataset = process_dataset(
         dataset=dataset, train_config=train_config, process_batch_sizes=(10, 10)
     )
-
-    samples = 0
-    for s in processed_dataset["train"]:
-        samples += 1
-
-    print("Number of train samples ", samples)
 
     trainer = CustomTrainer(
         model=model,

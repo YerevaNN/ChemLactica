@@ -4,9 +4,10 @@ import hashlib
 
 from aim.hugging_face import AimCallback
 import torch.distributed as dist
-from transformers.trainer_callback import TrainerCallback
+from transformers.trainer_callback import TrainerCallback, TrainerControl, TrainerState
 from transformers import AutoModel
 import torch
+from transformers.training_args import TrainingArguments
 
 
 def calc_hash_for_binary_file(path):
@@ -91,6 +92,23 @@ class ProfCallback(TrainerCallback):
 
     def on_step_end(self, args, state, control, **kwargs):
         self.prof.step()
+
+
+class EpochCallback(TrainerCallback):
+    def __init__(self, num_epochs=1):
+        self._num_epochs = num_epochs
+        self._current_epoch = 0
+
+    def on_epoch_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
+        self._current_epoch += 1
+        if self._current_epoch == self._num_epochs:
+            control.should_training_stop = True
 
 
 class ReproducabilityCallback(TrainerCallback):
