@@ -308,7 +308,9 @@ if __name__ == "__main__":
         # which has some conflict with saving checkpoints
         dataloader_num_workers=num_workers,
         logging_steps=eval_steps // 2,
-        gradient_checkpointing=False
+        gradient_checkpointing=False,
+        save_total_limit=4,
+        load_best_model_at_end=True
     )
 
     dataset = load_dataset(
