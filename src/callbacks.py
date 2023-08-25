@@ -25,6 +25,17 @@ class CustomAimCallback(AimCallback):
         self._run[self._checkpoints_dict_name] = {}
         self.blocksize = blocksize
 
+    def on_train_begin(self, args, state, control, **kwargs):
+        super().on_train_begin(args, state, control, **kwargs)
+
+        for arg_name, arg_value in vars(args).items():
+            self._run["TrainingArguments/" + arg_name] = str(arg_value)
+        for state_name, state_value in vars(state).items():
+            self._run["TrainerState/" + state_name] = str(state_value)
+        # Log the model configuration
+        for config_name, config_value in vars(self.model.config).items():
+            self._run["ModelConfig/" + config_name] = str(config_value)
+
     def on_save(self, args, state, control=None, **kwargs):
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
