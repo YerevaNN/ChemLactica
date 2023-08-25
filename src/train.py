@@ -143,7 +143,7 @@ def train(
     )
 
     processed_dataset = process_dataset(
-        dataset=dataset, train_config=train_config, process_batch_sizes=(10, 10)
+        dataset=dataset, train_config=train_config, process_batch_sizes=(100, 100)
     )
 
     trainer = CustomTrainer(
