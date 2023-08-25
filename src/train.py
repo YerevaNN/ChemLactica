@@ -8,7 +8,7 @@ import argparse
 import glob
 from callbacks import CustomAimCallback, WPSCounterCallback, ProfCallback, EpochCallback
 import os
-from utils import load_model
+from utils import load_model, CustomTokenizer
 from optimum.bettertransformer import BetterTransformer
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
@@ -52,6 +52,8 @@ def train(
     model = load_model(from_pretrained, train_config)
     # Converts the model to use PyTorch’s native attention implementation
     model = BetterTransformer.transform(model)
+
+    CustomTokenizer(model_config)
 
     # Not sure if this will not cause issues like initializing two distributed groups
     # comment out to run without accelerate

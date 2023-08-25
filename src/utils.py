@@ -29,6 +29,10 @@ class CustomTokenizer:
     pad_token_id = 1
     eos_token = "</s>"
     eos_token_id = 2
+    model_size = None
+
+    def __init__(self, model_size: str):
+        CustomTokenizer.model_size = model_size
 
     @staticmethod
     def get_instance():
@@ -42,7 +46,7 @@ class CustomTokenizer:
 
     @staticmethod
     def new_instance():
-        tok = AutoTokenizer.from_pretrained("facebook/galactica-125m")
+        tok = AutoTokenizer.from_pretrained(f"facebook/galactica-{CustomTokenizer.model_size}")
         tok.bos_token = CustomTokenizer.bos_token
         tok.bos_token_id = CustomTokenizer.bos_token_id
         tok.pad_token = CustomTokenizer.pad_token
