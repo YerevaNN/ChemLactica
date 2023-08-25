@@ -177,3 +177,5 @@ small_opt/
 checkpoints/
 
 .aim/
+
+src/live_prompt.ipynb
