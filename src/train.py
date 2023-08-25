@@ -109,7 +109,9 @@ def train(
     trainer_callback_dict["epoch_callback"] = EpochCallback()
     # trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
 
-    checkpoints_dir = os.path.join(checkpoints_root_dir, experiment_hash)
+    checkpoints_dir = os.path.join(
+        checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
+    )
 
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,
