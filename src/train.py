@@ -6,10 +6,9 @@ from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
 import glob
-import transformers
 from callbacks import CustomAimCallback, WPSCounterCallback, ProfCallback, EpochCallback, ReproducabilityCallback
 import os
-from utils import load_model
+from utils import load_model, CustomTokenizer
 from optimum.bettertransformer import BetterTransformer
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
@@ -51,6 +50,8 @@ def train(
     model = load_model(from_pretrained, train_config)
     # Converts the model to use PyTorch’s native attention implementation
     model = BetterTransformer.transform(model)
+
+    CustomTokenizer.set_model_size(model_config)
 
     # Not sure if this will not cause issues like initializing two distributed groups
     # comment out to run without accelerate
@@ -135,6 +136,8 @@ def train(
         dataloader_num_workers=dataloader_num_workers,
         logging_steps=eval_steps // 2,
         gradient_checkpointing=False,
+        save_total_limit=4,
+        load_best_model_at_end=True
     )
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
@@ -149,7 +152,7 @@ def train(
         dataset=dataset, train_config=train_config, process_batch_sizes=(100, 100)
     )
 
-    trainer = transformers.Trainer(
+    trainer = CustomTrainer(
         model=model,
         args=training_args,
         compute_metrics=compute_metrics,
