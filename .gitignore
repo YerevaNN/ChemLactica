@@ -174,3 +174,7 @@ cython_debug/
 galactica-125m-finetuned-pubchem/
 small_opt/
 checkpoints/
+
+.aim/
+
+src/live_prompt.ipynb
