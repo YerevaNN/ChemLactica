@@ -6,7 +6,8 @@ from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
 import glob
-from callbacks import CustomAimCallback, WPSCounterCallback, ProfCallback, EpochCallback
+import transformers
+from callbacks import CustomAimCallback, WPSCounterCallback, ProfCallback, EpochCallback, ReproducabilityCallback
 import os
 from utils import load_model
 from optimum.bettertransformer import BetterTransformer
@@ -42,8 +43,6 @@ def train(
     if not valid_batch_size:
         valid_batch_size = train_batch_size
 
-    training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-    valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
     absolute_path = os.path.dirname(os.path.abspath(__file__))
     print(absolute_path)
 
@@ -106,7 +105,7 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
-    trainer_callback_dict["epoch_callback"] = EpochCallback()
+    trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     # trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
 
     checkpoints_dir = os.path.join(
@@ -138,6 +137,8 @@ def train(
         gradient_checkpointing=False,
     )
 
+    training_data_files = glob.glob(training_data_dir + "/*.jsonl")
+    valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
     dataset = load_dataset(
         "text",
         data_files={"train": training_data_files, "validation": valid_data_files},
@@ -148,7 +149,7 @@ def train(
         dataset=dataset, train_config=train_config, process_batch_sizes=(100, 100)
     )
 
-    trainer = CustomTrainer(
+    trainer = transformers.Trainer(
         model=model,
         args=training_args,
         compute_metrics=compute_metrics,

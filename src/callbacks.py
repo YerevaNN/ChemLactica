@@ -1,13 +1,18 @@
 import os
 import time
 import hashlib
+import glob
+
+from dataset_utils import process_dataset
 
 from aim.hugging_face import AimCallback
 import torch.distributed as dist
 from transformers.trainer_callback import TrainerCallback, TrainerControl, TrainerState
-from transformers import AutoModel
+from transformers import OPTForCausalLM
+from optimum.bettertransformer import BetterTransformer
 import torch
 from transformers.training_args import TrainingArguments
+from datasets import load_dataset
 
 
 def calc_hash_for_binary_file(path):
@@ -116,12 +121,32 @@ class ReproducabilityCallback(TrainerCallback):
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
         )
-        saved_model = AutoModel.from_pretrained(checkpoint_dir)
-        _input = torch.randn(4, 2048, dtype=torch.float16)
-        out = saved_model(_input)
-        saved_out = model(_input)
+        saved_model = OPTForCausalLM.from_pretrained(checkpoint_dir).to(model.device)
 
-        is_repr = torch.allclose(out, saved_out, atol=1e-5)
+        training_data_files = glob.glob(".small_data/train" + "/*.jsonl")
+
+        dataset = load_dataset(
+            "text",
+            data_files={"data": training_data_files},
+            streaming=True,
+        )
+
+        processed_dataset = process_dataset(
+            dataset=dataset, train_config={"block_size": 2048}, process_batch_sizes=(100, 100)
+        )
+
+        is_repr = True
+        for inp in processed_dataset["data"]:
+            del inp["token_type_ids"]
+            inp = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
+            out = model(**inp)
+            saved_out = saved_model(**inp)
+            
+            ok = torch.allclose(out.logits, saved_out.logits, atol=1e-4)
+            if not ok:
+                is_repr = False
+            break
+
         if is_repr:
             print(f"Model at step {state.global_step} is reproducable.")
         else:
