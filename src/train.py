@@ -6,7 +6,13 @@ from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
 import glob
-from callbacks import CustomAimCallback, WPSCounterCallback, ProfCallback, EpochCallback, ReproducabilityCallback
+from callbacks import (
+    CustomAimCallback,
+    WPSCounterCallback,
+    ProfCallback,
+    EpochCallback,
+    # ReproducabilityCallback,
+)
 import os
 from utils import load_model, CustomTokenizer
 from optimum.bettertransformer import BetterTransformer
@@ -42,12 +48,15 @@ def train(
     if not valid_batch_size:
         valid_batch_size = train_batch_size
 
-    absolute_path = os.path.dirname(os.path.abspath(__file__))
-    print(absolute_path)
+    # absolute_path = os.path.dirname(os.path.abspath(__file__))
 
     train_config = model_train_configs[model_config]
 
     model = load_model(from_pretrained, train_config)
+    if os.path.isdir(from_pretrained):
+        resume_from_checkpoint = from_pretrained
+    else:
+        resume_from_checkpoint = False
     # Converts the model to use PyTorch’s native attention implementation
     model = BetterTransformer.transform(model)
 
@@ -112,6 +121,7 @@ def train(
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
     )
+    print("resume_from_checkpoint", resume_from_checkpoint)
 
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,
@@ -137,7 +147,7 @@ def train(
         logging_steps=eval_steps // 2,
         gradient_checkpointing=False,
         save_total_limit=4,
-        load_best_model_at_end=True
+        resume_from_checkpoint=resume_from_checkpoint,
     )
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
@@ -169,7 +179,7 @@ def train(
     )
 
     with prof_context_manager as prof:
-        trainer.train()
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
     return trainer
 
