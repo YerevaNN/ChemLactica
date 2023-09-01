@@ -44,6 +44,7 @@ def train(
     track_dir,
     profile,
     profile_dir,
+    gradient_accumulation_steps,
 ):
     if not valid_batch_size:
         valid_batch_size = train_batch_size
@@ -140,6 +141,7 @@ def train(
         save_steps=save_steps,
         dataloader_drop_last=True,
         dataloader_pin_memory=True,
+        gradient_accumulation_steps=gradient_accumulation_steps,
         # torch_compile=True,
         # torch_compile requires to set use_orig_params=true
         # which has some conflict with saving checkpoints
@@ -327,6 +329,14 @@ if __name__ == "__main__":
         required=False,
         help="profiling directory",
         default=None,
+    )
+    parser.add_argument(
+        "--gradient_accumulation_steps",
+        type=int,
+        metavar="GA",
+        dest="gradient_accumulation_steps",
+        required=False,
+        help="the number of steps to over which to accumulate gradients",
     )
 
     args = parser.parse_args()
