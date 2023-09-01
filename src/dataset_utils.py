@@ -12,7 +12,11 @@ def tokenize_function(examples):
 
 def process_str(str):
     # it's wierd workaround but works for now
-    compound = json.loads(json.loads((str["text"])))
+    try:
+        compound = json.loads(json.loads((str["text"])))
+    except Exception as e:
+        print(e)
+        return ""
     str["text"] = delete_empty_tags(compound)
     str["text"] = generate_formatted_string(compound)
     return str

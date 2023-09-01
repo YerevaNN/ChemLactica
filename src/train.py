@@ -1,10 +1,14 @@
 from config.create_train_config import model_train_configs
-import torch.distributed as dist
+
+# import torch.distributed as dist
+from accelerate.utils import broadcast_object_list
 import torch
 from transformers import TrainingArguments
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
+import accelerate
+from accelerate import Accelerator
 import glob
 from callbacks import (
     CustomAimCallback,
@@ -46,6 +50,10 @@ def train(
     profile_dir,
     gradient_accumulation_steps,
 ):
+    accelerator = Accelerator()
+    accelerate.tracking.AimTracker(run_name=experiment_name, logging_dir=track_dir)
+    print("test process", accelerator.process_index)
+
     if not valid_batch_size:
         valid_batch_size = train_batch_size
 
@@ -59,32 +67,39 @@ def train(
     else:
         resume_from_checkpoint = False
     # Converts the model to use PyTorch’s native attention implementation
+
     model = BetterTransformer.transform(model)
 
     CustomTokenizer.set_model_size(model_config)
 
     # Not sure if this will not cause issues like initializing two distributed groups
     # comment out to run without accelerate
-    dist.init_process_group()
+
+    # dist.init_process_group()
 
     trainer_callback_dict = {}
     experiment_hash = "none"
     communication_list = [experiment_hash]
     if track:
-        if dist.is_initialized():
-            if dist.get_rank() == 0:
-                aim_callback = CustomAimCallback(
-                    checkpoints_dict_name="checkpoints_hashes",
-                    repo=track_dir,
-                    experiment=experiment_name,
-                    model=model,
-                    blocksize=train_config["block_size"],
-                )
+        if accelerator.is_main_process:
+            aim_callback = CustomAimCallback(
+                checkpoints_dict_name="checkpoints_hashes",
+                repo=track_dir,
+                experiment=experiment_name,
+                model=model,
+                blocksize=train_config["block_size"],
+            )
 
-                trainer_callback_dict["aim_callback"] = aim_callback
+            trainer_callback_dict["aim_callback"] = aim_callback
 
-                experiment_hash = aim_callback._run_hash
-                communication_list = [experiment_hash]
+            experiment_hash = aim_callback._run_hash
+            communication_list = [experiment_hash]
+
+    accelerator.wait_for_everyone()
+    broadcast_object_list(communication_list)
+    experiment_hash = communication_list[0]
+
+    print(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
     if profile:
         prof = torch.profiler.profile(
@@ -104,10 +119,6 @@ def train(
         )
         trainer_callback_dict["profiller_callback"] = ProfCallback(prof)
 
-    dist.broadcast_object_list(communication_list, src=0)
-    experiment_hash = communication_list[0]
-    print(f"Process {dist.get_rank()} aim hash: {experiment_hash}")
-
     wps_counter_callback = WPSCounterCallback(
         train_config["block_size"],
         trainer_callback_dict.get("aim_callback")._run
@@ -122,7 +133,7 @@ def train(
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
     )
-    print("resume_from_checkpoint", resume_from_checkpoint)
+    accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,

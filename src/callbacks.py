@@ -6,10 +6,8 @@ import glob
 from dataset_utils import process_dataset
 
 from aim.hugging_face import AimCallback
-import torch.distributed as dist
 from transformers.trainer_callback import TrainerCallback, TrainerControl, TrainerState
 from transformers import OPTForCausalLM
-from optimum.bettertransformer import BetterTransformer
 import torch
 from transformers.training_args import TrainingArguments
 from datasets import load_dataset
@@ -45,6 +43,7 @@ class CustomAimCallback(AimCallback):
         # Log the model configuration
         for config_name, config_value in vars(self.model.config).items():
             self._run["ModelConfig/" + config_name] = str(config_value)
+        self.model = None
 
     def on_save(self, args, state, control=None, **kwargs):
         checkpoint_dir = os.path.join(
@@ -88,7 +87,7 @@ class WPSCounterCallback(TrainerCallback):
         self._start_time = None
 
     def on_step_begin(self, args, state, control, model, **kwargs):
-        if dist.get_rank() == 0 and self._aim_run is not None:
+        if state.is_world_process_zero and self._aim_run is not None:
             if self._start_time is not None:
                 batch_size = args.per_device_train_batch_size
                 # Calculate tokens in batch
@@ -143,7 +142,9 @@ class ReproducabilityCallback(TrainerCallback):
         )
 
         processed_dataset = process_dataset(
-            dataset=dataset, train_config={"block_size": 2048}, process_batch_sizes=(100, 100)
+            dataset=dataset,
+            train_config={"block_size": 2048},
+            process_batch_sizes=(100, 100),
         )
 
         is_repr = True
@@ -152,7 +153,7 @@ class ReproducabilityCallback(TrainerCallback):
             inp = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
             out = model(**inp)
             saved_out = saved_model(**inp)
-            
+
             ok = torch.allclose(out.logits, saved_out.logits, atol=1e-4)
             if not ok:
                 is_repr = False
