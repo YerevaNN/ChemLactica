@@ -348,6 +348,7 @@ if __name__ == "__main__":
         dest="gradient_accumulation_steps",
         required=False,
         help="the number of steps to over which to accumulate gradients",
+        default=1
     )
 
     args = parser.parse_args()
