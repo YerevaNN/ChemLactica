@@ -3,6 +3,7 @@ from config.create_train_config import model_train_configs
 # import torch.distributed as dist
 from accelerate.utils import broadcast_object_list
 import torch
+import transformers
 from transformers import TrainingArguments
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
@@ -15,7 +16,7 @@ from callbacks import (
     WPSCounterCallback,
     ProfCallback,
     EpochCallback,
-    # ReproducabilityCallback,
+    ReproducabilityCallback,
 )
 import os
 from utils import load_model, CustomTokenizer
@@ -68,7 +69,7 @@ def train(
         resume_from_checkpoint = False
     # Converts the model to use PyTorch’s native attention implementation
 
-    model = BetterTransformer.transform(model)
+    # model = BetterTransformer.transform(model)
 
     CustomTokenizer.set_model_size(model_config)
 

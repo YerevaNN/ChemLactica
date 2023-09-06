@@ -131,7 +131,7 @@ class ReproducabilityCallback(TrainerCallback):
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
         )
-        saved_model = OPTForCausalLM.from_pretrained(checkpoint_dir).to(model.device)
+        saved_model = OPTForCausalLM.from_pretrained(checkpoint_dir)
 
         training_data_files = glob.glob(".small_data/train" + "/*.jsonl")
 
@@ -150,11 +150,10 @@ class ReproducabilityCallback(TrainerCallback):
         is_repr = True
         for inp in processed_dataset["data"]:
             del inp["token_type_ids"]
-            inp = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
-            out = model(**inp)
-            saved_out = saved_model(**inp)
+            out = model(**{k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()})
+            saved_out = saved_model(**{k: inp[k].unsqueeze(0).to(saved_model.device) for k in inp.keys()})
 
-            ok = torch.allclose(out.logits, saved_out.logits, atol=1e-4)
+            ok = torch.allclose(out.logits, saved_out.logits.to(out.logits.device), atol=1e-4)
             if not ok:
                 is_repr = False
             break
