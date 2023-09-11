@@ -1,6 +1,7 @@
 from config.create_train_config import model_train_configs
 
 # import torch.distributed as dist
+from optimum.bettertransformer import BetterTransformer
 from accelerate.utils import broadcast_object_list
 import torch
 from torch.optim import AdamW
@@ -20,7 +21,6 @@ from callbacks import (
 )
 import os
 from utils import load_model, CustomTokenizer
-from optimum.bettertransformer import BetterTransformer
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from contextlib import nullcontext
@@ -166,13 +166,13 @@ def train(
         save_steps=save_steps,
         dataloader_drop_last=True,
         dataloader_pin_memory=True,
-        gradient_accumulation_steps=gradient_accumulation_steps,
         # torch_compile=True,
         # torch_compile requires to set use_orig_params=true
         # which has some conflict with saving checkpoints
         dataloader_num_workers=dataloader_num_workers,
         logging_steps=1,
         gradient_checkpointing=False,
+        gradient_accumulation_steps=gradient_accumulation_steps,
         save_total_limit=4,
         resume_from_checkpoint=resume_from_checkpoint,
         # load_best_model=True
