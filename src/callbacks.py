@@ -11,6 +11,8 @@ from transformers import OPTForCausalLM
 import torch
 from transformers.training_args import TrainingArguments
 from datasets import load_dataset
+from accelerate import Accelerator
+from utils import load_model
 
 
 def calc_hash_for_binary_file(path):
@@ -131,7 +133,13 @@ class ReproducabilityCallback(TrainerCallback):
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
         )
-        saved_model = OPTForCausalLM.from_pretrained(checkpoint_dir).to(model.device)
+        accelerator = Accelerator()
+        saved_model = load_model("facebook/galactica-125m", {})
+        saved_model = accelerator.prepare(saved_model)
+        checkpoint_dir = os.path.join(
+            args.output_dir, f"checkpoint-{state.global_step}"
+        )
+        accelerator.load_state(checkpoint_dir)
 
         training_data_files = glob.glob(".small_data/train" + "/*.jsonl")
 
@@ -147,18 +155,16 @@ class ReproducabilityCallback(TrainerCallback):
             process_batch_sizes=(100, 100),
         )
 
-        is_repr = True
+        _input = None
         for inp in processed_dataset["data"]:
             del inp["token_type_ids"]
-            inp = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
-            out = model(**inp)
-            saved_out = saved_model(**inp)
-
-            ok = torch.allclose(out.logits, saved_out.logits, atol=1e-4)
-            if not ok:
-                is_repr = False
+            _input = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
             break
 
+        out = model(**_input)
+        saved_out = saved_model(**_input)
+
+        is_repr = torch.allclose(out.logits, saved_out.logits, atol=1e-4)
         if is_repr:
             print(f"Model at step {state.global_step} is reproducable.")
         else:

@@ -15,7 +15,7 @@ from callbacks import (
     WPSCounterCallback,
     ProfCallback,
     EpochCallback,
-    # ReproducabilityCallback,
+    ReproducabilityCallback,
 )
 import os
 from utils import load_model, CustomTokenizer
@@ -68,7 +68,7 @@ def train(
         resume_from_checkpoint = False
     # Converts the model to use PyTorch’s native attention implementation
 
-    model = BetterTransformer.transform(model)
+    # model = BetterTransformer.transform(model)
 
     CustomTokenizer.set_model_size(model_config)
 
@@ -128,7 +128,7 @@ def train(
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
-    # trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
+    trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
 
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
