@@ -157,7 +157,7 @@ def train(
         # torch_compile requires to set use_orig_params=true
         # which has some conflict with saving checkpoints
         dataloader_num_workers=dataloader_num_workers,
-        logging_steps=eval_steps // 2,
+        logging_steps=1,
         gradient_checkpointing=False,
         save_total_limit=4,
         resume_from_checkpoint=resume_from_checkpoint,
