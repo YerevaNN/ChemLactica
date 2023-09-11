@@ -127,12 +127,7 @@ class EpochCallback(TrainerCallback):
 
 
 class ReproducabilityCallback(TrainerCallback):
-    def on_save(self, args, state, control, model, **kwargs):
-        checkpoint_dir = os.path.join(
-            args.output_dir, f"checkpoint-{state.global_step}"
-        )
-        saved_model = OPTForCausalLM.from_pretrained(checkpoint_dir)
-
+    def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, model, **kwargs):
         training_data_files = glob.glob(".small_data/train" + "/*.jsonl")
 
         dataset = load_dataset(
@@ -147,17 +142,23 @@ class ReproducabilityCallback(TrainerCallback):
             process_batch_sizes=(100, 100),
         )
 
-        is_repr = True
         for inp in processed_dataset["data"]:
             del inp["token_type_ids"]
-            out = model(**{k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()})
-            saved_out = saved_model(**{k: inp[k].unsqueeze(0).to(saved_model.device) for k in inp.keys()})
-
-            ok = torch.allclose(out.logits, saved_out.logits.to(out.logits.device), atol=1e-4)
-            if not ok:
-                is_repr = False
+            _input = inp
             break
 
+        with torch.no_grad():
+            out = model(**{k: v.unsqueeze(0).to(model.device) for k, v in _input.items()})
+
+        checkpoint_dir = os.path.join(
+            args.output_dir, f"checkpoint-{state.global_step}"
+        )
+        saved_model = OPTForCausalLM.from_pretrained(checkpoint_dir)
+
+        with torch.no_grad():
+            saved_out = saved_model(**{k: v.unsqueeze(0).to(saved_model.device) for k, v in _input.items()})
+
+        is_repr = torch.allclose(out.logits, saved_out.logits.to(out.logits.device), atol=1e-4)
         if is_repr:
             print(f"Model at step {state.global_step} is reproducable.")
         else:

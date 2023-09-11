@@ -20,7 +20,7 @@ def create_train_command(module, module_args, script, script_args):
     return train_command
 
 
-class TestNetwork(unittest.TestCase):
+class TestNetwork:
     def setUp(self):
         script_path = os.path.dirname(os.path.abspath(__file__))
         # Building absolute paths
@@ -61,6 +61,23 @@ class TestNetwork(unittest.TestCase):
         )
         if executed_prog.returncode != 0:
             raise Exception(f"\n\tExit code: {executed_prog.returncode}")
+
+
+class TestHuggingfaceAccelerateModelReproducability(unittest.TestCase):
+
+    def test_reproducability(self):
+        os.environ["PYTHONPATH"] = "/home/tigranfahradyan/ChemLactica/ChemLactica/src"
+        train_command = create_train_command(
+            module="accelerate.commands.launch",
+            module_args={"config_file": "src/config/test_config.yaml"},
+            script="src/tests/check_repr.py",
+            script_args={},
+        )
+        print(train_command)
+        executed_prog = subprocess.run(
+            train_command,
+            shell=True,
+        )
 
 
 if __name__ == "__main__":
