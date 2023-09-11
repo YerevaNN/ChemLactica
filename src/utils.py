@@ -1,7 +1,23 @@
 import tqdm
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers.models.opt.modeling_opt import OPTForCausalLM
 import transformers
+import torch.nn as nn
+
+
+class LinearFloat32(nn.Linear):
+    def forward(self, _input) -> torch.Tensor:
+        return super().forward(_input).to(torch.float32)
+
+
+def custom_opt_init(func):
+    def inner_func(self, config, *args, **kwargs):
+        func(self, config, *args, **kwargs)
+        self.lm_head = LinearFloat32(config.word_embed_proj_dim, config.vocab_size, bias=False)
+    return inner_func
+
+OPTForCausalLM.__init__ = custom_opt_init(OPTForCausalLM.__init__)
 
 
 def load_model(from_pretrained: str, train_config):

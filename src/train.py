@@ -156,7 +156,7 @@ def train(
         # torch_compile requires to set use_orig_params=true
         # which has some conflict with saving checkpoints
         dataloader_num_workers=dataloader_num_workers,
-        logging_steps=eval_steps // 2,
+        logging_steps=1,
         gradient_checkpointing=False,
         gradient_accumulation_steps=gradient_accumulation_steps,
         save_total_limit=4,
@@ -348,6 +348,7 @@ if __name__ == "__main__":
         dest="gradient_accumulation_steps",
         required=False,
         help="the number of steps to over which to accumulate gradients",
+        default=1
     )
 
     args = parser.parse_args()
