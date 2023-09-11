@@ -68,7 +68,7 @@ def train(
         resume_from_checkpoint = False
     # Converts the model to use PyTorch’s native attention implementation
 
-    # model = BetterTransformer.transform(model)
+    model = BetterTransformer.transform(model)
 
     CustomTokenizer.set_model_size(model_config)
 

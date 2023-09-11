@@ -135,6 +135,7 @@ class ReproducabilityCallback(TrainerCallback):
         )
         accelerator = Accelerator()
         saved_model = load_model("facebook/galactica-125m", {})
+        saved_model = saved_model.to(accelerator.device)
         saved_model = accelerator.prepare(saved_model)
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
@@ -161,11 +162,12 @@ class ReproducabilityCallback(TrainerCallback):
             _input = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
             break
 
-        out = model(**_input)
-        saved_out = saved_model(**_input)
+        model.eval()
+        saved_model.eval()
+        with torch.no_grad():
+            out = model(**_input)
+            saved_out = saved_model(**_input)
+        model.train()
 
-        is_repr = torch.allclose(out.logits, saved_out.logits, atol=1e-4)
-        if is_repr:
-            print(f"Model at step {state.global_step} is reproducable.")
-        else:
-            print(f"Model at step {state.global_step} is not reproducable.")
+        max_diff = torch.max(torch.abs(out.logits - saved_out.logits))
+        print(f"Reproducability test: max difference in logits is {max_diff}")
