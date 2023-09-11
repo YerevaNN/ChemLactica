@@ -3,7 +3,8 @@ from config.create_train_config import model_train_configs
 # import torch.distributed as dist
 from accelerate.utils import broadcast_object_list
 import torch
-from transformers import TrainingArguments
+from torch.optim import AdamW
+from transformers import TrainingArguments, get_linear_schedule_with_warmup
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
@@ -135,16 +136,29 @@ def train(
     )
     accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
+    optimizer = AdamW(
+        model.parameters(),
+        lr=train_config["max_learning_rate"],
+        betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
+        weight_decay=train_config["weight_decay"]
+        )
+    
+    lr_scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=train_config["warmup_steps"],
+        num_training_steps=max_steps
+        )
+    
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,
         per_device_train_batch_size=train_batch_size,
         per_device_eval_batch_size=valid_batch_size,
-        learning_rate=train_config["max_learning_rate"],
-        lr_scheduler_type="linear",
-        weight_decay=train_config["weight_decay"],
-        adam_beta1=train_config["adam_beta1"],
-        adam_beta2=train_config["adam_beta2"],
-        warmup_steps=train_config["warmup_steps"],
+        # learning_rate=train_config["max_learning_rate"],
+        # lr_scheduler_type="linear",
+        # weight_decay=train_config["weight_decay"],
+        # adam_beta1=train_config["adam_beta1"],
+        # adam_beta2=train_config["adam_beta2"],
+        # warmup_steps=train_config["warmup_steps"],
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
         eval_steps=eval_steps,
@@ -161,6 +175,7 @@ def train(
         gradient_checkpointing=False,
         save_total_limit=4,
         resume_from_checkpoint=resume_from_checkpoint,
+        # load_best_model=True
     )
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
@@ -182,6 +197,7 @@ def train(
         train_dataset=processed_dataset["train"],
         eval_dataset=processed_dataset["validation"],
         callbacks=list(trainer_callback_dict.values()),
+        optimizers=[optimizer, lr_scheduler],
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
