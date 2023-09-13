@@ -1,3 +1,4 @@
+import shutil
 from transformers import Trainer
 from typing import Optional
 from transformers import OPTForCausalLM
@@ -11,6 +12,12 @@ from transformers import OPTForCausalLM
 
 
 class CustomTrainer(Trainer):
+    def _save_checkpoint(self, model, trial, metrics=None):
+        if shutil.disk_usage('/').free > 3 * 1024 ** 3: 
+            super()._save_checkpoint(model, trial, metrics=None)
+        else:
+            print("**disk is full didn't save**")
+
     def save_model(
         self, output_dir: Optional[str] = None, _internal_call: bool = False
     ):
