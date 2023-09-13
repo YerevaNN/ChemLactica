@@ -27,6 +27,9 @@ from contextlib import nullcontext
 import random
 import numpy
 
+# os.environ['TRANSFORMERS_CACHE'] = "/dev/shm/cache"
+# os.environ['HF_DATASETS_CACHE'] = 
+
 torch.manual_seed(42)
 random.seed(42)
 numpy.random.seed(42)
@@ -183,7 +186,7 @@ def train(
     dataset = load_dataset(
         "text",
         data_files={"train": training_data_files, "validation": valid_data_files},
-        streaming=True,
+        streaming=False, cache_dir="/dev/shm/cache"
     )
 
     processed_dataset = process_dataset(
@@ -207,8 +210,8 @@ def train(
         else nullcontext()
     )
 
-    with prof_context_manager as prof:
-        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+    # with prof_context_manager as prof:
+    #     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
     return trainer
 
