@@ -5,7 +5,7 @@ from optimum.bettertransformer import BetterTransformer
 from accelerate.utils import broadcast_object_list
 import torch
 from torch.optim import AdamW
-from transformers import TrainingArguments, get_linear_schedule_with_warmup
+from transformers import TrainingArguments, get_polynomial_decay_schedule_with_warmup
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
@@ -52,7 +52,7 @@ def train(
     gradient_accumulation_steps,
 ):
     accelerator = Accelerator()
-    accelerate.tracking.AimTracker(run_name=experiment_name, logging_dir=track_dir)
+    # accelerate.tracking.AimTracker(run_name=experiment_name, logging_dir=track_dir)
     print("test process", accelerator.process_index)
 
     if not valid_batch_size:
@@ -143,10 +143,12 @@ def train(
         weight_decay=train_config["weight_decay"]
         )
     
-    lr_scheduler = get_linear_schedule_with_warmup(
+    lr_scheduler = get_polynomial_decay_schedule_with_warmup(
         optimizer,
         num_warmup_steps=train_config["warmup_steps"],
-        num_training_steps=max_steps
+        num_training_steps=max_steps,
+        lr_end=0.1*train_config["max_learning_rate"],
+        power=1.0,
         )
     
     training_args = TrainingArguments(
