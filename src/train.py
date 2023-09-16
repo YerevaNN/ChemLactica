@@ -4,12 +4,14 @@ from config.create_train_config import model_train_configs
 from optimum.bettertransformer import BetterTransformer
 from accelerate.utils import broadcast_object_list
 import torch
+import torch.distributed as dist
 from torch.optim import AdamW
 from transformers import TrainingArguments, get_linear_schedule_with_warmup
 from datasets import load_dataset
+from datasets.iterable_dataset import IterableDataset
+from datasets.dataset_dict import IterableDatasetDict
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
-import accelerate
 from accelerate import Accelerator
 import glob
 from callbacks import (
@@ -22,7 +24,7 @@ from callbacks import (
 import os
 from utils import load_model, CustomTokenizer
 from custom_trainer import CustomTrainer
-from dataset_utils import process_dataset
+from dataset_utils import process_dataset, samples_generator, JsonlDataset
 from contextlib import nullcontext
 import random
 import numpy
@@ -52,7 +54,6 @@ def train(
     gradient_accumulation_steps,
 ):
     accelerator = Accelerator()
-    accelerate.tracking.AimTracker(run_name=experiment_name, logging_dir=track_dir)
     print("test process", accelerator.process_index)
 
     if not valid_batch_size:
@@ -141,13 +142,13 @@ def train(
         lr=train_config["max_learning_rate"],
         betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
         weight_decay=train_config["weight_decay"]
-        )
+    )
     
     lr_scheduler = get_linear_schedule_with_warmup(
         optimizer,
         num_warmup_steps=train_config["warmup_steps"],
         num_training_steps=max_steps
-        )
+    )
     
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,
@@ -185,6 +186,12 @@ def train(
         data_files={"train": training_data_files, "validation": valid_data_files},
         streaming=True,
     )
+    train_jsonl_datasets = {_file: JsonlDataset(_file) for _file in training_data_files}
+    valid_jsonl_datasets = {_file: JsonlDataset(_file) for _file in valid_data_files}
+    # dataset = IterableDatasetDict({
+    #     "train": IterableDataset.from_generator(samples_generator(train_jsonl_datasets)),
+    #     "validation": IterableDataset.from_generator(samples_generator(valid_jsonl_datasets))
+    # })
 
     processed_dataset = process_dataset(
         dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
@@ -199,6 +206,7 @@ def train(
         callbacks=list(trainer_callback_dict.values()),
         optimizers=[optimizer, lr_scheduler],
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
+        train_jsonl_datasets=train_jsonl_datasets
     )
 
     prof_context_manager = (

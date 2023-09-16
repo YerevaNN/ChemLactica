@@ -1,21 +1,74 @@
 import time
-import argparse
 import glob
 import logging
+import sys
 
-from datasets import load_dataset
+sys.path.append("/home/tigranfahradyan/ChemLactica/ChemLactica/src")
+
 from torch.utils.data import DataLoader
-from dataset_utils import process_dataset
+import torch
+import numpy
+import random
+from dataset_utils import process_dataset, samples_generator, JsonlDataset
 from transformers import TrainingArguments
 from transformers.data.data_collator import default_data_collator
-from transformers.trainer_pt_utils import IterableDatasetShard
-
+from datasets.iterable_dataset import IterableDataset
+from datasets.dataset_dict import IterableDatasetDict
+from utils import CustomTokenizer
+from datasets import load_dataset, IterableDataset
+from datasets.download.streaming_download_manager import FilesIterable
 
 logging.basicConfig(
     filename="dataloader_benchmark.log",
     level=logging.INFO,
     format="%(levelname)s: " "%(message)s",
 )
+
+torch.manual_seed(42)
+random.seed(42)
+numpy.random.seed(42)
+
+if __name__ == "__main__":
+    start_time = time.time()
+
+    # training_data_files = glob.glob("/home/tigranfahradyan/single_data/train" + "/*.jsonl")
+    # valid_data_files = glob.glob("/home/tigranfahradyan/single_data/valid" + "/*.jsonl")
+    training_data_files = glob.glob("/home/tigranfahradyan/ChemLactica/ChemLactica/.small_data/train" + "/*.jsonl")
+    validation_data_files = glob.glob("/home/tigranfahradyan/ChemLactica/ChemLactica/.small_data/valid" + "/*.jsonl")
+    print(training_data_files)
+    # dataset = load_dataset(
+    #     "text",
+    #     data_files={"train": training_data_files, "validation": valid_data_files},
+    #     streaming=True
+    # )
+    train_jsonl_datasets = {_file: JsonlDataset(_file) for _file in training_data_files}
+    valid_jsonl_datasets = {_file: JsonlDataset(_file) for _file in validation_data_files}
+    dataset = IterableDatasetDict({
+        "train": IterableDataset.from_generator(samples_generator(train_jsonl_datasets)),
+        "validation": IterableDataset.from_generator(samples_generator(valid_jsonl_datasets))
+    })
+
+    # dataset = process_dataset(
+    #     dataset=dataset, train_config={"block_size": 2048}, process_batch_sizes=(50, 50)
+    # )
+
+    CustomTokenizer.set_model_size("125m")
+
+    # for s in samples_generator(train_jsonl_datasets)():
+    #     print(s)
+
+    # _samples = []
+    samples = 0
+    for s in dataset["train"]:
+        samples += 1
+        print(s)
+        print(samples)
+        # _samples.append(s)
+        # if len(_samples) == 2:
+        #     print(_samples[0] == _samples[1])
+        #     _samples.clear()
+    
+    logging.info(f"finished (took {time.time() - start_time}).")
 
 
 def test_dataloader_speed(dl: DataLoader, config, max_num_of_samples: int = None):
@@ -41,115 +94,18 @@ def test_dataloader_speed(dl: DataLoader, config, max_num_of_samples: int = None
     )
 
 
-if __name__ == "__main__":
-    start_time = time.time()
-    parser = argparse.ArgumentParser(description="dataloader speed testing parser")
-
-    parser.add_argument(
-        "--data_dir",
-        type=str,
-        metavar="DT",
-        dest="data_dir",
-        required=True,
-        help="path to directory containing *.jsonl files",
-    )
-    parser.add_argument(
-        "--num_workers",
-        type=int,
-        metavar="NW",
-        dest="num_workers",
-        required=True,
-        help="number of processes",
-    )
-    parser.add_argument(
-        "--batch_size",
-        type=int,
-        metavar="BS",
-        dest="batch_size",
-        required=True,
-        help="batch size",
-    )
-    parser.add_argument(
-        "--process_batch_size",
-        type=int,
-        metavar="PBS",
-        dest="process_batch_size",
-        required=True,
-        help="process batch size",
-    )
-
-    args = parser.parse_args()
-    data_dir = args.data_dir
-    num_workers = args.num_workers
-    batch_size = args.batch_size
-    process_batch_size = args.process_batch_size
-
-    config = {
-        "block_size": 2048,
-        "batch_size": batch_size,
-        "dataloader_pin_memory": True,
-        "torch_compile": True,
-        "num_workers": num_workers,
-        "process_batch_size": process_batch_size,
-    }
-
-    logging.info("Params:")
-    for key, value in config.items():
-        logging.info(f"\t{key}: {value}")
-
-    data_collator = default_data_collator
-
-    data_files = glob.glob(data_dir + "/*.jsonl")
-
-    dataset = load_dataset(
-        "text",
-        data_files={"data": data_files},
-        streaming=True,
-    )
-
-    processed_dataset = process_dataset(
-        dataset=dataset,
-        train_config=config,
-        process_batch_sizes=(
-            config["process_batch_size"],
-            config["process_batch_size"],
-        ),
-    )
-
-    args = TrainingArguments(
-        output_dir="./",
-        per_device_train_batch_size=config["batch_size"],
-        per_device_eval_batch_size=config["batch_size"],
-        dataloader_pin_memory=config["dataloader_pin_memory"],
-        torch_compile=config["torch_compile"],
-        dataloader_num_workers=config["num_workers"],
-        dataloader_drop_last=True,
-    )
-
-    if args.world_size > 1:
-        processed_dataset["data"] = IterableDatasetShard(
-            processed_dataset["data"],
-            batch_size=config["process_batch_size"],
-            drop_last=args.dataloader_drop_last,
-            num_processes=args.world_size,
-            process_index=args.process_index,
-        )
-
-    dataloader = DataLoader(
-        processed_dataset["data"],
-        batch_size=config["batch_size"],
-        drop_last=args.dataloader_drop_last,
-        num_workers=args.dataloader_num_workers,
-        collate_fn=data_collator,
-        pin_memory=args.dataloader_pin_memory,
-    )
-
-    # num_samples = 0
-    # for s in processed_dataset["data"]:
-    #     # print(s["input_ids"].shape)
-    #     num_samples += 1
-
-    # print(num_samples)
-
-    test_dataloader_speed(dataloader, config, max_num_of_samples=20)
-    logging.info(f"finished (took {time.time() - start_time}).")
+# from multiprocessing import Process, Queue
+# def writer(i,q):
+#     message = f'I am Process {i}'
+#     q.put(message)
+# if __name__ ==  '__main__':
+#     # Create multiprocessing queue
+#     q = Queue()
+    
+#     # Create a group of parallel writers and start them
+#     for i in range(10):
+#         Process(target=writer, args=(i,q,)).start()
+#     # Read the queue sequentially
+#     for i in range(10):
+#         message = q.get()
+#         print(message)
