@@ -218,8 +218,6 @@ def train(
 
     with prof_context_manager as prof:
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
-    # for sample in processed_dataset["train"]:
-    #     print(sample)
 
     return trainer
 
