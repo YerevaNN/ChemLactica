@@ -19,6 +19,7 @@ from callbacks import (
     WPSCounterCallback,
     ProfCallback,
     EpochCallback,
+    JsonlDatasetResumeCallback
     # ReproducabilityCallback,
 )
 import os
@@ -69,7 +70,6 @@ def train(
     else:
         resume_from_checkpoint = False
     # Converts the model to use PyTorch’s native attention implementation
-
     model = BetterTransformer.transform(model)
 
     CustomTokenizer.set_model_size(model_config)
@@ -129,7 +129,27 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
+    training_data_files = glob.glob(training_data_dir + "/*.jsonl")
+    valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
+    # dataset = load_dataset(
+    #     "text",
+    #     data_files={"train": training_data_files, "validation": valid_data_files},
+    #     streaming=True,
+    # )
+
+    train_jsonl_datasets = {_file: JsonlDataset(_file) for _file in training_data_files}
+    valid_jsonl_datasets = {_file: JsonlDataset(_file) for _file in valid_data_files}
+    dataset = IterableDatasetDict({
+        "train": IterableDataset.from_generator(samples_generator, gen_kwargs={"jsonl_datasets_dict": train_jsonl_datasets}),
+        "validation": IterableDataset.from_generator(samples_generator, gen_kwargs={"jsonl_datasets_dict": valid_jsonl_datasets})
+    })
+
+    processed_dataset = process_dataset(
+        dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
+    )
+
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
+    trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback(train_jsonl_datasets, resume_from_checkpoint)
     # trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
 
     checkpoints_dir = os.path.join(
@@ -179,24 +199,6 @@ def train(
         # load_best_model=True
     )
 
-    training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-    valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-    dataset = load_dataset(
-        "text",
-        data_files={"train": training_data_files, "validation": valid_data_files},
-        streaming=True,
-    )
-    train_jsonl_datasets = {_file: JsonlDataset(_file) for _file in training_data_files}
-    valid_jsonl_datasets = {_file: JsonlDataset(_file) for _file in valid_data_files}
-    # dataset = IterableDatasetDict({
-    #     "train": IterableDataset.from_generator(samples_generator(train_jsonl_datasets)),
-    #     "validation": IterableDataset.from_generator(samples_generator(valid_jsonl_datasets))
-    # })
-
-    processed_dataset = process_dataset(
-        dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
-    )
-
     trainer = CustomTrainer(
         model=model,
         args=training_args,
@@ -206,7 +208,6 @@ def train(
         callbacks=list(trainer_callback_dict.values()),
         optimizers=[optimizer, lr_scheduler],
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-        train_jsonl_datasets=train_jsonl_datasets
     )
 
     prof_context_manager = (
@@ -217,6 +218,8 @@ def train(
 
     with prof_context_manager as prof:
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+    # for sample in processed_dataset["train"]:
+    #     print(sample)
 
     return trainer
 

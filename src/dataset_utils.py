@@ -3,80 +3,50 @@ from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
 from utils import CustomTokenizer
-from multiprocessing import Process, Queue
-from multiprocessing import set_start_method
 from typing import Dict
-from datasets import IterableDataset
-set_start_method("fork")
+import copy
 
 
 class JsonlDataset:
 
     def __init__(self, _file_path):
         self._f = open(_file_path, "r")
-        self._line_number = 0
-        self._exhausted = False
+        # for some mysterious reasons the line_number cannot be kept in the json file,
+        # it does not work properly
+        self.line_number = 0
 
     def __next__(self):
-        if self._exhausted:
-            return None
-        
         line = self._f.readline()
-        self._line_number += 1
         if not line:
-            self._f.close()
-            self._exhausted = True
+            if not self._f.closed:
+                self._f.close()
             return None
+        self.line_number += 1
+        print(self.line_number, line[:100])
+        return line
         
-        return {"text": line} # this is done to be compatible with the old code
 
     def get_read_position(self):
-        """ return the read position in bytes """
+        """
+            returns an integer giving the file object’s current position in the file
+            represented as number of bytes from the beginning of the file
+        """
         return self._f.tell()
 
     def set_read_position(self, position):
-        self._f.seek(position)
+        self._f.seek(position, 0)
 
 
-# class CustomIterableDataset(IterableDataset):
-
-#     def __init__(self, *args, **kwargs):
-#         self.generator = None
-
-#     @staticmethod
-#     def from_generator(generator, *args, **kwargs):
-#         return super().from_generator(generator, *args, **kwargs)
-
-
-# class CustomSamplesGenerator:
-
-#     def __init__(self, jsonl_datasets: Dict[str, JsonlGeneratorDataset]):
-#         self.jsonl_datasets = jsonl_datasets
-#         self.iter = self.__iter__()
-
-#     def __call__(self):
-#         return next(self.iter)
-    
-#     def __iter__(self):
-#         for ds in self.jsonl_datasets.values():
-#             for sample in ds.generator():
-#                 if sample:
-#                     yield sample
-
-def samples_generator(jsonl_datasets: Dict[str, JsonlDataset]):
-    def inner_func():
-        while True:
-            _returned = False
-            for ds in jsonl_datasets.values():
-                sample = next(ds)
-                if sample:
-                    _returned = True
-                    yield sample
-            
-            if not _returned:
-                break
-
-    return inner_func
+def samples_generator(jsonl_datasets_dict: Dict[str, JsonlDataset]):
+    jsonl_datasets = list(jsonl_datasets_dict.values())
+    while True:
+        returned = False
+        for sample in map(next, jsonl_datasets):
+            if sample:
+                returned = True
+                yield {"text" : sample} # this is done to be compatible with the old code
+        if not returned:
+            break
 
 
 def tokenize_function(examples):

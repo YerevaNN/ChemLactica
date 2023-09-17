@@ -2,8 +2,9 @@ import os
 import time
 import hashlib
 import glob
+import json
 
-from dataset_utils import process_dataset
+from dataset_utils import process_dataset, JsonlDataset
 
 from aim.hugging_face import AimCallback
 from transformers.trainer_callback import TrainerCallback, TrainerControl, TrainerState
@@ -11,6 +12,7 @@ from transformers import OPTForCausalLM
 import torch
 from transformers.training_args import TrainingArguments
 from datasets import load_dataset
+import accelerate
 
 
 def calc_hash_for_binary_file(path):
@@ -163,3 +165,42 @@ class ReproducabilityCallback(TrainerCallback):
             print(f"Model at step {state.global_step} is reproducable.")
         else:
             print(f"Model at step {state.global_step} is not reproducable.")
+
+
+
+class JsonlDatasetResumeCallback(TrainerCallback):
+
+    def __init__(self, train_jsonl_datasets, resume_from_checkpoint):
+        self._train_jsonl_datasets = train_jsonl_datasets
+        if resume_from_checkpoint:
+            self.on_train_begin = self._on_train_begin
+
+    def _on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        if args.resume_from_checkpoint: # resume training
+
+            with open(os.path.join(args.resume_from_checkpoint, "jsonl_generators.json"), "r") as _file:
+                jsonl_dataset_info = json.load(_file)
+
+            print(f"setting the readers from {args.resume_from_checkpoint} checkpoint.")
+            for name, ds in self._train_jsonl_datasets.items():
+                print(f"{name} read position: {jsonl_dataset_info[name]}.")
+                ds.set_read_position(int(jsonl_dataset_info[name]["position"]))
+                # ds.line_number = jsonl_dataset_info[name]["line_number"]
+
+            accelerate.skip_first_batches = lambda : None # disable this function to not skip any steps
+
+
+    def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        if torch.distributed.get_rank() == 0:
+            checkpoint_dir = os.path.join(
+                args.output_dir, f"checkpoint-{state.global_step}"
+            )
+            # save file offsets
+            jsonl_generators_dict = {}
+            for file_name, ds in self._train_jsonl_datasets.items():
+                jsonl_generators_dict[file_name] = {}
+                jsonl_generators_dict[file_name]["position"] = ds.get_read_position()
+                # jsonl_generators_dict[file_name]["line_number"] = ds.line_number
+            
+            with open(os.path.join(checkpoint_dir, "jsonl_generators.json"), "w") as _f:
+                json.dump(jsonl_generators_dict, _f, indent=4)
