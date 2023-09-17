@@ -4,7 +4,6 @@ import torch
 
 from utils import CustomTokenizer
 from typing import Dict
-import copy
 
 
 class JsonlDataset:
@@ -22,7 +21,6 @@ class JsonlDataset:
                 self._f.close()
             return None
         self.line_number += 1
-        print(self.line_number, line[:100])
         return line
         
 
@@ -70,7 +68,7 @@ def group_texts(examples, train_config):
     # Concatenate all texts.
     concatenated_examples = {
         "input_ids": torch.as_tensor(
-            sum(examples["input_ids"], [CustomTokenizer.eos_token_id])
+            sum(examples["input_ids"], [2]) # here was CustomTokenizer.eos_token_id
         ),
         "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
         "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),
