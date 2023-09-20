@@ -1,6 +1,5 @@
 from config.create_train_config import model_train_configs
 
-# import torch.distributed as dist
 from optimum.bettertransformer import BetterTransformer
 from accelerate.utils import broadcast_object_list
 import torch
@@ -77,8 +76,6 @@ def train(
     # Not sure if this will not cause issues like initializing two distributed groups
     # comment out to run without accelerate
 
-    # dist.init_process_group()
-
     trainer_callback_dict = {}
     experiment_hash = "none"
     communication_list = [experiment_hash]
@@ -97,7 +94,6 @@ def train(
             experiment_hash = aim_callback._run_hash
             communication_list = [experiment_hash]
 
-    accelerator.wait_for_everyone()
     broadcast_object_list(communication_list)
     experiment_hash = communication_list[0]
 
@@ -155,7 +151,7 @@ def train(
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
     )
-    accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
+    # accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
     optimizer = AdamW(
         model.parameters(),
@@ -218,6 +214,10 @@ def train(
 
     with prof_context_manager as prof:
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+
+    # for s1, s2 in zip(dataset["train"], old_dataset["train"]):
+    #     if s1 != s2:
+    #         print("diff", s1, "\n", s2)
 
     return trainer
 

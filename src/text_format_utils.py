@@ -13,17 +13,22 @@ def delete_empty_tags(compound_json):
 
 
 def generate_formatted_string(compound_json):
+    # key_value_pairs = []
+    # if random.random() < 0.5:
+    #     key = "SMILES"
+    #     key_value_pairs.append(format_key_value(key, compound_json[key]))
+    #     del compound_json["SMILES"]
+    # keys = list(compound_json.keys())
+    # for key in random.sample(keys, len(keys)):
+    #     key_value_pairs.append(format_key_value(key, compound_json[key]))
+    # compound_formatted_string = "".join(key_value_pairs) + CustomTokenizer.eos_token
+    # return compound_formatted_string
+
+    # no shuffle code
     key_value_pairs = []
-    if random.random() < 0.5:
-        key = "SMILES"
-        key_value_pairs.append(format_key_value(key, compound_json[key]))
-        del compound_json["SMILES"]
-    keys = list(compound_json.keys())
-    for key in random.sample(keys, len(keys)):
-        key_value_pairs.append(format_key_value(key, compound_json[key]))
-    compound_formatted_string = "".join(key_value_pairs) + CustomTokenizer.eos_token
-    return compound_formatted_string
-    # return str(compound_json)
+    for key, value in compound_json.items():
+        key_value_pairs.append(format_key_value(key, value))
+    return "".join(key_value_pairs) + CustomTokenizer.eos_token
 
 
 def format_key_value(key, value):

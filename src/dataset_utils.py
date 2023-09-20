@@ -15,7 +15,7 @@ class JsonlDataset:
         self.line_number = 0
 
     def __next__(self):
-        line = self._f.readline()
+        line = self._f.readline()[:-1] # exclude the newline character
         if not line:
             if not self._f.closed:
                 self._f.close()
@@ -68,7 +68,7 @@ def group_texts(examples, train_config):
     # Concatenate all texts.
     concatenated_examples = {
         "input_ids": torch.as_tensor(
-            sum(examples["input_ids"], [2]) # here was CustomTokenizer.eos_token_id
+            sum(examples["input_ids"], [CustomTokenizer.eos_token_id])
         ),
         "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
         "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),
