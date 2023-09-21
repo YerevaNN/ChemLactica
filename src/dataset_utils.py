@@ -3,48 +3,45 @@ from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
 from utils import CustomTokenizer
-from typing import Dict, List
+from typing import Dict, List, Any
 import pickle
 import os
-import subprocess
 
 
 class JsonlDataset:
 
-    def __init__(self, file_path):
+    def __init__(self, file_path: str):
         self._file_path = file_path
         self._f = open(file_path, "r")
-        # for some mysterious reasons the line_number cannot be kept in the json file,
-        # it does not work properly
         self.line_number = 0
 
-    def __next__(self):
+    def __next__(self) -> str:
         line = self._f.readline()[:-1] # exclude the newline character
         if not line:
             if not self._f.closed:
                 self._f.close()
             return None
-        print("Process:", torch.distributed.get_rank(), self.line_number, "line number id:", id(self.line_number), "dataloader id:", id(self), self.get_read_position())
+        # print("Process:", torch.distributed.get_rank(), self.line_number, "line number id:", id(self.line_number), "dataloader id:", id(self), self.get_read_position())
         self.line_number += 1
         return line
     
-    def get_read_position(self):
+    def get_read_position(self) -> int:
         """
             returns an integer giving the file object’s current position in the file
             represented as number of bytes from the beginning of the file
         """
         return self._f.tell()
 
-    def set_read_position(self, position):
+    def set_read_position(self, position: int):
         self._f.seek(position, 0)
 
-    def get_state(self):
+    def get_state(self) -> Dict[str, Any]:
         return {
             "position": self.get_read_position(),
             "line_number": self.line_number
         }
     
-    def load_state(self, state: Dict):
+    def load_state(self, state: Dict[str, Any]):
         self.set_read_position(state["position"])
         self.line_number = state["line_number"]
         print("loaded jsonl state:", {state: self.get_state()})

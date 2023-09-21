@@ -2,9 +2,6 @@ import shutil
 from transformers import Trainer
 from typing import Optional
 from transformers import OPTForCausalLM, TrainingArguments
-import accelerate
-import os
-import json
 
 
 class CustomTrainer(Trainer):
