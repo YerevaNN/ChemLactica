@@ -125,7 +125,8 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
-    trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback()
+    if accelerator.is_main_process:
+        trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback()
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
@@ -142,7 +143,10 @@ def train(
             samples_generator,
             gen_kwargs={
                 "jsonl_datasets_dict": train_jsonl_datasets,
-                "pickle_states_path": trainer_callback_dict["json_dataset_resume_callback"].pickle_states_path
+                "pickle_states_path": (
+                    trainer_callback_dict["json_dataset_resume_callback"].pickle_states_path
+                    if trainer_callback_dict.get("json_dataset_resume_callback") else None
+                )
             }),
         "validation": IterableDataset.from_generator(
             samples_generator,
@@ -221,13 +225,6 @@ def train(
 
     with prof_context_manager as prof:
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
-
-    # for i, sample in enumerate(processed_dataset["train"]):
-    #         # print(sample)
-    #     if i == 1000:
-    #         trainer_callback_dict["json_dataset_resume_callback"].on_step_end(
-    #             trainer.args, trainer.state, trainer.control
-    #         )
 
     return trainer
 

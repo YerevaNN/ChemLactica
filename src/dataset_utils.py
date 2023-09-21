@@ -44,7 +44,7 @@ class JsonlDataset:
     def load_state(self, state: Dict[str, Any]):
         self.set_read_position(state["position"])
         self.line_number = state["line_number"]
-        print("loaded jsonl state:", {state: self.get_state()})
+        print(f"loaded jsonl state: {state}")
 
 
 def samples_generator(jsonl_datasets_dict: Dict[str, JsonlDataset], pickle_states_path: str):

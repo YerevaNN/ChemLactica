@@ -169,7 +169,6 @@ class ReproducabilityCallback(TrainerCallback):
 
 
 class JsonlDatasetResumeCallback(TrainerCallback):
-
     def __init__(
         self,
         communication_dir="/tmp/jsonl_states",
@@ -181,7 +180,9 @@ class JsonlDatasetResumeCallback(TrainerCallback):
         self.communication_dir = communication_dir
         self.file_name_to_store_states = file_name_to_store_states
         self.pickle_states_path = os.path.join(self.communication_dir, f"{self.file_name_to_store_states}.pickle")
+        print(f"Communication file {self.pickle_states_path}")
         if os.path.exists(self.pickle_states_path):
+            print("Removing the communication file.")
             os.remove(self.pickle_states_path)
 
     def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
@@ -201,14 +202,13 @@ class JsonlDatasetResumeCallback(TrainerCallback):
         os.rmdir(self.communication_dir)
 
     def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        if torch.distributed.get_rank() == 0:
-            assert os.path.exists(self.pickle_states_path)
+        assert os.path.exists(self.pickle_states_path)
 
-            with open(self.pickle_states_path, "rb") as file:
-                jsonl_states = pickle.load(file)
+        with open(self.pickle_states_path, "rb") as file:
+            jsonl_states = pickle.load(file)
 
-            checkpoint_dir = os.path.join(args.output_dir, f"checkpoint-{state.global_step}")
-            jsonl_states_path = os.path.join(checkpoint_dir, f"{self.file_name_to_store_states}.json")
-            with open(jsonl_states_path, "w") as file:
-                json.dump(jsonl_states, file, indent=4)
-            print(f"Jsonl datasets states saved to {jsonl_states_path}")
+        checkpoint_dir = os.path.join(args.output_dir, f"checkpoint-{state.global_step}")
+        jsonl_states_path = os.path.join(checkpoint_dir, f"{self.file_name_to_store_states}.json")
+        with open(jsonl_states_path, "w") as file:
+            json.dump(jsonl_states, file, indent=4)
+        print(f"Jsonl datasets states saved to {jsonl_states_path}")
