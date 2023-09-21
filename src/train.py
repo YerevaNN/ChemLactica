@@ -124,6 +124,8 @@ def train(
         else None,
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
+    trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
+    trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback()
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
@@ -133,19 +135,24 @@ def train(
     #     streaming=True,
     # )
 
-    train_jsonl_datasets = {_file: JsonlDataset(_file) for _file in training_data_files}
-    valid_jsonl_datasets = {_file: JsonlDataset(_file) for _file in valid_data_files}
+    train_jsonl_datasets = {path: JsonlDataset(path) for path in training_data_files}
+    valid_jsonl_datasets = {path: JsonlDataset(path) for path in valid_data_files}
     dataset = IterableDatasetDict({
-        "train": IterableDataset.from_generator(samples_generator, gen_kwargs={"jsonl_datasets_dict": train_jsonl_datasets}),
-        "validation": IterableDataset.from_generator(samples_generator, gen_kwargs={"jsonl_datasets_dict": valid_jsonl_datasets})
+        "train": IterableDataset.from_generator(
+            samples_generator,
+            gen_kwargs={
+                "jsonl_datasets_dict": train_jsonl_datasets,
+                "pickle_states_path": trainer_callback_dict["json_dataset_resume_callback"].pickle_states_path
+            }),
+        "validation": IterableDataset.from_generator(
+            samples_generator,
+            gen_kwargs={"jsonl_datasets": valid_jsonl_datasets}),
     })
 
     processed_dataset = process_dataset(
-        dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
+        dataset=dataset, train_config=train_config, process_batch_sizes=(5, 5)
     )
 
-    trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
-    trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback(train_jsonl_datasets, resume_from_checkpoint)
     # trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
 
     checkpoints_dir = os.path.join(
@@ -215,9 +222,12 @@ def train(
     with prof_context_manager as prof:
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
-    # for s1, s2 in zip(dataset["train"], old_dataset["train"]):
-    #     if s1 != s2:
-    #         print("diff", s1, "\n", s2)
+    # for i, sample in enumerate(processed_dataset["train"]):
+    #         # print(sample)
+    #     if i == 1000:
+    #         trainer_callback_dict["json_dataset_resume_callback"].on_step_end(
+    #             trainer.args, trainer.state, trainer.control
+    #         )
 
     return trainer
 

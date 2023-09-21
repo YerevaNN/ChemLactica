@@ -27,5 +27,5 @@ class CustomTrainer(Trainer):
             is_main_process=self.accelerator.is_main_process,
             save_directory=output_dir,
             save_function=self.accelerator.save,
-            max_shard_size="200MB",
+            max_shard_size="500MB",
         )
