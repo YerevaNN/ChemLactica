@@ -43,7 +43,7 @@ property_names = (
     "NUMALIPHATICRINGS",
     "NUMALIPHATICHETEROCYCLES",
     "NUMALIPHATICCARBOCYCLES",
-    "IUPAC",
+    "IUPAC"
 )
 
 
