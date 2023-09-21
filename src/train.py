@@ -125,33 +125,33 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
-    # if accelerator.is_main_process:
-    #     trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback()
+    if accelerator.is_main_process:
+        trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback()
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-    dataset = load_dataset(
-        "text",
-        data_files={"train": training_data_files, "validation": valid_data_files},
-        streaming=True,
-    )
+    # dataset = load_dataset(
+    #     "text",
+    #     data_files={"train": training_data_files, "validation": valid_data_files},
+    #     streaming=True,
+    # )
 
     train_jsonl_datasets = {path: JsonlDataset(path) for path in training_data_files}
     valid_jsonl_datasets = {path: JsonlDataset(path) for path in valid_data_files}
-    # dataset = IterableDatasetDict({
-    #     "train": IterableDataset.from_generator(
-    #         samples_generator,
-    #         gen_kwargs={
-    #             "jsonl_datasets_dict": train_jsonl_datasets,
-    #             "pickle_states_path": (
-    #                 trainer_callback_dict["json_dataset_resume_callback"].pickle_states_path
-    #                 if trainer_callback_dict.get("json_dataset_resume_callback") else None
-    #             )
-    #         }),
-    #     "validation": IterableDataset.from_generator(
-    #         samples_generator,
-    #         gen_kwargs={"jsonl_datasets": valid_jsonl_datasets}),
-    # })
+    dataset = IterableDatasetDict({
+        "train": IterableDataset.from_generator(
+            samples_generator,
+            gen_kwargs={
+                "jsonl_datasets_dict": train_jsonl_datasets,
+                "pickle_states_path": (
+                    trainer_callback_dict["json_dataset_resume_callback"].pickle_states_path
+                    if trainer_callback_dict.get("json_dataset_resume_callback") else None
+                )
+            }),
+        "validation": IterableDataset.from_generator(
+            samples_generator,
+            gen_kwargs={"jsonl_datasets": valid_jsonl_datasets}),
+    })
 
     processed_dataset = process_dataset(
         dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
