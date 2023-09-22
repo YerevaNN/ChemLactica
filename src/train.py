@@ -9,7 +9,8 @@ from transformers import TrainingArguments, get_polynomial_decay_schedule_with_w
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
-import accelerate
+
+# import accelerate
 from accelerate import Accelerator
 import glob
 from callbacks import (
@@ -72,7 +73,6 @@ def train(
     model = BetterTransformer.transform(model)
 
     CustomTokenizer.set_model_size(model_config)
-
     # Not sure if this will not cause issues like initializing two distributed groups
     # comment out to run without accelerate
 
@@ -140,17 +140,17 @@ def train(
         model.parameters(),
         lr=train_config["max_learning_rate"],
         betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
-        weight_decay=train_config["weight_decay"]
-        )
-    
+        weight_decay=train_config["weight_decay"],
+    )
+
     lr_scheduler = get_polynomial_decay_schedule_with_warmup(
         optimizer,
         num_warmup_steps=train_config["warmup_steps"],
         num_training_steps=max_steps,
-        lr_end=0.1*train_config["max_learning_rate"],
+        lr_end=0.1 * train_config["max_learning_rate"],
         power=1.0,
-        )
-    
+    )
+
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,
         per_device_train_batch_size=train_batch_size,
@@ -366,7 +366,7 @@ if __name__ == "__main__":
         dest="gradient_accumulation_steps",
         required=False,
         help="the number of steps to over which to accumulate gradients",
-        default=1
+        default=1,
     )
 
     args = parser.parse_args()

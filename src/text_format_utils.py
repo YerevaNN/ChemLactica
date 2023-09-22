@@ -2,7 +2,7 @@ import random
 import time
 from utils import CustomTokenizer
 
-SPECIAL_TAGS = {"SMILES": {"start": "[START_SMILES] ", "end": " [END_SMILES]"}}
+SPECIAL_TAGS = {"SMILES": {"start": "[START_SMILES]", "end": "[END_SMILES]"}}
 
 
 def delete_empty_tags(compound_json):
