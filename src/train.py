@@ -145,12 +145,12 @@ def train(
                 "jsonl_datasets_dict": train_jsonl_datasets,
                 "pickle_states_path": (
                     trainer_callback_dict["json_dataset_resume_callback"].pickle_states_path
-                    if trainer_callback_dict.get("json_dataset_resume_callback") else None
+                    if trainer_callback_dict.get("json_dataset_resume_callback") else ""
                 )
             }),
         "validation": IterableDataset.from_generator(
             samples_generator,
-            gen_kwargs={"jsonl_datasets": valid_jsonl_datasets}),
+            gen_kwargs={"jsonl_datasets_dict": valid_jsonl_datasets}),
     })
 
     processed_dataset = process_dataset(

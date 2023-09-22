@@ -74,7 +74,8 @@ def main():
     for i in range(100000):
         example = json.loads((string))
         example = delete_empty_tags(example)
-        generate_formatted_string((example))
+        print(generate_formatted_string((example)))
+        break
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(elapsed_time)

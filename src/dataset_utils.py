@@ -47,9 +47,9 @@ class JsonlDataset:
         print(f"loaded jsonl state: {state}")
 
 
-def samples_generator(jsonl_datasets_dict: Dict[str, JsonlDataset], pickle_states_path: str):
+def samples_generator(jsonl_datasets_dict: Dict[str, JsonlDataset], pickle_states_path: str = ""):
     jsonl_states = {}
-    if os.path.exists(pickle_states_path):
+    if pickle_states_path and os.path.exists(pickle_states_path):
         with open(pickle_states_path, "rb") as file:
             jsonl_states = pickle.load(file) # load the states
             for name, state in jsonl_states.items():
@@ -60,8 +60,9 @@ def samples_generator(jsonl_datasets_dict: Dict[str, JsonlDataset], pickle_state
         for name, ds in jsonl_datasets_dict.items():
             sample = next(ds)
             jsonl_states[name] = ds.get_state()
-            with open(pickle_states_path, "wb") as file:
-                pickle.dump(jsonl_states, file) # save the states
+            if pickle_states_path:
+                with open(pickle_states_path, "wb") as file:
+                    pickle.dump(jsonl_states, file) # save the states
             if sample:
                 returned = True
                 yield {"text" : sample} # this is done to be compatible with the old code
