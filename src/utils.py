@@ -150,12 +150,14 @@ if __name__ == "__main__":
     train_config = model_train_configs["125m"]
     train_config["block_size"] = 2048
 
-    CustomTokenizer.set_model_size("125m")
-    tokenizer = CustomTokenizer.get_instance()
-    tokenizer.save_pretrained("tokenizer.json")
-    training_data_dir = "/home/tigranfahradyan/single_data/train"
+    # CustomTokenizer.set_model_size("125m")
+    # tokenizer = CustomTokenizer.get_instance()
+    # tokenizer.save_pretrained("tokenizer.json")
+    training_data_dir = "/home/tigranfahradyan/single_data/valid"
 
-    training_data_files = glob.glob(training_data_dir + "/xae_shuf.jsonl")
+    # training_data_files = glob.glob(training_data_dir + "/xae_shuf.jsonl")
+    training_data_files = glob.glob(training_data_dir + "/*.jsonl")
+
     dataset = load_dataset(
         "text",
         data_files={"train": training_data_files, "validation": training_data_files},
@@ -174,8 +176,3 @@ if __name__ == "__main__":
     # print('*'*20)
     # print(prompt)
     # print(tokenizer.encode(prompt))
-    tokens = 1
-    while True:
-        next(iter(processed_dataset["train"]))
-        tokens += 1
-    print(tokens)
