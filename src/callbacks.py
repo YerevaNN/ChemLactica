@@ -6,6 +6,7 @@ import json
 import pickle
 
 from dataset_utils import process_dataset
+from jsonl_dataset import shared_jsonl_states
 
 from aim.hugging_face import AimCallback
 from transformers.trainer_callback import TrainerCallback, TrainerControl, TrainerState
@@ -169,46 +170,39 @@ class ReproducabilityCallback(TrainerCallback):
 
 
 class JsonlDatasetResumeCallback(TrainerCallback):
-    def __init__(
-        self,
-        communication_dir="/tmp/jsonl_states",
-        file_name_to_store_states="jsonl_states"
-    ):
-        if not os.path.exists(communication_dir):
-            os.mkdir(communication_dir)
-        self.jsonl_datasets_states = {}
-        self.communication_dir = communication_dir
-        self.file_name_to_store_states = file_name_to_store_states
-        self.pickle_states_path = os.path.join(self.communication_dir, f"{self.file_name_to_store_states}.pickle")
-        print(f"Communication file {self.pickle_states_path}")
-        if os.path.exists(self.pickle_states_path):
-            print("Removing the communication file.")
-            os.remove(self.pickle_states_path)
+    # def __init__(self):
+        # if not os.path.exists(communication_dir):
+        #     os.mkdir(communication_dir)
+        # self.jsonl_datasets_states = {}
+        # self.communication_dir = communication_dir
+        # self.file_name_to_store_states = file_name_to_store_states
+        # self.pickle_states_path = os.path.join(self.communication_dir, f"{self.file_name_to_store_states}.pickle")
+        # print(f"Communication file {self.pickle_states_path}")
+        # if os.path.exists(self.pickle_states_path):
+        #     print("Removing the communication file.")
+        #     os.remove(self.pickle_states_path)
+
+    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        print("Jsonl states", shared_jsonl_states.get())
 
     def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         if args.resume_from_checkpoint: # resume training
-            jsonl_states_path = os.path.join(args.resume_from_checkpoint, f"{self.file_name_to_store_states}.json")
-            with open(jsonl_states_path, "r") as file:
-                self.jsonl_datasets_states = json.load(file)
+            checkpoint_dir = os.path.join(
+                args.output_dir, f"checkpoint-{state.global_step}"
+            )
+            with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "r") as file:
+                jsonl_states = json.load(file)
+            shared_jsonl_states.put(jsonl_states)
 
-            with open(self.pickle_states_path, "wb") as file:
-                pickle.dump(self.jsonl_datasets_states, file)
-            
-            accelerate.skip_first_batches = lambda: None # disable this function to not skip any steps
-
-    def on_train_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        assert os.path.exists(self.pickle_states_path)
-        os.remove(self.pickle_states_path)
-        os.rmdir(self.communication_dir)
+            accelerate.skip_first_batches = lambda: None
 
     def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        assert os.path.exists(self.pickle_states_path)
+        jsonl_states = shared_jsonl_states.get()
+        assert jsonl_states
 
-        with open(self.pickle_states_path, "rb") as file:
-            jsonl_states = pickle.load(file)
-
-        checkpoint_dir = os.path.join(args.output_dir, f"checkpoint-{state.global_step}")
-        jsonl_states_path = os.path.join(checkpoint_dir, f"{self.file_name_to_store_states}.json")
-        with open(jsonl_states_path, "w") as file:
+        checkpoint_dir = os.path.join(
+            args.output_dir, f"checkpoint-{state.global_step}"
+        )
+        with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "w") as file:
             json.dump(jsonl_states, file, indent=4)
-        print(f"Jsonl datasets states saved to {jsonl_states_path}")
+        print(f"Jsonl states saved.")

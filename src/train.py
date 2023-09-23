@@ -3,7 +3,6 @@ from config.create_train_config import model_train_configs
 from optimum.bettertransformer import BetterTransformer
 from accelerate.utils import broadcast_object_list
 import torch
-import torch.distributed as dist
 from torch.optim import AdamW
 from transformers import TrainingArguments, get_linear_schedule_with_warmup
 from datasets import load_dataset
@@ -24,7 +23,8 @@ from callbacks import (
 import os
 from utils import load_model, CustomTokenizer
 from custom_trainer import CustomTrainer
-from dataset_utils import process_dataset, samples_generator, JsonlDataset
+from dataset_utils import process_dataset
+from jsonl_dataset import samples_generator, JsonlDataset
 from contextlib import nullcontext
 import random
 import numpy
@@ -141,13 +141,7 @@ def train(
     dataset = IterableDatasetDict({
         "train": IterableDataset.from_generator(
             samples_generator,
-            gen_kwargs={
-                "jsonl_datasets_dict": train_jsonl_datasets,
-                "pickle_states_path": (
-                    trainer_callback_dict["json_dataset_resume_callback"].pickle_states_path
-                    if trainer_callback_dict.get("json_dataset_resume_callback") else ""
-                )
-            }),
+            gen_kwargs={"jsonl_datasets_dict": train_jsonl_datasets}),
         "validation": IterableDataset.from_generator(
             samples_generator,
             gen_kwargs={"jsonl_datasets_dict": valid_jsonl_datasets}),

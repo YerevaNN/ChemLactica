@@ -3,72 +3,10 @@ from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
 from utils import CustomTokenizer
+import multiprocessing
 from typing import Dict, List, Any
 import pickle
 import os
-
-
-class JsonlDataset:
-
-    def __init__(self, file_path: str):
-        self._file_path = file_path
-        self._f = open(file_path, "r")
-        self.line_number = 0
-
-    def __next__(self) -> str:
-        line = self._f.readline()[:-1] # exclude the newline character
-        if not line:
-            if not self._f.closed:
-                self._f.close()
-            return None
-        # print("Process:", torch.distributed.get_rank(), self.line_number, "line number id:", id(self.line_number), "dataloader id:", id(self), self.get_read_position())
-        self.line_number += 1
-        return line
-    
-    def get_read_position(self) -> int:
-        """
-            returns an integer giving the file object’s current position in the file
-            represented as number of bytes from the beginning of the file
-        """
-        return self._f.tell()
-
-    def set_read_position(self, position: int):
-        self._f.seek(position, 0)
-
-    def get_state(self) -> Dict[str, Any]:
-        return {
-            "position": self.get_read_position(),
-            "line_number": self.line_number
-        }
-    
-    def load_state(self, state: Dict[str, Any]):
-        self.set_read_position(state["position"])
-        self.line_number = state["line_number"]
-        print(f"loaded jsonl state: {state}")
-
-
-def samples_generator(jsonl_datasets_dict: Dict[str, JsonlDataset], pickle_states_path: str = ""):
-    jsonl_states = {}
-    if pickle_states_path and os.path.exists(pickle_states_path):
-        with open(pickle_states_path, "rb") as file:
-            jsonl_states = pickle.load(file) # load the states
-            for name, state in jsonl_states.items():
-                jsonl_datasets_dict[name].load_state(state)
-
-    while True:
-        returned = False
-        for name, ds in jsonl_datasets_dict.items():
-            sample = next(ds)
-            jsonl_states[name] = ds.get_state()
-            if pickle_states_path:
-                with open(pickle_states_path, "wb") as file:
-                    pickle.dump(jsonl_states, file) # save the states
-            if sample:
-                returned = True
-                yield {"text" : sample} # this is done to be compatible with the old code
-
-        if not returned:
-            break
 
 
 def tokenize_function(examples):
@@ -98,7 +36,7 @@ def group_texts(examples, train_config):
         "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),
     }
 
-    total_length = len(concatenated_examples[list(examples.keys())[0]])
+    total_length = len(concatenated_examples["input_ids"])
     # We drop the small remainder,
     # we could add padding if the model supported it instead of this drop.
     total_length = (total_length // train_config["block_size"]) * train_config[
