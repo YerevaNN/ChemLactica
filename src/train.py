@@ -136,8 +136,11 @@ def train(
     #     streaming=True,
     # )
 
-    train_jsonl_datasets = {path: JsonlDataset(path) for path in training_data_files}
-    valid_jsonl_datasets = {path: JsonlDataset(path) for path in valid_data_files}
+    train_jsonl_datasets = {}
+    valid_jsonl_datasets = {}
+    if accelerator.is_main_process:
+        train_jsonl_datasets = {path: JsonlDataset(path) for path in training_data_files}
+        valid_jsonl_datasets = {path: JsonlDataset(path) for path in valid_data_files}
     dataset = IterableDatasetDict({
         "train": IterableDataset.from_generator(
             samples_generator,

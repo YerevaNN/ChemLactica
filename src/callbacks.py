@@ -170,39 +170,33 @@ class ReproducabilityCallback(TrainerCallback):
 
 
 class JsonlDatasetResumeCallback(TrainerCallback):
-    # def __init__(self):
-        # if not os.path.exists(communication_dir):
-        #     os.mkdir(communication_dir)
-        # self.jsonl_datasets_states = {}
-        # self.communication_dir = communication_dir
-        # self.file_name_to_store_states = file_name_to_store_states
-        # self.pickle_states_path = os.path.join(self.communication_dir, f"{self.file_name_to_store_states}.pickle")
-        # print(f"Communication file {self.pickle_states_path}")
-        # if os.path.exists(self.pickle_states_path):
-        #     print("Removing the communication file.")
-        #     os.remove(self.pickle_states_path)
-
-    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        print("Jsonl states", shared_jsonl_states.get())
-
     def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        print("On Train begin")
         if args.resume_from_checkpoint: # resume training
             checkpoint_dir = os.path.join(
                 args.output_dir, f"checkpoint-{state.global_step}"
             )
             with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "r") as file:
                 jsonl_states = json.load(file)
+
+            assert shared_jsonl_states.empty()
             shared_jsonl_states.put(jsonl_states)
 
             accelerate.skip_first_batches = lambda: None
 
     def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        jsonl_states = shared_jsonl_states.get()
+        
+        while not shared_jsonl_states.empty():
+            jsonl_states = shared_jsonl_states.get()
+        
+        assert shared_jsonl_states.empty()
         assert jsonl_states
 
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
         )
+        print(f"Saving jsonl states")
+        for name, state in jsonl_states.items():
+            print(name, state)
         with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "w") as file:
             json.dump(jsonl_states, file, indent=4)
-        print(f"Jsonl states saved.")

@@ -1,5 +1,6 @@
 import multiprocessing
 from typing import Dict, Any
+import torch
 
 
 global shared_jsonl_states
@@ -42,15 +43,20 @@ class JsonlDataset:
     def load_state(self, state: Dict[str, Any]):
         self.set_read_position(state["position"])
         self.line_number = state["line_number"]
-        print(f"loaded jsonl state: {state}")
+        print(f"loaded jsonl state: {self._file_path} {state}")
 
 
 def samples_generator(jsonl_datasets_dict: Dict[str, JsonlDataset]):
+    assert torch.distributed.get_rank() == 0
     if shared_jsonl_states.empty():
         jsonl_states = {}
     else:
+        assert not shared_jsonl_states.empty()
         jsonl_states = shared_jsonl_states.get()
-        print(f"Jsonl states loaded.")
+        assert shared_jsonl_states.empty()
+        for name, state in jsonl_states.items():
+            jsonl_datasets_dict[name].load_state(state)
+    
     while True:
         returned = False
         for name, ds in jsonl_datasets_dict.items():
@@ -59,7 +65,8 @@ def samples_generator(jsonl_datasets_dict: Dict[str, JsonlDataset]):
 
             # empty the queue and put the latest states
             while not shared_jsonl_states.empty():
-                shared_jsonl_states.get()   
+                shared_jsonl_states.get()
+            assert shared_jsonl_states.empty()
             shared_jsonl_states.put(jsonl_states)
 
             if sample:

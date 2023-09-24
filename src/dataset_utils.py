@@ -3,10 +3,6 @@ from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
 from utils import CustomTokenizer
-import multiprocessing
-from typing import Dict, List, Any
-import pickle
-import os
 
 
 def tokenize_function(examples):
