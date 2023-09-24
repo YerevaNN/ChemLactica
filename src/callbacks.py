@@ -3,10 +3,9 @@ import time
 import hashlib
 import glob
 import json
-import pickle
 
 from dataset_utils import process_dataset
-from jsonl_dataset import shared_jsonl_states
+from jsonl_dataset import shared_jsonl_files
 
 from aim.hugging_face import AimCallback
 from transformers.trainer_callback import TrainerCallback, TrainerControl, TrainerState
@@ -179,18 +178,17 @@ class JsonlDatasetResumeCallback(TrainerCallback):
             with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "r") as file:
                 jsonl_states = json.load(file)
 
-            assert shared_jsonl_states.empty()
-            shared_jsonl_states.put(jsonl_states)
+            assert not shared_jsonl_files
+            print(f"loaded states {jsonl_states}")
+            for name, pos in jsonl_states.items():
+                shared_jsonl_files[name] = pos
 
             accelerate.skip_first_batches = lambda: None
 
     def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        
-        while not shared_jsonl_states.empty():
-            jsonl_states = shared_jsonl_states.get()
-        
-        assert shared_jsonl_states.empty()
-        assert jsonl_states
+        assert shared_jsonl_files
+        jsonl_states = {key: value for key, value in shared_jsonl_files.items()}
+        print(jsonl_states)
 
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"

@@ -24,7 +24,7 @@ import os
 from utils import load_model, CustomTokenizer
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
-from jsonl_dataset import samples_generator, JsonlDataset
+from jsonl_dataset import samples_generator
 from contextlib import nullcontext
 import random
 import numpy
@@ -128,26 +128,22 @@ def train(
     if accelerator.is_main_process:
         trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback()
 
-    training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-    valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-    # dataset = load_dataset(
-    #     "text",
-    #     data_files={"train": training_data_files, "validation": valid_data_files},
-    #     streaming=True,
-    # )
-
-    train_jsonl_datasets = {}
-    valid_jsonl_datasets = {}
+    training_data_files = []
+    valid_data_files = []
     if accelerator.is_main_process:
-        train_jsonl_datasets = {path: JsonlDataset(path) for path in training_data_files}
-        valid_jsonl_datasets = {path: JsonlDataset(path) for path in valid_data_files}
+        training_data_files = glob.glob(training_data_dir + "/*.jsonl")
+        valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
+    
+    validation_dataset = load_dataset(
+        "text",
+        data_files={"validation": valid_data_files},
+        streaming=True,
+    )
     dataset = IterableDatasetDict({
         "train": IterableDataset.from_generator(
             samples_generator,
-            gen_kwargs={"jsonl_datasets_dict": train_jsonl_datasets}),
-        "validation": IterableDataset.from_generator(
-            samples_generator,
-            gen_kwargs={"jsonl_datasets_dict": valid_jsonl_datasets}),
+            gen_kwargs={"jsonl_files": training_data_files}),
+        "validation": validation_dataset["validation"]
     })
 
     processed_dataset = process_dataset(
@@ -222,6 +218,9 @@ def train(
 
     with prof_context_manager as prof:
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+
+    # for sample in processed_dataset["train"]:
+    #     print(sample)
 
     return trainer
 
