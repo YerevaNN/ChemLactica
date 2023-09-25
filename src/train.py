@@ -64,6 +64,8 @@ def train(
     train_config = model_train_configs[model_config]
 
     model = load_model(from_pretrained, train_config)
+    model.resize_token_embeddings(train_config['vocab_size'] + len(CustomTokenizer.chemlactica_special_tokens))
+
     if os.path.isdir(from_pretrained):
         resume_from_checkpoint = from_pretrained
     else:

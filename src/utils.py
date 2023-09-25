@@ -57,7 +57,7 @@ class CustomTokenizer:
         "[EXPERIMENTAL ",
         "[SAS ",
         "[WEIGHT ",
-        "[TPSA",
+        "[TPSA ",
         "[CLOGP ",
         "[QED ",
         "[NUMHDONORS ",
@@ -99,7 +99,9 @@ class CustomTokenizer:
     @staticmethod
     def new_instance():
         tok = AutoTokenizer.from_pretrained(
-            f"facebook/galactica-{CustomTokenizer.model_size}"
+            # f"facebook/galactica-{CustomTokenizer.model_size}"
+            'src/tokenizer/ChemLacticaTokenizer'
+            # 'src/tokenizer/GalacticaTokenizer'
         )
         tok.bos_token = CustomTokenizer.bos_token
         tok.bos_token_id = CustomTokenizer.bos_token_id
@@ -107,9 +109,9 @@ class CustomTokenizer:
         tok.pad_token_id = CustomTokenizer.pad_token_id
         tok.eos_token = CustomTokenizer.eos_token
         tok.eos_token_id = CustomTokenizer.eos_token_id
-        tok.add_special_tokens(
-            {"additional_special_tokens": CustomTokenizer.chemlactica_special_tokens}
-        )
+        # tok.add_tokens(
+        #     CustomTokenizer.chemlactica_special_tokens
+        # )
         return tok
 
 
@@ -152,8 +154,8 @@ if __name__ == "__main__":
 
     # CustomTokenizer.set_model_size("125m")
     # tokenizer = CustomTokenizer.get_instance()
-    # tokenizer.save_pretrained("tokenizer.json")
-    training_data_dir = "/home/tigranfahradyan/single_data/valid"
+    # tokenizer.save_pretrained("ChemLacticaTokenizer")
+    training_data_dir = ".small_data/valid"
 
     # training_data_files = glob.glob(training_data_dir + "/xae_shuf.jsonl")
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
@@ -168,8 +170,8 @@ if __name__ == "__main__":
         dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
     )
 
-    # sample = next(iter(processed_dataset["train"]))
-    # prompt = "[START_SMILES] CCCCN [END_SMILES][CLOGP 0.00][SAS 123][QED]"
+    sample = next(iter(processed_dataset["train"]))
+    prompt = "[START_SMILES] CCCCN [END_SMILES][CLOGP 0.00][SAS 123][QED]"
     # print(tokenizer.decode(sample["input_ids"]))
     # print(*sample["input_ids"].numpy())
     # print(len(tokenizer.decode(sample["input_ids"])), len(sample["input_ids"].numpy()))
