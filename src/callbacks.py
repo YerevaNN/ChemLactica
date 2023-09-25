@@ -5,7 +5,6 @@ import glob
 import json
 
 from dataset_utils import process_dataset
-from jsonl_dataset import shared_jsonl_files
 
 from aim.hugging_face import AimCallback
 from transformers.trainer_callback import TrainerCallback, TrainerControl, TrainerState
@@ -169,6 +168,9 @@ class ReproducabilityCallback(TrainerCallback):
 
 
 class JsonlDatasetResumeCallback(TrainerCallback):
+    def __init__(self, shared_jsonl_files):
+        self.shared_jsonl_files = shared_jsonl_files
+    
     def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         print("On Train begin")
         if args.resume_from_checkpoint: # resume training
@@ -178,16 +180,16 @@ class JsonlDatasetResumeCallback(TrainerCallback):
             with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "r") as file:
                 jsonl_states = json.load(file)
 
-            assert not shared_jsonl_files
+            assert not self.shared_jsonl_files
             print(f"loaded states {jsonl_states}")
-            for name, pos in jsonl_states.items():
-                shared_jsonl_files[name] = pos
+            for name, state in jsonl_states.items():
+                self.shared_jsonl_files[name] = state
 
             accelerate.skip_first_batches = lambda: None
 
     def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        assert shared_jsonl_files
-        jsonl_states = {key: value for key, value in shared_jsonl_files.items()}
+        assert self.shared_jsonl_files
+        jsonl_states = {key: value for key, value in self.shared_jsonl_files.items()}
         print(jsonl_states)
 
         checkpoint_dir = os.path.join(

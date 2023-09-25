@@ -28,6 +28,7 @@ from jsonl_dataset import samples_generator
 from contextlib import nullcontext
 import random
 import numpy
+import multiprocessing
 
 torch.manual_seed(42)
 random.seed(42)
@@ -125,8 +126,12 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
+    
+    shared_jsonl_files = None
     if accelerator.is_main_process:
-        trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback()
+        manager = multiprocessing.Manager()
+        shared_jsonl_files = manager.dict()
+        trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback(shared_jsonl_files)
 
     training_data_files = []
     valid_data_files = []
@@ -142,9 +147,14 @@ def train(
     dataset = IterableDatasetDict({
         "train": IterableDataset.from_generator(
             samples_generator,
-            gen_kwargs={"jsonl_files": training_data_files}),
+            gen_kwargs={
+                "files": training_data_files,
+                "shared_jsonl_files": shared_jsonl_files
+            }
+        ),
         "validation": validation_dataset["validation"]
     })
+    # print("process rank:", torch.distributed.get_rank(), "shards:", dataset["train"].n_shards)
 
     processed_dataset = process_dataset(
         dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
@@ -220,7 +230,7 @@ def train(
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
     # for sample in processed_dataset["train"]:
-    #     print(sample)
+    #     pass
 
     return trainer
 
