@@ -13,6 +13,7 @@ from transformers import TrainingArguments, get_polynomial_decay_schedule_with_w
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
+from utils import chemlactica_special_tokens
 
 # import accelerate
 from accelerate import Accelerator
@@ -27,7 +28,7 @@ from callbacks import (
     # ReproducabilityCallback,
 )
 import os
-from utils import load_model, CustomTokenizer
+from utils import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from contextlib import nullcontext
@@ -69,11 +70,17 @@ def train(
 
     model = load_model(from_pretrained, train_config)
     model.resize_token_embeddings(
-        train_config["vocab_size"] + len(CustomTokenizer.chemlactica_special_tokens)
+        train_config["vocab_size"] + len(chemlactica_special_tokens)
     )
 
     # Converts the model to use PyTorch’s native attention implementation
     model = BetterTransformer.transform(model)
+
+    # CustomTokenizer.set_model_size(model_config)
+    # Not sure if this will not cause issues like initializing two distributed groups
+    # comment out to run without accelerate
+
+    # dist.init_process_group()
 
     trainer_callback_dict = {}
     experiment_hash = "none"
@@ -106,7 +113,6 @@ def train(
     else:
         resume_from_checkpoint = False
 
-    CustomTokenizer.set_model_size(model_config)
     # Not sure if this will not cause issues like initializing two distributed groups
     # dist.init_process_group()
     logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
@@ -194,22 +200,34 @@ def train(
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-    dataset = load_dataset(
+    train_dataset = load_dataset(
         "text",
-        data_files={"train": training_data_files, "validation": valid_data_files},
+        data_files={"train": training_data_files},
         streaming=True,
     )
+    eval_dataset = load_dataset(
+        "text", data_files={"validation": valid_data_files}, streaming=False
+    )
 
-    processed_dataset = process_dataset(
-        dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
+    processed_train_dataset = process_dataset(
+        dataset=train_dataset,
+        train_config=train_config,
+        process_batch_sizes=(50, 50),
+        is_eval=False,
+    )
+    processed_eval_dataset = process_dataset(
+        dataset=eval_dataset,
+        train_config=train_config,
+        process_batch_sizes=(50, 50),
+        is_eval=True,
     )
 
     trainer = CustomTrainer(
         model=model,
         args=training_args,
         compute_metrics=compute_metrics,
-        train_dataset=processed_dataset["train"],
-        eval_dataset=processed_dataset["validation"],
+        train_dataset=processed_train_dataset["train"],
+        eval_dataset=processed_eval_dataset["validation"],
         optimizers=[optimizer, lr_scheduler],
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )

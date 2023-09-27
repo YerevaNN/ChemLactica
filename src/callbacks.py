@@ -57,8 +57,9 @@ class CustomAimCallback(AimCallback):
         for state_name, state_value in vars(state).items():
             self._run["TrainerState/" + state_name] = str(state_value)
         # Log the model configuration
-        for config_name, config_value in vars(self.model.config).items():
-            self._run["ModelConfig/" + config_name] = str(config_value)
+        if self.model:
+            for config_name, config_value in vars(self.model.config).items():
+                self._run["ModelConfig/" + config_name] = str(config_value)
         self.model = None
 
     def on_save(self, args, state, control=None, **kwargs):
