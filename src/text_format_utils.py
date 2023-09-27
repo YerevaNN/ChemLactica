@@ -1,6 +1,6 @@
 import random
 import time
-from utils import CustomTokenizer
+from utils import get_tokenizer
 
 SPECIAL_TAGS = {"SMILES": {"start": "[START_SMILES]", "end": "[END_SMILES]"}}
 
@@ -21,7 +21,7 @@ def generate_formatted_string(compound_json):
     keys = list(compound_json.keys())
     for key in random.sample(keys, len(keys)):
         key_value_pairs.append(format_key_value(key, compound_json[key]))
-    compound_formatted_string = "".join(key_value_pairs) + CustomTokenizer.eos_token
+    compound_formatted_string = "".join(key_value_pairs) + "</s>" # get_tokenizer().eos_token
     return compound_formatted_string
     # return str(compound_json)
 

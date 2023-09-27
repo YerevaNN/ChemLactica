@@ -1,12 +1,14 @@
 import json
 from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
+import os
 
-from utils import CustomTokenizer
+from utils import get_tokenizer
 
 
 def tokenize_function(examples):
-    tokenizer = CustomTokenizer.get_instance()
+    tokenizer = get_tokenizer()
+    # print(f"Process id: {os.getpid()}, {tokenizer}")
     return tokenizer(examples["text"])
 
 
@@ -26,7 +28,7 @@ def group_texts(examples, train_config):
     # Concatenate all texts.
     concatenated_examples = {
         "input_ids": torch.as_tensor(
-            sum(examples["input_ids"], [CustomTokenizer.eos_token_id])
+            sum(examples["input_ids"], [get_tokenizer().eos_token_id])
         ),
         "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
         "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),

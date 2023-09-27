@@ -9,6 +9,7 @@ from transformers import TrainingArguments, get_polynomial_decay_schedule_with_w
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
+from utils import chemlactica_special_tokens
 
 # import accelerate
 from accelerate import Accelerator
@@ -21,7 +22,7 @@ from callbacks import (
     # ReproducabilityCallback,
 )
 import os
-from utils import load_model, CustomTokenizer
+from utils import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from contextlib import nullcontext
@@ -64,7 +65,7 @@ def train(
     train_config = model_train_configs[model_config]
 
     model = load_model(from_pretrained, train_config)
-    model.resize_token_embeddings(train_config['vocab_size'] + len(CustomTokenizer.chemlactica_special_tokens))
+    model.resize_token_embeddings(train_config['vocab_size'] + len(chemlactica_special_tokens))
 
     if os.path.isdir(from_pretrained):
         resume_from_checkpoint = from_pretrained
@@ -74,7 +75,7 @@ def train(
 
     model = BetterTransformer.transform(model)
 
-    CustomTokenizer.set_model_size(model_config)
+    # CustomTokenizer.set_model_size(model_config)
     # Not sure if this will not cause issues like initializing two distributed groups
     # comment out to run without accelerate
 
