@@ -121,11 +121,6 @@ def get_tokenizer():
         setattr(get_tokenizer, "first_call", False)
         print(f"Process {os.getpid()} created a tokenizer")
 
-        def on_delete():
-            print(f"Process {os.getpid()} terminated")
-
-        get_tokenizer.__del__ = on_delete
-
     return get_tokenizer.tokenizer
 
 
@@ -133,7 +128,6 @@ def create_tokenizer():
     tok = AutoTokenizer.from_pretrained(
         # f"facebook/galactica-125m"
         "src/tokenizer/ChemLacticaTokenizer"
-        # 'src/tokenizer/GalacticaTokenizer'
         # "src/tokenizer/galactica-125m"
     )
     bos_token = "<s>"

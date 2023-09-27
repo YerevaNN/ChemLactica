@@ -64,7 +64,6 @@ def train(
     transformers.utils.logging.enable_explicit_format()
 
     accelerator = Accelerator(log_with="all", project_dir=track_dir)
-    # accelerate.tracking.AimTracker(run_name=experiment_name, logging_dir=track_dir)
 
     train_config = model_train_configs[model_config]
 
@@ -75,12 +74,6 @@ def train(
 
     # Converts the model to use PyTorch’s native attention implementation
     model = BetterTransformer.transform(model)
-
-    # CustomTokenizer.set_model_size(model_config)
-    # Not sure if this will not cause issues like initializing two distributed groups
-    # comment out to run without accelerate
-
-    # dist.init_process_group()
 
     trainer_callback_dict = {}
     experiment_hash = "none"
@@ -113,8 +106,6 @@ def train(
     else:
         resume_from_checkpoint = False
 
-    # Not sure if this will not cause issues like initializing two distributed groups
-    # dist.init_process_group()
     logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
     if profile:
