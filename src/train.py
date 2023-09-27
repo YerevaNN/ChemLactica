@@ -1,4 +1,8 @@
 from config.create_train_config import model_train_configs
+import transformers
+from accelerate import logging
+
+# from accelerate.logging import get_logger
 
 # import torch.distributed as dist
 from optimum.bettertransformer import BetterTransformer
@@ -13,11 +17,13 @@ import argparse
 # import accelerate
 from accelerate import Accelerator
 import glob
+from transformers import ProgressCallback
 from callbacks import (
     CustomAimCallback,
     WPSCounterCallback,
     ProfCallback,
     EpochCallback,
+    CustomProgressCallback,
     # ReproducabilityCallback,
 )
 import os
@@ -31,6 +37,7 @@ import numpy
 torch.manual_seed(42)
 random.seed(42)
 numpy.random.seed(42)
+logger = logging.get_logger("transformers")
 
 
 def train(
@@ -52,33 +59,21 @@ def train(
     profile_dir,
     gradient_accumulation_steps,
 ):
-    accelerator = Accelerator()
+    transformers.logging.set_verbosity_info()
+    transformers.utils.logging.enable_explicit_format()
+
+    accelerator = Accelerator(log_with="all", project_dir=track_dir)
     # accelerate.tracking.AimTracker(run_name=experiment_name, logging_dir=track_dir)
-    print("test process", accelerator.process_index)
-
-    if not valid_batch_size:
-        valid_batch_size = train_batch_size
-
-    # absolute_path = os.path.dirname(os.path.abspath(__file__))
 
     train_config = model_train_configs[model_config]
 
     model = load_model(from_pretrained, train_config)
-    model.resize_token_embeddings(train_config['vocab_size'] + len(CustomTokenizer.chemlactica_special_tokens))
+    model.resize_token_embeddings(
+        train_config["vocab_size"] + len(CustomTokenizer.chemlactica_special_tokens)
+    )
 
-    if os.path.isdir(from_pretrained):
-        resume_from_checkpoint = from_pretrained
-    else:
-        resume_from_checkpoint = False
     # Converts the model to use PyTorch’s native attention implementation
-
     model = BetterTransformer.transform(model)
-
-    CustomTokenizer.set_model_size(model_config)
-    # Not sure if this will not cause issues like initializing two distributed groups
-    # comment out to run without accelerate
-
-    # dist.init_process_group()
 
     trainer_callback_dict = {}
     experiment_hash = "none"
@@ -101,8 +96,20 @@ def train(
     accelerator.wait_for_everyone()
     broadcast_object_list(communication_list)
     experiment_hash = communication_list[0]
-
     print(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
+
+    if not valid_batch_size:
+        valid_batch_size = train_batch_size
+
+    if os.path.isdir(from_pretrained):
+        resume_from_checkpoint = from_pretrained
+    else:
+        resume_from_checkpoint = False
+
+    CustomTokenizer.set_model_size(model_config)
+    # Not sure if this will not cause issues like initializing two distributed groups
+    # dist.init_process_group()
+    logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
     if profile:
         prof = torch.profiler.profile(
@@ -132,7 +139,7 @@ def train(
 
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     # trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
-
+    trainer_callback_dict["progress_callback"] = CustomProgressCallback()
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
     )
@@ -157,6 +164,9 @@ def train(
         output_dir=checkpoints_dir,
         per_device_train_batch_size=train_batch_size,
         per_device_eval_batch_size=valid_batch_size,
+        # log_level = "info",
+        log_on_each_node=True,
+        logging_dir=track_dir,
         # learning_rate=train_config["max_learning_rate"],
         # lr_scheduler_type="linear",
         # weight_decay=train_config["weight_decay"],
@@ -200,10 +210,12 @@ def train(
         compute_metrics=compute_metrics,
         train_dataset=processed_dataset["train"],
         eval_dataset=processed_dataset["validation"],
-        callbacks=list(trainer_callback_dict.values()),
         optimizers=[optimizer, lr_scheduler],
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
+    trainer.remove_callback(ProgressCallback)
+    for additional_callback in list(trainer_callback_dict.values()):
+        trainer.add_callback(additional_callback)
 
     prof_context_manager = (
         trainer_callback_dict.get("profiller_callback").prof
@@ -212,7 +224,10 @@ def train(
     )
 
     with prof_context_manager as prof:
-        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+        try:
+            trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+        except Exception as e:
+            logger.error(e, exc_info=True)
 
     return trainer
 

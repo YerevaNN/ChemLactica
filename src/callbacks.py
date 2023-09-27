@@ -4,13 +4,21 @@ import hashlib
 import glob
 
 from dataset_utils import process_dataset
+from accelerate.logging import get_logger
 
 from aim.hugging_face import AimCallback
-from transformers.trainer_callback import TrainerCallback, TrainerControl, TrainerState
+from transformers.trainer_callback import (
+    TrainerCallback,
+    TrainerControl,
+    TrainerState,
+    ProgressCallback,
+)
 from transformers import OPTForCausalLM
 import torch
 from transformers.training_args import TrainingArguments
 from datasets import load_dataset
+
+logger = get_logger(__name__)
 
 
 def calc_hash_for_binary_file(path):
@@ -18,6 +26,14 @@ def calc_hash_for_binary_file(path):
         file_content = _file.read()
         hex_hash = hashlib.md5(file_content).hexdigest()
         return hex_hash
+
+
+class CustomProgressCallback(ProgressCallback):
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if state.is_local_process_zero and self.training_bar is not None:
+            _ = logs.pop("total_flos", None)
+            self.training_bar.write(str(logs))
+            logger.info(str(logs))
 
 
 class CustomAimCallback(AimCallback):
