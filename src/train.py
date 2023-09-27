@@ -25,7 +25,7 @@ from callbacks import (
     ProfCallback,
     EpochCallback,
     CustomProgressCallback,
-    # ReproducabilityCallback,
+    ReproducabilityCallback,
 )
 import os
 from utils import load_model
@@ -59,6 +59,7 @@ def train(
     profile,
     profile_dir,
     gradient_accumulation_steps,
+    check_reproducability
 ):
     transformers.logging.set_verbosity_info()
     transformers.utils.logging.enable_explicit_format()
@@ -135,7 +136,8 @@ def train(
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
-    # trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
+    if check_reproducability:
+        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
     trainer_callback_dict["progress_callback"] = CustomProgressCallback()
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
@@ -394,6 +396,19 @@ if __name__ == "__main__":
         help="the number of steps to over which to accumulate gradients",
         default=1,
     )
+    parser.add_argument(
+        "--check-reproducability",
+        action="store_true",
+        dest="check_reproducability",
+        help="whether or not check reproducability (should only be use for testing)",
+    )
+    parser.add_argument(
+        "--no-check-reproducability",
+        action="store_false",
+        dest="check_reproducability",
+        help="whether or not check reproducability (should only be use for testing)",
+    )
+    parser.set_defaults(profile=False)
 
     args = parser.parse_args()
     train(**args.__dict__)

@@ -69,7 +69,7 @@ property_names = (
 
 
 # def get_property_entries():
-#     return getattr(get_property_entries, "property_entries", construct_prop_entries())
+#     return getattr(get_property_entries, "property_entries", construct_prop_entries()) # fix this should be setattr
 
 
 # TODO: add overflow error handling here

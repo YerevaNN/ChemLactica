@@ -2,6 +2,7 @@ import os
 import time
 import hashlib
 import glob
+import gc
 
 from dataset_utils import process_dataset
 from accelerate.logging import get_logger
@@ -145,6 +146,9 @@ class EpochCallback(TrainerCallback):
 
 class ReproducabilityCallback(TrainerCallback):
     def on_save(self, args, state, control, model, **kwargs):
+        gc.collect()
+        torch.cuda.empty_cache()
+
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
         )
@@ -164,19 +168,18 @@ class ReproducabilityCallback(TrainerCallback):
             process_batch_sizes=(100, 100),
         )
 
-        is_repr = True
-        for inp in processed_dataset["data"]:
-            del inp["token_type_ids"]
-            inp = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
-            out = model(**inp)
-            saved_out = saved_model(**inp)
+        model.eval()
+        saved_model.eval()
+        with torch.no_grad():
+            for i, inp in enumerate(processed_dataset["data"]):
+                del inp["token_type_ids"]
+                inp = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
+                out = model(**inp)
+                saved_out = saved_model(**inp)
 
-            ok = torch.allclose(out.logits, saved_out.logits, atol=1e-4)
-            if not ok:
-                is_repr = False
-            break
-
-        if is_repr:
-            print(f"Model at step {state.global_step} is reproducable.")
-        else:
-            print(f"Model at step {state.global_step} is not reproducable.")
+                diff = torch.abs(out.logits - saved_out.logits)
+                print(f"Iteration {i}: min {diff.min()}, \
+                      max {diff.max()}, mean {diff.mean()}, \
+                      median {torch.median(diff)}")
+                
+                if i == 9: break

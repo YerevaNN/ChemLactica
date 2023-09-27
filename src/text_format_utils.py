@@ -23,7 +23,6 @@ def generate_formatted_string(compound_json):
         key_value_pairs.append(format_key_value(key, compound_json[key]))
     compound_formatted_string = "".join(key_value_pairs) + "</s>" # get_tokenizer().eos_token
     return compound_formatted_string
-    # return str(compound_json)
 
 
 def format_key_value(key, value):
