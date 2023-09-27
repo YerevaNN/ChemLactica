@@ -1,4 +1,3 @@
-import tqdm
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers.models.opt.modeling_opt import OPTForCausalLM
@@ -99,7 +98,7 @@ chemlactica_special_tokens = [
 
 #     @staticmethod
 #     def new_instance():
-#         tok = AutoTokenizer.from_pretrained(    
+#         tok = AutoTokenizer.from_pretrained(
 #             f"facebook/galactica-{CustomTokenizer.model_size}"
 #             # 'src/tokenizer/ChemLacticaTokenizer'
 #             # 'src/tokenizer/GalacticaTokenizer'
@@ -121,17 +120,19 @@ def get_tokenizer():
         setattr(get_tokenizer, "tokenizer", create_tokenizer())
         setattr(get_tokenizer, "first_call", False)
         print(f"Process {os.getpid()} created a tokenizer")
+
         def on_delete():
             print(f"Process {os.getpid()} terminated")
+
         get_tokenizer.__del__ = on_delete
 
     return get_tokenizer.tokenizer
 
 
 def create_tokenizer():
-    tok = AutoTokenizer.from_pretrained(    
+    tok = AutoTokenizer.from_pretrained(
         # f"facebook/galactica-125m"
-        'src/tokenizer/ChemLacticaTokenizer'
+        "src/tokenizer/ChemLacticaTokenizer"
         # 'src/tokenizer/GalacticaTokenizer'
         # "src/tokenizer/galactica-125m"
     )
@@ -151,32 +152,6 @@ def create_tokenizer():
     #     CustomTokenizer.chemlactica_special_tokens
     # )
     return tok
-
-
-class ProgressBar(tqdm.tqdm):
-    __instance = None
-    __total = None
-
-    def __init__(self, total=None, *args, **kwargs):
-        new_total = ProgressBar.__total if total is None else total
-        super().__init__(total=new_total, *args, **kwargs)
-        if ProgressBar.__instance is not None:
-            raise Exception(f"There can only be one instance of {__class__.__name__}")
-
-        ProgressBar.__instance = self
-        ProgressBar.__total = new_total
-
-    @staticmethod
-    def set_total(total):
-        ProgressBar.__total = total
-
-    @staticmethod
-    def delete_instance():
-        ProgressBar.__instance = None
-
-    @staticmethod
-    def get_instance():
-        return ProgressBar.__instance
 
 
 if __name__ == "__main__":
