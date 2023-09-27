@@ -65,7 +65,9 @@ def train(
     train_config = model_train_configs[model_config]
 
     model = load_model(from_pretrained, train_config)
-    model.resize_token_embeddings(train_config['vocab_size'] + len(chemlactica_special_tokens))
+    model.resize_token_embeddings(
+        train_config["vocab_size"] + len(chemlactica_special_tokens)
+    )
 
     if os.path.isdir(from_pretrained):
         resume_from_checkpoint = from_pretrained
@@ -185,22 +187,34 @@ def train(
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-    dataset = load_dataset(
+    train_dataset = load_dataset(
         "text",
-        data_files={"train": training_data_files, "validation": valid_data_files},
+        data_files={"train": training_data_files},
         streaming=True,
     )
+    eval_dataset = load_dataset(
+        "text", data_files={"validation": valid_data_files}, streaming=False
+    )
 
-    processed_dataset = process_dataset(
-        dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
+    processed_train_dataset = process_dataset(
+        dataset=train_dataset,
+        train_config=train_config,
+        process_batch_sizes=(50, 50),
+        is_eval=False,
+    )
+    processed_eval_dataset = process_dataset(
+        dataset=eval_dataset,
+        train_config=train_config,
+        process_batch_sizes=(50, 50),
+        is_eval=True,
     )
 
     trainer = CustomTrainer(
         model=model,
         args=training_args,
         compute_metrics=compute_metrics,
-        train_dataset=processed_dataset["train"],
-        eval_dataset=processed_dataset["validation"],
+        train_dataset=processed_train_dataset["train"],
+        eval_dataset=processed_eval_dataset["validation"],
         callbacks=list(trainer_callback_dict.values()),
         optimizers=[optimizer, lr_scheduler],
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
