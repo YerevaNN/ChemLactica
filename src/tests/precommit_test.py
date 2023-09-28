@@ -7,6 +7,8 @@ import sys
 # sys.path.append(os.path.join(script_path, ".."))
 import torch
 
+test_directory = "/tmp/chemlactica_test_dir"
+
 
 def create_train_command(module, module_args, script, script_args):
     train_command = "python3 -m "
@@ -69,8 +71,8 @@ class TestReproducability(unittest.TestCase):
 
         # script_path = os.path.dirname(os.path.abspath(__file__))
         # print("script path", os.getcwd())
-        subprocess.run("mkdir test_dir", shell=True)
-        subprocess.run("mkdir test_dir/checkpoints", shell=True)
+        subprocess.run(f"mkdir {test_directory}", shell=True)
+        subprocess.run(f"mkdir {test_directory}/checkpoints", shell=True)
 
         train_command = create_train_command(
             module="accelerate.commands.launch",
@@ -97,11 +99,9 @@ class TestReproducability(unittest.TestCase):
             train_command,
             shell=True,
         )
-        subprocess.run("rm -rf test_dir", shell=True)
+        subprocess.run(f"rm -rf {test_directory}", shell=True)
         if executed_prog.returncode != 0:
             raise Exception(f"\n\tExit code: {executed_prog.returncode}")
-
-
 
 
 if __name__ == "__main__":

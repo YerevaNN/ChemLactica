@@ -178,7 +178,7 @@ class ReproducabilityCallback(TrainerCallback):
                 saved_out = saved_model(**inp)
 
                 diff = torch.abs(out.logits - saved_out.logits)
-                print(f"Iteration {i}: min {diff.min()}, \
+                print(f"Diff of logits at iteration {i}: min {diff.min()}, \
                       max {diff.max()}, mean {diff.mean()}, \
                       median {torch.median(diff)}")
                 
