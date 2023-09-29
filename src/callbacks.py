@@ -5,6 +5,7 @@ import glob
 import gc
 
 from dataset_utils import process_dataset
+from utils import load_model, chemlactica_special_tokens
 from accelerate.logging import get_logger
 
 from aim.hugging_face import AimCallback
@@ -18,6 +19,7 @@ from transformers import OPTForCausalLM
 import torch
 from transformers.training_args import TrainingArguments
 from datasets import load_dataset
+from accelerate import Accelerator
 
 logger = get_logger(__name__)
 
@@ -145,14 +147,14 @@ class EpochCallback(TrainerCallback):
 
 
 class ReproducabilityCallback(TrainerCallback):
+    def __init__(self, accelerator, model_config, train_config):
+        self.accelerator = accelerator
+        self.model_config = model_config
+        self.train_config = train_config
+        
     def on_save(self, args, state, control, model, **kwargs):
         gc.collect()
         torch.cuda.empty_cache()
-
-        checkpoint_dir = os.path.join(
-            args.output_dir, f"checkpoint-{state.global_step}"
-        )
-        saved_model = OPTForCausalLM.from_pretrained(checkpoint_dir).to(model.device)
 
         training_data_files = glob.glob(".small_data/train" + "/*.jsonl")
 
@@ -168,18 +170,47 @@ class ReproducabilityCallback(TrainerCallback):
             process_batch_sizes=(100, 100),
         )
 
+        batches = []
+        for i, inp in enumerate(processed_dataset["data"]):
+            del inp["token_type_ids"]
+            inp = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
+            batches.append(inp)
+            if i == 9: break
+
+        checkpoint_dir = os.path.join(
+            args.output_dir, f"checkpoint-{state.global_step}"
+        )
+        model_logits = []
+        
+        model.to(self.accelerator.device)
         model.eval()
+        with torch.no_grad():
+            for batch in batches:
+                # print(batch)
+                model_logits.append(model(**batch))
+
+        accelerator = Accelerator()
+        saved_model = load_model(f"facebook/galactica-{self.model_config}", self.train_config)
+        saved_model.resize_token_embeddings(
+            self.train_config["vocab_size"] + len(chemlactica_special_tokens)
+        )
+        saved_model = accelerator.prepare(saved_model)
+        accelerator.load_state(checkpoint_dir)
+        saved_model.to(accelerator.device)
+
         saved_model.eval()
         with torch.no_grad():
-            for i, inp in enumerate(processed_dataset["data"]):
-                del inp["token_type_ids"]
-                inp = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
-                out = model(**inp)
-                saved_out = saved_model(**inp)
+            for i, batch in enumerate(batches):
+                # print(batch)
+                saved_out = saved_model(**batch)
+                out = model_logits[i]
 
-                diff = torch.abs(out.logits - saved_out.logits)
-                print(f"Diff of logits at iteration {i}: min {diff.min()}, \
-                      max {diff.max()}, mean {diff.mean()}, \
-                      median {torch.median(diff)}")
-                
-                if i == 9: break
+                logits_diff = torch.abs(out.logits - saved_out.logits)
+                print(f"Logits difference {i} min {logits_diff.min():.6f}, max {logits_diff.max():.6f}, mean {logits_diff.mean():.6f}, median {logits_diff.median():.6f}")
+                loss_diff = torch.abs(out.loss - saved_out.loss)
+                print(f"loss difference {loss_diff}")
+                different_tokens_count = torch.sum(out.logits.softmax(-1).argmax(-1) != saved_out.logits.softmax(-1).argmax(-1))
+                print("different token count", different_tokens_count.item())
+
+
+# python3 -m accelerate.commands.launch --config_file src/tests/test_config.yaml src/train.py --from_pretrained facebook/galactica-125m --model_config 125m --training_data_dir .small_data/train --valid_data_dir .small_data/valid --train_batch_size 4 --max_steps 10 --eval_steps 5 --save_steps 5 --dataloader_num_workers 1 --experiment_name gal125m_test_reproducability_of_logits --checkpoints_root_dir test_dir/checkpoints/facebook/galactica-125m --no-track  --check-reproducability

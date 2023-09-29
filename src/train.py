@@ -74,7 +74,7 @@ def train(
     )
 
     # Converts the model to use PyTorch’s native attention implementation
-    model = BetterTransformer.transform(model)
+    # model = BetterTransformer.transform(model)
 
     trainer_callback_dict = {}
     experiment_hash = "none"
@@ -137,7 +137,7 @@ def train(
 
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     if check_reproducability:
-        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
+        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(accelerator, model_config, train_config)
     trainer_callback_dict["progress_callback"] = CustomProgressCallback()
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
@@ -174,8 +174,8 @@ def train(
         # warmup_steps=train_config["warmup_steps"],
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
-        eval_steps=eval_steps,
         max_steps=max_steps,
+        eval_steps=eval_steps,
         save_steps=save_steps,
         dataloader_drop_last=True,
         dataloader_pin_memory=True,
