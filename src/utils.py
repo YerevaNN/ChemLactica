@@ -127,8 +127,8 @@ def get_tokenizer():
 def create_tokenizer():
     tok = AutoTokenizer.from_pretrained(
         # f"facebook/galactica-125m"
-        "src/tokenizer/ChemLacticaTokenizer"
-        # "src/tokenizer/galactica-125m"
+        # "src/tokenizer/ChemLacticaTokenizer"
+        "src/tokenizer/galactica-125m"
     )
     bos_token = "<s>"
     bos_token_id = 0

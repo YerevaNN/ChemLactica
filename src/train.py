@@ -61,20 +61,20 @@ def train(
     gradient_accumulation_steps,
     check_reproducability
 ):
-    transformers.logging.set_verbosity_info()
-    transformers.utils.logging.enable_explicit_format()
+    # transformers.logging.set_verbosity_info()
+    # transformers.utils.logging.enable_explicit_format()
 
     accelerator = Accelerator(log_with="all", project_dir=track_dir)
 
     train_config = model_train_configs[model_config]
 
     model = load_model(from_pretrained, train_config)
-    model.resize_token_embeddings(
-        train_config["vocab_size"] + len(chemlactica_special_tokens)
-    )
+    # model.resize_token_embeddings(
+    #     train_config["vocab_size"] + len(chemlactica_special_tokens)
+    # )
 
     # Converts the model to use PyTorch’s native attention implementation
-    # model = BetterTransformer.transform(model)
+    model = BetterTransformer.transform(model)
 
     trainer_callback_dict = {}
     experiment_hash = "none"

@@ -1,21 +1,14 @@
 import subprocess
+import argparse
 import unittest
 import gc
 import os
 import sys
-script_path = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(script_path, ".."))
-import glob
 
-import transformers
-from transformers import OPTForCausalLM
-from config.create_train_config import model_train_configs
-from datasets import load_dataset
-from dataset_utils import process_dataset
 import torch
-from accelerate import Accelerator
 
-test_directory = "/tmp/chemlactica_test_dir"
+
+test_directory = "/tmp/chemlactica_precommit_test"
 
 
 def create_train_command(module, module_args, script, script_args):
@@ -72,9 +65,10 @@ def create_train_command(module, module_args, script, script_args):
 #             raise Exception(f"\n\tExit code: {executed_prog.returncode}")
 
 
-class TestReproducability(unittest.TestCase):
+class TestReproducabilityOfModelOutput(unittest.TestCase):
 
     def setUp(self):
+        # clean up
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -84,25 +78,29 @@ class TestReproducability(unittest.TestCase):
     def tearDown(self):
         subprocess.run(f"rm -rf {test_directory}", shell=True)
 
-    def test_reproducability_of_logits(self):
+        # clean up
+        gc.collect()
+        torch.cuda.empty_cache()
 
-        # script_path = os.path.dirname(os.path.abspath(__file__))
-        # print("script path", os.getcwd())
+    def test_repr_of_model_output(self):
+        self.check_repr_of_model_output("src/config/test_configs/fsdp_config.yaml")
+        # self.check_repr_of_model_output("src/config/test_configs/ddp_config.yaml")
+
+    def check_repr_of_model_output(self, acc_config_file):
         model_config = "125m"
-        train_config = model_train_configs[model_config]
         output_dir = f"{test_directory}/checkpoints"
         train_batch_size = 4
-        max_steps = 5
-        eval_steps = 5
+        max_steps = 10
+        eval_steps = 20
         save_steps = 5
-        dataloader_num_workers = 1
+        dataloader_num_workers = 0
         training_data_dir = ".small_data/train"
         valid_data_dir = ".small_data/valid"
         gradient_accumulation_steps = 1
 
         train_command = create_train_command(
             module="accelerate.commands.launch",
-            module_args={"config_file": "src/tests/test_config.yaml"},
+            module_args={"config_file": acc_config_file},
             script="src/train.py",
             script_args={
                 "from_pretrained": f"facebook/galactica-{model_config}",
@@ -128,58 +126,39 @@ class TestReproducability(unittest.TestCase):
         if executed_prog.returncode != 0:
             raise Exception(f"\n\tExit code: {executed_prog.returncode}")
 
-        # saved_model = OPTForCausalLM.from_pretrained(f"{test_directory}/checkpoints/facebook/galactica-{model_config}/none/checkpoint-5")
-        # accelerator = Accelerator()
-        # saved_model = OPTForCausalLM.from_pretrained(f"facebook/galactica-{model_config}")
-        # saved_model = accelerator.prepare(accelerator)
-        # accelerator.load_state(f"{test_directory}/checkpoints/facebook/galactica-{model_config}/none/checkpoint-5")
-
-        # training_args = transformers.TrainingArguments(
-        #     output_dir=output_dir,
-        #     per_device_train_batch_size=train_batch_size,
-        #     per_device_eval_batch_size=train_batch_size,
-        #     # log_level = "info",
-        #     log_on_each_node=True,
-        #     # learning_rate=train_config["max_learning_rate"],
-        #     # lr_scheduler_type="linear",
-        #     # weight_decay=train_config["weight_decay"],
-        #     # adam_beta1=train_config["adam_beta1"],
-        #     # adam_beta2=train_config["adam_beta2"],
-        #     # warmup_steps=train_config["warmup_steps"],
-        #     max_grad_norm=train_config["global_gradient_norm"],
-        #     evaluation_strategy="steps",
-        #     max_steps=max_steps,
-        #     eval_steps=eval_steps,
-        #     save_steps=save_steps,
-        #     dataloader_drop_last=True,
-        #     dataloader_pin_memory=True,
-        #     dataloader_num_workers=dataloader_num_workers,
-        #     logging_steps=1,
-        #     gradient_checkpointing=False,
-        #     gradient_accumulation_steps=gradient_accumulation_steps,
-        #     save_total_limit=4,
-        # )
-
-        # valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-        # eval_dataset = load_dataset(
-        #     "text", data_files={"validation": valid_data_files}, streaming=False
-        # )
-
-        # processed_eval_dataset = process_dataset(
-        #     dataset=eval_dataset,
-        #     train_config=train_config,
-        #     process_batch_sizes=(50, 50),
-        #     is_eval=True,
-        # )
-
-        # trainer = transformers.Trainer(
-        #     model=saved_model,
-        #     args=training_args,
-        #     train_dataset=processed_eval_dataset["validation"],
-        #     eval_dataset=processed_eval_dataset["validation"]
-        # )
-        # trainer.evaluate()
-
 
 if __name__ == "__main__":
+
+    # parser = argparse.ArgumentParser()
+
+    # parser.add_argument(
+    #     "--gpu_devices",
+    #     type=str,
+    #     metavar="GD",
+    #     dest="gpu_devices",
+    #     required=True,
+    #     help="comma seperated gpu device indices",
+    # )
+    # parser.add_argument(
+    #     "--test_directory",
+    #     type=str,
+    #     metavar="TD",
+    #     dest="test_directory",
+    #     required=False,
+    #     help="dir where to create intermediate test files (this dir will be deleted at the end)",
+    #     default="/tmp/chemlactica_precommit_test"
+    # )
+
+    # args = parser.parse_args()
+    # gpu_devices = args.gpu_devices
+    # test_directory = args.test_directory
+
+    # script_path = os.path.dirname(os.path.abspath(__file__))
+    # src_code_path = os.path.join(script_path, "..")
+
+    # os.environ["CUDA_VISIBLE_DEVICES"] = gpu_devices
+    # os.environ["TOKENIZERS_PARALLELISM"] = "true"
+    # # os.environ["PYTHONPATH"] = src_code_path
+    # print(f"TESTING WITH DEVICES '{gpu_devices}'")
+
     unittest.main(verbosity=2)

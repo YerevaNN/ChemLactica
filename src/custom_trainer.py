@@ -2,6 +2,7 @@ import shutil
 from transformers import Trainer
 from typing import Optional
 from transformers import OPTForCausalLM
+from optimum.bettertransformer import BetterTransformer
 
 # from torch.distributed.fsdp import (
 #     FullyShardedDataParallel as FSDP,
@@ -32,4 +33,9 @@ class CustomTrainer(Trainer):
         #     save_function=self.accelerator.save,
         #     max_shard_size="200MB",
         # )
+        # self.model = BetterTransformer.reverse(self.model)
+        # super().save_model(output_dir, _internal_call)
+        # self.model = BetterTransformer.transform(self.model)
+        # self.model = BetterTransformer.reverse(self.model)
         self.accelerator.save_state(output_dir)
+        # self.model = BetterTransformer.transform(self.model)

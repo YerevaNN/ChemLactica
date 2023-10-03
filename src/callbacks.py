@@ -3,10 +3,13 @@ import time
 import hashlib
 import glob
 import gc
+import pickle
 
 from dataset_utils import process_dataset
 from utils import load_model, chemlactica_special_tokens
 from accelerate.logging import get_logger
+from utils import get_tokenizer
+import torch
 
 from aim.hugging_face import AimCallback
 from transformers.trainer_callback import (
@@ -20,6 +23,7 @@ import torch
 from transformers.training_args import TrainingArguments
 from datasets import load_dataset
 from accelerate import Accelerator
+from optimum.bettertransformer import BetterTransformer
 
 logger = get_logger(__name__)
 
@@ -153,10 +157,11 @@ class ReproducabilityCallback(TrainerCallback):
         self.train_config = train_config
         
     def on_save(self, args, state, control, model, **kwargs):
+        print(f"Process {torch.distributed.get_rank()}")
         gc.collect()
         torch.cuda.empty_cache()
 
-        training_data_files = glob.glob(".small_data/train" + "/*.jsonl")
+        training_data_files = glob.glob(".small_data/valid" + "/*.jsonl")
 
         dataset = load_dataset(
             "text",
@@ -180,37 +185,72 @@ class ReproducabilityCallback(TrainerCallback):
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
         )
-        model_logits = []
-        
-        model.to(self.accelerator.device)
-        model.eval()
-        with torch.no_grad():
-            for batch in batches:
-                # print(batch)
-                model_logits.append(model(**batch))
+
+        # all_params = []
+        # for p in model.parameters():
+        #     all_params.append(p)
+
+        # with open("logits1.pickle", "wb") as f:
+        #     pickle.dump(all_params, f)
+
+        # with open("logits.pickle", "rb") as f:
+        #     logs = pickle.load(f)
+        #     print(type(logs))
+        #     print("Equality", logs == model_logits)
+        #     assert model_logits == logs
 
         accelerator = Accelerator()
         saved_model = load_model(f"facebook/galactica-{self.model_config}", self.train_config)
-        saved_model.resize_token_embeddings(
-            self.train_config["vocab_size"] + len(chemlactica_special_tokens)
-        )
+        # saved_model.resize_token_embeddings(
+        #     self.train_config["vocab_size"] + len(chemlactica_special_tokens)
+        # )
         saved_model = accelerator.prepare(saved_model)
         accelerator.load_state(checkpoint_dir)
         saved_model.to(accelerator.device)
 
+        # saved_model = load_model(checkpoint_dir, self.train_config)
+        # saved_model.to(model.device)
+        # saved_model = BetterTransformer.transform(saved_model)
+
+        model.eval()
         saved_model.eval()
         with torch.no_grad():
             for i, batch in enumerate(batches):
-                # print(batch)
-                saved_out = saved_model(**batch)
-                out = model_logits[i]
+                out = model(**batch)
+                saved_md_out = saved_model(**batch)
+                # print(i, batch)
 
-                logits_diff = torch.abs(out.logits - saved_out.logits)
+                logits_diff = torch.abs(out.logits - saved_md_out.logits)
                 print(f"Logits difference {i} min {logits_diff.min():.6f}, max {logits_diff.max():.6f}, mean {logits_diff.mean():.6f}, median {logits_diff.median():.6f}")
-                loss_diff = torch.abs(out.loss - saved_out.loss)
+                loss_diff = torch.abs(out.loss - saved_md_out.loss)
                 print(f"loss difference {loss_diff}")
-                different_tokens_count = torch.sum(out.logits.softmax(-1).argmax(-1) != saved_out.logits.softmax(-1).argmax(-1))
+                different_tokens_count = torch.sum(out.logits.softmax(-1).argmax(-1) != saved_md_out.logits.softmax(-1).argmax(-1))
                 print("different token count", different_tokens_count.item())
 
+        contexts = [
+            "[CLOGP 100][START_SMILES]",
+            "[SAS 1][START_SMILES]",
+            "[WEIGHT 41.123][START_SMILES]",
+            "random input",
+        ]
 
-# python3 -m accelerate.commands.launch --config_file src/tests/test_config.yaml src/train.py --from_pretrained facebook/galactica-125m --model_config 125m --training_data_dir .small_data/train --valid_data_dir .small_data/valid --train_batch_size 4 --max_steps 10 --eval_steps 5 --save_steps 5 --dataloader_num_workers 1 --experiment_name gal125m_test_reproducability_of_logits --checkpoints_root_dir test_dir/checkpoints/facebook/galactica-125m --no-track  --check-reproducability
+        for cont in contexts:
+            max_length = 400
+            inputs = get_tokenizer()(cont, return_tensors="pt").to(model.device)
+            generated_toks = model.generate(
+                inputs["input_ids"],
+                max_length=max_length,
+                do_sample=False
+            )
+            saved_md_generated_toks = saved_model.generate(
+                inputs["input_ids"],
+                max_length=max_length,
+                do_sample=False
+            )
+            generated_toks = generated_toks.squeeze()
+            saved_md_generated_toks = saved_md_generated_toks.squeeze()
+            maximum = max(len(generated_toks), len(saved_md_generated_toks))
+            torch.pad(generated_toks.squeeze(), pad=, mode='constant', value=0)
+            print(generated_toks.shape, saved_md_generated_toks.shape, generated_toks.squeeze()[-1], saved_md_generated_toks.squeeze()[-1])
+            diff_gen_tokens = torch.sum(generated_toks.squeeze() != saved_md_generated_toks.squeeze())
+            print(f"Checking diff generated tokens (max_length={max_length}) '{cont}': count {diff_gen_tokens}")
