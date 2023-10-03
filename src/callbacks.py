@@ -10,6 +10,7 @@ from utils import load_model, chemlactica_special_tokens
 from accelerate.logging import get_logger
 from utils import get_tokenizer
 import torch
+import torch.nn.functional as F
 
 from aim.hugging_face import AimCallback
 from transformers.trainer_callback import (
@@ -250,7 +251,9 @@ class ReproducabilityCallback(TrainerCallback):
             generated_toks = generated_toks.squeeze()
             saved_md_generated_toks = saved_md_generated_toks.squeeze()
             maximum = max(len(generated_toks), len(saved_md_generated_toks))
-            torch.pad(generated_toks.squeeze(), pad=, mode='constant', value=0)
-            print(generated_toks.shape, saved_md_generated_toks.shape, generated_toks.squeeze()[-1], saved_md_generated_toks.squeeze()[-1])
+            print(len(saved_md_generated_toks), len(generated_toks), maximum)
+            generated_toks = F.pad(generated_toks, pad=(0, maximum - len(generated_toks)), mode='constant', value=0)
+            saved_md_generated_toks = F.pad(saved_md_generated_toks, pad=(0, maximum - len(saved_md_generated_toks)), mode='constant', value=0)
+            print(generated_toks.shape, saved_md_generated_toks.shape)
             diff_gen_tokens = torch.sum(generated_toks.squeeze() != saved_md_generated_toks.squeeze())
             print(f"Checking diff generated tokens (max_length={max_length}) '{cont}': count {diff_gen_tokens}")

@@ -74,7 +74,7 @@ def train(
     # )
 
     # Converts the model to use PyTorch’s native attention implementation
-    model = BetterTransformer.transform(model)
+    # model = BetterTransformer.transform(model)
 
     trainer_callback_dict = {}
     experiment_hash = "none"

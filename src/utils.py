@@ -34,10 +34,12 @@ def load_model(from_pretrained: str, train_config):
                 ffn_dim=train_config["ffn_dim"],
                 max_position_embeddings=train_config["max_position_embeddings"],
                 num_attention_heads=train_config["num_attention_heads"],
-                word_embed_proj_dim=train_config["word_embed_proj_dim"],
+                word_embed_proj_dim=train_config["word_sembed_proj_dim"],
             )
         )
-    return AutoModelForCausalLM.from_pretrained(from_pretrained)
+    return AutoModelForCausalLM.from_pretrained(
+        from_pretrained, use_flash_attention_2=True, torch_dtype=torch.bfloat16
+    )
 
 
 # class CustomTokenizer:
