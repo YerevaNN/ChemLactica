@@ -181,37 +181,24 @@ class ReproducabilityCallback(TrainerCallback):
             del inp["token_type_ids"]
             inp = {k: inp[k].unsqueeze(0).to(model.device) for k in inp.keys()}
             batches.append(inp)
-            if i == 9: break
+            if i == 20: break
 
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
         )
-
-        # all_params = []
-        # for p in model.parameters():
-        #     all_params.append(p)
-
-        # with open("logits1.pickle", "wb") as f:
-        #     pickle.dump(all_params, f)
-
-        # with open("logits.pickle", "rb") as f:
-        #     logs = pickle.load(f)
-        #     print(type(logs))
-        #     print("Equality", logs == model_logits)
-        #     assert model_logits == logs
+        print("Loading from checkpoint:", checkpoint_dir)
 
         accelerator = Accelerator()
-        saved_model = load_model(f"facebook/galactica-{self.model_config}", self.train_config)
-        # saved_model.resize_token_embeddings(
-        #     self.train_config["vocab_size"] + len(chemlactica_special_tokens)
-        # )
+        saved_model = load_model(f"facebook/galactica-{self.model_config}", flash_att=True, dtype=torch.bfloat16)
+        saved_model.resize_token_embeddings(
+            self.train_config["vocab_size"] + len(chemlactica_special_tokens)
+        )
         saved_model = accelerator.prepare(saved_model)
         accelerator.load_state(checkpoint_dir)
         saved_model.to(accelerator.device)
 
         # saved_model = load_model(checkpoint_dir, self.train_config)
         # saved_model.to(model.device)
-        # saved_model = BetterTransformer.transform(saved_model)
 
         model.eval()
         saved_model.eval()
@@ -235,25 +222,26 @@ class ReproducabilityCallback(TrainerCallback):
             "random input",
         ]
 
-        for cont in contexts:
-            max_length = 400
-            inputs = get_tokenizer()(cont, return_tensors="pt").to(model.device)
-            generated_toks = model.generate(
-                inputs["input_ids"],
-                max_length=max_length,
-                do_sample=False
-            )
-            saved_md_generated_toks = saved_model.generate(
-                inputs["input_ids"],
-                max_length=max_length,
-                do_sample=False
-            )
-            generated_toks = generated_toks.squeeze()
-            saved_md_generated_toks = saved_md_generated_toks.squeeze()
-            maximum = max(len(generated_toks), len(saved_md_generated_toks))
-            print(len(saved_md_generated_toks), len(generated_toks), maximum)
-            generated_toks = F.pad(generated_toks, pad=(0, maximum - len(generated_toks)), mode='constant', value=0)
-            saved_md_generated_toks = F.pad(saved_md_generated_toks, pad=(0, maximum - len(saved_md_generated_toks)), mode='constant', value=0)
-            print(generated_toks.shape, saved_md_generated_toks.shape)
-            diff_gen_tokens = torch.sum(generated_toks.squeeze() != saved_md_generated_toks.squeeze())
-            print(f"Checking diff generated tokens (max_length={max_length}) '{cont}': count {diff_gen_tokens}")
+        # with torch.no_grad():
+        #     for cont in contexts:
+        #         max_length = 400
+        #         inputs = get_tokenizer()(cont, return_tensors="pt").to(model.device)
+        #         generated_toks = saved_model.generate(
+        #             inputs["input_ids"],
+        #             max_length=max_length,
+        #             do_sample=False
+        #         )
+        #         saved_md_generated_toks = saved_model.generate(
+        #             inputs["input_ids"],
+        #             max_length=max_length,
+        #             do_sample=False
+        #         )
+        #         generated_toks = generated_toks.squeeze()
+        #         saved_md_generated_toks = saved_md_generated_toks.squeeze()
+        #         maximum = max(len(generated_toks), len(saved_md_generated_toks))
+        #         print(len(saved_md_generated_toks), len(generated_toks), maximum)
+        #         generated_toks = F.pad(generated_toks, pad=(0, maximum - len(generated_toks)), mode='constant', value=0)
+        #         saved_md_generated_toks = F.pad(saved_md_generated_toks, pad=(0, maximum - len(saved_md_generated_toks)), mode='constant', value=0)
+        #         print(generated_toks.shape, saved_md_generated_toks.shape)
+        #         diff_gen_tokens = torch.sum(generated_toks.squeeze() != saved_md_generated_toks.squeeze())
+        #         print(f"Checking diff generated tokens (max_length={max_length}) '{cont}': count {diff_gen_tokens}")

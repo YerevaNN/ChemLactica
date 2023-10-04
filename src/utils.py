@@ -20,11 +20,10 @@ def custom_opt_init(func):
 
     return inner_func
 
-
 OPTForCausalLM.__init__ = custom_opt_init(OPTForCausalLM.__init__)
 
 
-def load_model(from_pretrained: str, train_config):
+def load_model(from_pretrained: str, flash_att=False, dtype=None, train_config=None):
     if from_pretrained == "small_opt":
         return transformers.OPTForCausalLM(
             transformers.OPTConfig(
@@ -37,9 +36,10 @@ def load_model(from_pretrained: str, train_config):
                 word_embed_proj_dim=train_config["word_sembed_proj_dim"],
             )
         )
-    return AutoModelForCausalLM.from_pretrained(
-        from_pretrained, use_flash_attention_2=True, torch_dtype=torch.bfloat16
+    model = AutoModelForCausalLM.from_pretrained(
+        from_pretrained, use_flash_attention_2=flash_att, torch_dtype=dtype
     )
+    return model
 
 
 # class CustomTokenizer:
@@ -129,8 +129,8 @@ def get_tokenizer():
 def create_tokenizer():
     tok = AutoTokenizer.from_pretrained(
         # f"facebook/galactica-125m"
-        # "src/tokenizer/ChemLacticaTokenizer"
-        "src/tokenizer/galactica-125m"
+        "src/tokenizer/ChemLacticaTokenizer"
+        # "src/tokenizer/galactica-125m"
     )
     bos_token = "<s>"
     bos_token_id = 0

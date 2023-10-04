@@ -68,10 +68,10 @@ def train(
 
     train_config = model_train_configs[model_config]
 
-    model = load_model(from_pretrained, train_config)
-    # model.resize_token_embeddings(
-    #     train_config["vocab_size"] + len(chemlactica_special_tokens)
-    # )
+    model = load_model(from_pretrained, flash_att=True, train_config=train_config)
+    model.resize_token_embeddings(
+        train_config["vocab_size"] + len(chemlactica_special_tokens)
+    )
 
     # Converts the model to use PyTorch’s native attention implementation
     # model = BetterTransformer.transform(model)
