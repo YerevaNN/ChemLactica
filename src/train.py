@@ -61,8 +61,8 @@ def train(
     gradient_accumulation_steps,
     check_reproducability
 ):
-    # transformers.logging.set_verbosity_info()
-    # transformers.utils.logging.enable_explicit_format()
+    transformers.logging.set_verbosity_info()
+    transformers.utils.logging.enable_explicit_format()
 
     accelerator = Accelerator(log_with="all", project_dir=track_dir)
 

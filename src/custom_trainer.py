@@ -1,15 +1,6 @@
 import shutil
 from transformers import Trainer
-from typing import Optional
-from transformers import OPTForCausalLM
-from optimum.bettertransformer import BetterTransformer
 
-# from torch.distributed.fsdp import (
-#     FullyShardedDataParallel as FSDP,
-#     FullStateDictConfig,
-#     StateDictType,
-# )
-# import torch.distributed as dist
 
 
 class CustomTrainer(Trainer):
@@ -19,9 +10,9 @@ class CustomTrainer(Trainer):
         else:
             print("**disk is full didn't save**")
 
-    def save_model(
-        self, output_dir: Optional[str] = None, _internal_call: bool = False
-    ):
+    # def save_model(
+    #     self, output_dir: Optional[str] = None, _internal_call: bool = False
+    # ):
         # underlying_config = self.model.module.config
         # cpu_state = self.accelerator.get_state_dict(self.model, unwrap=True)
         # converted_model = OPTForCausalLM.from_pretrained(
@@ -37,5 +28,5 @@ class CustomTrainer(Trainer):
         # super().save_model(output_dir, _internal_call)
         # self.model = BetterTransformer.transform(self.model)
         # self.model = BetterTransformer.reverse(self.model)
-        self.accelerator.save_state(output_dir)
+        # self.accelerator.save_state(output_dir)
         # self.model = BetterTransformer.transform(self.model)

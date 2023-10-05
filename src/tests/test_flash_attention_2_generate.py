@@ -8,7 +8,7 @@ from transformers import OPTForCausalLM
 
 
 if __name__ == "__main__":
-    checkpoint_dir = "/home/tigranfahradyan/ChemLactica/checkpoints/facebook/galactica-125m/none/checkpoint-10"
+    checkpoint_dir = "/home/tigranfahradyan/ChemLactica/checkpoints/facebook/galactica-125m/none/checkpoint-5"
     accelerator = Accelerator()
     saved_model = load_model(f"facebook/galactica-125m", flash_att=True, dtype=torch.bfloat16)
     saved_model.resize_token_embeddings(
@@ -16,8 +16,13 @@ if __name__ == "__main__":
     )
     saved_model = accelerator.prepare(saved_model)
     accelerator.load_state(checkpoint_dir)
-    saved_model.to(accelerator.device)  
+    saved_model.to("cuda:0")
     saved_model.eval()
+    print(saved_model)
+
+    saved_model = load_model(checkpoint_dir, flash_att=True, dtype=torch.bfloat16)
+    saved_model.to("cuda:0")
+    # saved_model.eval()
 
     contexts = [
         "[CLOGP 100][START_SMILES]",

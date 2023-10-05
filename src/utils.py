@@ -4,6 +4,7 @@ from transformers.models.opt.modeling_opt import OPTForCausalLM
 import transformers
 import torch.nn as nn
 import os
+from transformers import OPTModel
 
 
 class LinearFloat32(nn.Linear):
@@ -11,16 +12,17 @@ class LinearFloat32(nn.Linear):
         return super().forward(_input).to(torch.float32)
 
 
-def custom_opt_init(func):
-    def inner_func(self, config, *args, **kwargs):
-        func(self, config, *args, **kwargs)
-        self.lm_head = LinearFloat32(
-            config.word_embed_proj_dim, config.vocab_size, bias=False
-        )
+# use tbis class for training
+class CustomOPTForCausalLM(OPTForCausalLM):
+    def __init__(self, config):
+        super().__init__(config)
+        self.model = OPTModel(config)
 
-    return inner_func
+        # the lm_head weight is automatically tied to the embed tokens weight
+        self.lm_head = LinearFloat32(config.word_embed_proj_dim, config.vocab_size, bias=False)
 
-OPTForCausalLM.__init__ = custom_opt_init(OPTForCausalLM.__init__)
+        # Initialize weights and apply final processing
+        self.post_init()
 
 
 def load_model(from_pretrained: str, flash_att=False, dtype=None, train_config=None):
@@ -36,7 +38,7 @@ def load_model(from_pretrained: str, flash_att=False, dtype=None, train_config=N
                 word_embed_proj_dim=train_config["word_sembed_proj_dim"],
             )
         )
-    model = AutoModelForCausalLM.from_pretrained(
+    model = CustomOPTForCausalLM.from_pretrained(
         from_pretrained, use_flash_attention_2=flash_att, torch_dtype=dtype
     )
     return model

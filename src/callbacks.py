@@ -197,7 +197,7 @@ class ReproducabilityCallback(TrainerCallback):
         accelerator.load_state(checkpoint_dir)
         saved_model.to(accelerator.device)
 
-        # saved_model = load_model(checkpoint_dir, self.train_config)
+        # saved_model = load_model(checkpoint_dir, flash_att=True, dtype=torch.bfloat16)
         # saved_model.to(model.device)
 
         model.eval()
