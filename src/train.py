@@ -5,7 +5,7 @@ from accelerate import logging
 # from accelerate.logging import get_logger
 
 # import torch.distributed as dist
-from optimum.bettertransformer import BetterTransformer
+# from optimum.bettertransformer import BetterTransformer
 from accelerate.utils import broadcast_object_list
 import torch
 from torch.optim import AdamW
