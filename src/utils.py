@@ -13,7 +13,7 @@ class LinearFloat32(nn.Linear):
 
 
 # use tbis class for training
-class CustomOPTForCausalLM(OPTForCausalLM):
+class CustomOPTForCausalLM(OPTForCausalLM): # VLE: add fllat32
     def __init__(self, config):
         super().__init__(config)
         self.model = OPTModel(config)
@@ -38,8 +38,11 @@ def load_model(from_pretrained: str, flash_att=False, dtype=None, train_config=N
                 word_embed_proj_dim=train_config["word_sembed_proj_dim"],
             )
         )
+    # model = CustomOPTForCausalLM.from_pretrained(
+    #     from_pretrained, use_flash_attention_2=flash_att, torch_dtype=dtype
+    # )
     model = CustomOPTForCausalLM.from_pretrained(
-        from_pretrained, use_flash_attention_2=flash_att, torch_dtype=dtype
+        from_pretrained, torch_dtype=dtype
     )
     return model
 

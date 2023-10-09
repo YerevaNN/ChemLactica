@@ -5,7 +5,6 @@ from accelerate import logging
 # from accelerate.logging import get_logger
 
 # import torch.distributed as dist
-# from optimum.bettertransformer import BetterTransformer
 from accelerate.utils import broadcast_object_list
 import torch
 from torch.optim import AdamW
@@ -205,7 +204,7 @@ def train(
     processed_train_dataset = process_dataset(
         dataset=train_dataset,
         train_config=train_config,
-        process_batch_sizes=(50, 50),
+        process_batch_sizes=(20, 20),
         is_eval=False,
     )
     processed_eval_dataset = process_dataset(

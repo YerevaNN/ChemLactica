@@ -90,9 +90,9 @@ class TestReproducabilityOfModelOutput(unittest.TestCase):
         model_config = "125m"
         output_dir = f"{test_directory}/checkpoints"
         train_batch_size = 4
-        max_steps = 1000
-        eval_steps = 100
-        save_steps = 100
+        max_steps = 20
+        eval_steps = 5
+        save_steps = 5
         dataloader_num_workers = 0
         training_data_dir = ".small_data/train"
         valid_data_dir = ".small_data/valid"

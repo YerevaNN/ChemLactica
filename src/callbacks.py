@@ -24,7 +24,6 @@ import torch
 from transformers.training_args import TrainingArguments
 from datasets import load_dataset
 from accelerate import Accelerator
-from optimum.bettertransformer import BetterTransformer
 
 logger = get_logger(__name__)
 
