@@ -7,53 +7,6 @@ import os
 from transformers import OPTModel
 
 
-class LinearFloat32(nn.Linear):
-    def forward(self, _input) -> torch.Tensor:
-        return super().forward(_input).to(torch.float32)
-
-
-# use tbis class for training
-class CustomOPTForCausalLM(OPTForCausalLM):
-    def __init__(self, config):
-        super().__init__(config)
-        self.model = OPTModel(config)
-
-        # the lm_head weight is automatically tied to the embed tokens weight
-        self.lm_head = LinearFloat32(config.word_embed_proj_dim, config.vocab_size, bias=False)
-
-        # Initialize weights and apply final processing
-        self.post_init()
-
-
-def load_model(from_pretrained: str, flash_att=False, dtype=None, train_config=None):
-    if from_pretrained == "small_opt":
-        return transformers.OPTForCausalLM(
-            transformers.OPTConfig(
-                vocab_size=train_config["vocab_size"],
-                hidden_size=train_config["hidden_size"],
-                num_hidden_layers=train_config["num_hidden_layers"],
-                ffn_dim=train_config["ffn_dim"],
-                max_position_embeddings=train_config["max_position_embeddings"],
-                num_attention_heads=train_config["num_attention_heads"],
-                word_embed_proj_dim=train_config["word_sembed_proj_dim"],
-            )
-        )
-    model = CustomOPTForCausalLM.from_pretrained(
-        from_pretrained, use_flash_attention_2=flash_att, torch_dtype=dtype
-    )
-    return model
-
-
-# class CustomTokenizer:
-#     __instance = None
-#     precomuted_ids = {}
-#     bos_token = "<s>"
-#     bos_token_id = 0
-#     pad_token = "<pad>"
-#     pad_token_id = 1
-#     eos_token = "</s>"
-#     eos_token_id = 2
-#     qed_token = "[QEDĠ"
 chemlactica_special_tokens = [
     "[SYNONYM ",
     "[RELATED ",
@@ -84,39 +37,6 @@ chemlactica_special_tokens = [
     "[NUMALIPHATICCARBOCYCLES ",
     "[IUPAC ",
 ]
-#     model_size = None
-
-#     @staticmethod
-#     def set_model_size(model_size):
-#         CustomTokenizer.model_size = model_size
-
-#     @staticmethod
-#     def get_instance():
-#         if CustomTokenizer.__instance is None:
-#             CustomTokenizer.__instance = CustomTokenizer.new_instance()
-#             CustomTokenizer.precomuted_ids = {
-#                 v: torch.tensor(CustomTokenizer.__instance.encode(v), dtype=torch.int32)
-#                 for v in ["[START_SMILES]", "[END_SMILES]", "[", "]", "<pad>"]
-#             }
-#         return CustomTokenizer.__instance
-
-#     @staticmethod
-#     def new_instance():
-#         tok = AutoTokenizer.from_pretrained(
-#             f"facebook/galactica-{CustomTokenizer.model_size}"
-#             # 'src/tokenizer/ChemLacticaTokenizer'
-#             # 'src/tokenizer/GalacticaTokenizer'
-#         )
-#         tok.bos_token = CustomTokenizer.bos_token
-#         tok.bos_token_id = CustomTokenizer.bos_token_id
-#         tok.pad_token = CustomTokenizer.pad_token
-#         tok.pad_token_id = CustomTokenizer.pad_token_id
-#         tok.eos_token = CustomTokenizer.eos_token
-#         tok.eos_token_id = CustomTokenizer.eos_token_id
-#         # tok.add_tokens(
-#         #     CustomTokenizer.chemlactica_special_tokens
-#         # )
-#         return tok
 
 
 def get_tokenizer():

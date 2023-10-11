@@ -28,7 +28,7 @@ from callbacks import (
     ReproducabilityCallback,
 )
 import os
-from utils import load_model
+from custom_transformer import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from contextlib import nullcontext

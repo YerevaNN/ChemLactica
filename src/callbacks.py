@@ -3,28 +3,23 @@ import time
 import hashlib
 import glob
 import gc
-import pickle
 
 from dataset_utils import process_dataset
-from utils import load_model, chemlactica_special_tokens
-from accelerate.logging import get_logger
-from utils import get_tokenizer
-import torch
-import torch.nn.functional as F
+from datasets import load_dataset
+from custom_transformer import load_model
+from utils import chemlactica_special_tokens
 
 from aim.hugging_face import AimCallback
+import torch
 from transformers.trainer_callback import (
     TrainerCallback,
     TrainerControl,
     TrainerState,
     ProgressCallback,
 )
-from transformers import OPTForCausalLM
-import torch
 from transformers.training_args import TrainingArguments
-from datasets import load_dataset
 from accelerate import Accelerator
-from optimum.bettertransformer import BetterTransformer
+from accelerate.logging import get_logger
 
 logger = get_logger(__name__)
 
