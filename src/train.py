@@ -235,10 +235,7 @@ def train(
     )
 
     with prof_context_manager as prof:
-        try:
-            trainer.train(resume_from_checkpoint=resume_from_checkpoint)
-        except Exception as e:
-            logger.error(e, exc_info=True)
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
     return trainer
 
