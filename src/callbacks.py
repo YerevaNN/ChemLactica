@@ -6,7 +6,7 @@ import gc
 
 from dataset_utils import process_dataset
 from datasets import load_dataset
-from custom_transformer import load_model
+from model_utils import load_model
 from utils import chemlactica_special_tokens
 
 from aim.hugging_face import AimCallback

@@ -2,10 +2,6 @@ from config.create_train_config import model_train_configs
 import transformers
 from accelerate import logging
 
-# from accelerate.logging import get_logger
-
-# import torch.distributed as dist
-# from optimum.bettertransformer import BetterTransformer
 from accelerate.utils import broadcast_object_list
 import torch
 from torch.optim import AdamW
@@ -28,7 +24,7 @@ from callbacks import (
     ReproducabilityCallback,
 )
 import os
-from custom_transformer import load_model
+from model_utils import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from contextlib import nullcontext
