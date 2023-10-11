@@ -4,18 +4,19 @@ from transformers import AutoTokenizer, BatchEncoding
 
 jsonl_file_path = "/mnt/sxtn/phil/3953_start.jsonl"
 tokenizer = AutoTokenizer.from_pretrained("facebook/galactica-125m")
-
 CONTEXT_LENGTH = 2048
 wrong_count = 0
 
 
-def add_name(assay_object, document):
-    document += "[ASSNAME" + assay_object["name"] + "]"
-    return document
-
-
 def get_num_tokens(tokenized):
     return len(tokenized["input_ids"])
+
+
+def iter_get_num_tokens(list_ass):
+    sum = 0
+    for a in list_ass:
+        sum += get_num_tokens(a)
+    return sum
 
 
 def add_var_str(var_object):
@@ -35,12 +36,11 @@ def remove_from_all_values(dict_type, num_to_remove):
 def evenly_remove_elements_from_lists(lists, total_elements_to_remove):
     num_lists = len(lists)
     print("number of lists", num_lists)
-    elements_per_list = total_elements_to_remove // num_lists
-    extra_elements = total_elements_to_remove % num_lists
+    # extra_elements = total_elements_to_remove % num_lists
 
-    for i in range(num_lists):
-        num_to_remove = elements_per_list + (1 if i < extra_elements else 0)
-        lists[i] = remove_from_all_values(lists[i], num_to_remove)
+    # for i in range(num_lists):
+    #    num_to_remove = elements_per_list + (1 if i < extra_elements else 0)
+    lists[-1] = remove_from_all_values(lists[-1], total_elements_to_remove)
     return lists
 
 
@@ -96,6 +96,7 @@ with open(jsonl_file_path, "r") as jsonl_file:
         assay_num = 0
 
         while sorted_assays:
+            doc_len_dic = {"desc": 0, "name": 0, "var": 0}
             doc_len = 0
             curr_doc_ass_names = []
             curr_doc_ass_descs = []
@@ -103,14 +104,13 @@ with open(jsonl_file_path, "r") as jsonl_file:
             tok_ass_vars = []
 
             while doc_len < context_length:
-                # print("doc_len", doc_len)
-                # print("need new assay ", need_new_assay)
+                print("descsuma", iter_get_num_tokens(curr_doc_ass_descs))
+                print(doc_len_dic)
                 if need_new_assay:
+                    tok_ass_vars = []
                     try:
                         assay = sorted_assays.pop()
                         variables = assay["variables"]
-                        # print("there are this many variables:", len(variables))
-                        print(assay_num)
                         assay_num += 1
                     except Exception as e:
                         print(e)
@@ -123,7 +123,9 @@ with open(jsonl_file_path, "r") as jsonl_file:
                     curr_doc_ass_names.append(tok_ass_name)
                     curr_doc_ass_descs.append(tok_ass_desc)
                     doc_len += tok_name_len + tok_desc_len
-                    print("doc_len after adding name + desc", doc_len)
+                    doc_len_dic["name"] += get_num_tokens(tok_ass_name)
+                    doc_len_dic["desc"] += get_num_tokens(tok_ass_desc)
+                    # print("doc_len after adding name + desc", doc_len_dic)
                     need_new_assay = False
                     continue
 
@@ -139,15 +141,17 @@ with open(jsonl_file_path, "r") as jsonl_file:
                     var = variables.pop()
                     new_var = tokenizer(add_var_str(var))
                     doc_len += get_num_tokens(new_var)
-                    print("doc_len after adding var", doc_len)
+                    doc_len_dic["var"] += get_num_tokens(new_var)
+                    # print("doc_len after adding var", doc_len_dic)
                     # print("appended var",type(new_var))
                     tok_ass_vars.append(new_var)
             # print("curr doc vars",curr_doc_ass_vars)
+            print("desc sumb", iter_get_num_tokens(curr_doc_ass_descs))
+            print(doc_len_dic)
             if tok_ass_vars:
-                print("it was not empty")
+                # print("it was not empty")
                 curr_doc_ass_vars.append(tok_ass_vars)
-            print("document length:", doc_len)
-            print
+            # print("document length:", doc_len)
             difference = doc_len - context_length
             if difference > 0:
                 sum = 0
@@ -162,15 +166,9 @@ with open(jsonl_file_path, "r") as jsonl_file:
                         var_sum += get_num_tokens(m)
                 lein = len(curr_doc_ass_descs)
                 print(
-                    f"before removing {difference} the desc sum is {sum} for {lein} assay descs"
+                    "description sum for document =",
+                    iter_get_num_tokens(curr_doc_ass_descs),
                 )
-                print(
-                    f"and the sum of names is {name_sum} for {len(curr_doc_ass_names)} assay names"
-                )
-                print(
-                    f"sum of vars is {var_sum} when length of vars is {len(curr_doc_ass_vars)}"
-                )
-                print(f"thus, total sum = {sum + name_sum + var_sum}")
 
                 curr_doc_ass_descs = evenly_remove_elements_from_lists(
                     curr_doc_ass_descs, difference
@@ -181,7 +179,7 @@ with open(jsonl_file_path, "r") as jsonl_file:
 
                 print("after desc", sum)
             curr_doc = []
-
+            doc_len = 0
             assert len(curr_doc_ass_names) == len(curr_doc_ass_descs)
             # print("names", type(curr_doc_ass_names[0]))
             # print("descs", type(curr_doc_ass_descs[0]))
@@ -202,7 +200,6 @@ with open(jsonl_file_path, "r") as jsonl_file:
             else:
                 wrong_count += 1
 
-            doc_len = 0
             curr_doc_ass_names = []
             curr_doc_ass_descs = []
             curr_doc_ass_vars = []
