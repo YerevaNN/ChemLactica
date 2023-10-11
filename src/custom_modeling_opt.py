@@ -290,6 +290,8 @@ class CustomOPTAttention(nn.Module):
         return attn_output, attn_weights_reshaped, past_key_value
 
 
+# may be cite the author of OptFlashAttention2
+# be very careful when using this with padded input, look at the implementation of huggingface's in this case
 class OptFlashAttention2(CustomOPTAttention):
     """
     OPT flash attention module. This module inherits from `OPTAttention` as the weights of the module stays untouched.
@@ -408,6 +410,7 @@ class OptFlashAttention2(CustomOPTAttention):
                 The scaling of QK^T before applying softmax. Default to 1 / sqrt(head_dim)
         """
         # Contains at least one padding token in the sequence
+        assert not padding_mask # VLE: this is added manually to make sure that padding mask is none
         if padding_mask is not None:
             batch_size = query_states.shape[0]
             query_states, key_states, value_states, indices_q, cu_seq_lens, max_seq_lens = self._upad_input(
