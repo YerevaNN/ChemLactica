@@ -1,26 +1,34 @@
 from config.create_train_config import model_train_configs
+import transformers
+from accelerate import logging
+
+# from accelerate.logging import get_logger
 
 # import torch.distributed as dist
-from optimum.bettertransformer import BetterTransformer
+# from optimum.bettertransformer import BetterTransformer
 from accelerate.utils import broadcast_object_list
 import torch
 from torch.optim import AdamW
-from transformers import TrainingArguments, get_linear_schedule_with_warmup
+from transformers import TrainingArguments, get_polynomial_decay_schedule_with_warmup
 from datasets import load_dataset
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 import argparse
-import accelerate
+from utils import chemlactica_special_tokens
+
+# import accelerate
 from accelerate import Accelerator
 import glob
+from transformers import ProgressCallback
 from callbacks import (
     CustomAimCallback,
     WPSCounterCallback,
     ProfCallback,
     EpochCallback,
-    # ReproducabilityCallback,
+    CustomProgressCallback,
+    ReproducabilityCallback,
 )
 import os
-from utils import load_model, CustomTokenizer
+from utils import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from contextlib import nullcontext
@@ -30,6 +38,7 @@ import numpy
 torch.manual_seed(42)
 random.seed(42)
 numpy.random.seed(42)
+logger = logging.get_logger("transformers")
 
 
 def train(
@@ -50,33 +59,22 @@ def train(
     profile,
     profile_dir,
     gradient_accumulation_steps,
+    check_reproducability
 ):
-    accelerator = Accelerator()
-    accelerate.tracking.AimTracker(run_name=experiment_name, logging_dir=track_dir)
-    print("test process", accelerator.process_index)
+    transformers.logging.set_verbosity_info()
+    transformers.utils.logging.enable_explicit_format()
 
-    if not valid_batch_size:
-        valid_batch_size = train_batch_size
-
-    # absolute_path = os.path.dirname(os.path.abspath(__file__))
+    accelerator = Accelerator(log_with="all", project_dir=track_dir)
 
     train_config = model_train_configs[model_config]
 
-    model = load_model(from_pretrained, train_config)
-    if os.path.isdir(from_pretrained):
-        resume_from_checkpoint = from_pretrained
-    else:
-        resume_from_checkpoint = False
+    model = load_model(from_pretrained, flash_att=True, train_config=train_config)
+    model.resize_token_embeddings(
+        train_config["vocab_size"] + len(chemlactica_special_tokens)
+    )
+
     # Converts the model to use PyTorch’s native attention implementation
-
-    model = BetterTransformer.transform(model)
-
-    CustomTokenizer.set_model_size(model_config)
-
-    # Not sure if this will not cause issues like initializing two distributed groups
-    # comment out to run without accelerate
-
-    # dist.init_process_group()
+    # model = BetterTransformer.transform(model)
 
     trainer_callback_dict = {}
     experiment_hash = "none"
@@ -99,8 +97,17 @@ def train(
     accelerator.wait_for_everyone()
     broadcast_object_list(communication_list)
     experiment_hash = communication_list[0]
-
     print(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
+
+    if not valid_batch_size:
+        valid_batch_size = train_batch_size
+
+    if os.path.isdir(from_pretrained):
+        resume_from_checkpoint = from_pretrained
+    else:
+        resume_from_checkpoint = False
+
+    logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
     if profile:
         prof = torch.profiler.profile(
@@ -129,8 +136,9 @@ def train(
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
-    # trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback()
-
+    if check_reproducability:
+        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(accelerator, model_config, train_config)
+    trainer_callback_dict["progress_callback"] = CustomProgressCallback()
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
     )
@@ -140,19 +148,24 @@ def train(
         model.parameters(),
         lr=train_config["max_learning_rate"],
         betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
-        weight_decay=train_config["weight_decay"]
-        )
-    
-    lr_scheduler = get_linear_schedule_with_warmup(
+        weight_decay=train_config["weight_decay"],
+    )
+
+    lr_scheduler = get_polynomial_decay_schedule_with_warmup(
         optimizer,
         num_warmup_steps=train_config["warmup_steps"],
-        num_training_steps=max_steps
-        )
-    
+        num_training_steps=max_steps,
+        lr_end=0.1 * train_config["max_learning_rate"],
+        power=1.0,
+    )
+
     training_args = TrainingArguments(
         output_dir=checkpoints_dir,
         per_device_train_batch_size=train_batch_size,
         per_device_eval_batch_size=valid_batch_size,
+        # log_level = "info",
+        log_on_each_node=True,
+        logging_dir=track_dir,
         # learning_rate=train_config["max_learning_rate"],
         # lr_scheduler_type="linear",
         # weight_decay=train_config["weight_decay"],
@@ -161,8 +174,8 @@ def train(
         # warmup_steps=train_config["warmup_steps"],
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
-        eval_steps=eval_steps,
         max_steps=max_steps,
+        eval_steps=eval_steps,
         save_steps=save_steps,
         dataloader_drop_last=True,
         dataloader_pin_memory=True,
@@ -180,26 +193,40 @@ def train(
 
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-    dataset = load_dataset(
+    train_dataset = load_dataset(
         "text",
-        data_files={"train": training_data_files, "validation": valid_data_files},
+        data_files={"train": training_data_files},
         streaming=True,
     )
+    eval_dataset = load_dataset(
+        "text", data_files={"validation": valid_data_files}, streaming=False
+    )
 
-    processed_dataset = process_dataset(
-        dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
+    processed_train_dataset = process_dataset(
+        dataset=train_dataset,
+        train_config=train_config,
+        process_batch_sizes=(50, 50),
+        is_eval=False,
+    )
+    processed_eval_dataset = process_dataset(
+        dataset=eval_dataset,
+        train_config=train_config,
+        process_batch_sizes=(50, 50),
+        is_eval=True,
     )
 
     trainer = CustomTrainer(
         model=model,
         args=training_args,
         compute_metrics=compute_metrics,
-        train_dataset=processed_dataset["train"],
-        eval_dataset=processed_dataset["validation"],
-        callbacks=list(trainer_callback_dict.values()),
+        train_dataset=processed_train_dataset["train"],
+        eval_dataset=processed_eval_dataset["validation"],
         optimizers=[optimizer, lr_scheduler],
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
+    trainer.remove_callback(ProgressCallback)
+    for additional_callback in list(trainer_callback_dict.values()):
+        trainer.add_callback(additional_callback)
 
     prof_context_manager = (
         trainer_callback_dict.get("profiller_callback").prof
@@ -208,7 +235,10 @@ def train(
     )
 
     with prof_context_manager as prof:
-        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+        try:
+            trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+        except Exception as e:
+            logger.error(e, exc_info=True)
 
     return trainer
 
@@ -364,8 +394,21 @@ if __name__ == "__main__":
         dest="gradient_accumulation_steps",
         required=False,
         help="the number of steps to over which to accumulate gradients",
-        default=1
+        default=1,
     )
+    parser.add_argument(
+        "--check-reproducability",
+        action="store_true",
+        dest="check_reproducability",
+        help="whether or not check reproducability (should only be use for testing)",
+    )
+    parser.add_argument(
+        "--no-check-reproducability",
+        action="store_false",
+        dest="check_reproducability",
+        help="whether or not check reproducability (should only be use for testing)",
+    )
+    parser.set_defaults(profile=False)
 
     args = parser.parse_args()
     train(**args.__dict__)
