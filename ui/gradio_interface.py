@@ -1,4 +1,4 @@
-from optimum.bettertransformer import BetterTransformer
+# from optimum.bettertransformer import BetterTransformer
 from typing import Union
 import torch
 import json
@@ -29,8 +29,10 @@ import sascorer  # noqa
 def main(model_path):
     print(model_path)
     model = OPTForCausalLM.from_pretrained(model_path)
-    model = BetterTransformer.transform(model)
-    tokenizer = AutoTokenizer.from_pretrained("facebook/galactica-125m")
+    # model = BetterTransformer.transform(model)
+    if torch.cuda.is_available():
+        model.to("cuda")
+    tokenizer = AutoTokenizer.from_pretrained("facebook/galactica-1.3b")
     valid_property_options = [str(prop) for prop in ChemLacticaProperty]
     print(valid_property_options)
 
@@ -93,6 +95,7 @@ def main(model_path):
 
     def calculate_perplexity(text):
         inputs = tokenizer.encode(text, return_tensors="pt")
+        inputs = inputs.to("cuda")
         with torch.no_grad():
             outputs = model(inputs, labels=inputs)
             loss = outputs.loss
@@ -107,7 +110,7 @@ def main(model_path):
         except Exception as e:
             gr.Warning(str(e))
             pass
-        inputs = tokenizer.encode(input_text, return_tensors="pt")
+        inputs = tokenizer.encode(input_text, return_tensors="pt").to("cuda")
         with torch.backends.cuda.sdp_kernel(
             enable_flash=True, enable_math=False, enable_mem_efficient=False
         ):
@@ -183,7 +186,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_path",
         type=str,
-        default="/home/tigranfahradyan/BIG-benchWr/checkpoint-190464",
+        default="/home/philipp/checkpoint-147456/",
         required=False,
     )
     args = parser.parse_args()
