@@ -46,16 +46,17 @@ def train(
     eval_steps,
     save_steps,
     train_batch_size,
-    valid_batch_size,
     experiment_name,
     checkpoints_root_dir,
     dataloader_num_workers,
-    track,
-    track_dir,
-    profile,
-    profile_dir,
+    use_flash_attn,
     gradient_accumulation_steps,
-    check_reproducability
+    track=False,
+    track_dir=None,
+    check_reproducability=False,
+    valid_batch_size=None,
+    profile=False,
+    profile_dir=None
 ):
     transformers.logging.set_verbosity_info()
     transformers.utils.logging.enable_explicit_format()
@@ -64,7 +65,7 @@ def train(
 
     train_config = model_train_configs[model_config]
 
-    model = load_model(from_pretrained, flash_att=True, train_config=train_config)
+    model = load_model(from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config)
     model.resize_token_embeddings(
         train_config["vocab_size"] + len(chemlactica_special_tokens)
     )
@@ -90,7 +91,6 @@ def train(
             experiment_hash = aim_callback._run_hash
             communication_list = [experiment_hash]
 
-    accelerator.wait_for_everyone()
     broadcast_object_list(communication_list)
     experiment_hash = communication_list[0]
     print(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
@@ -133,7 +133,7 @@ def train(
 
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     if check_reproducability:
-        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(accelerator, model_config, train_config)
+        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(accelerator, model_config, use_flash_attn)
     trainer_callback_dict["progress_callback"] = CustomProgressCallback()
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
@@ -232,8 +232,6 @@ def train(
 
     with prof_context_manager as prof:
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
-
-    return trainer
 
 
 if __name__ == "__main__":
@@ -380,6 +378,19 @@ if __name__ == "__main__":
         help="profiling directory",
         default=None,
     )
+    parser.add_argument(
+        "--flash-attn",
+        action="store_true",
+        dest="use_flash_attn",
+        help="whether or not to use flash attn)",
+    )
+    parser.add_argument(
+        "--no-flash-attn",
+        action="store_false",
+        dest="use_flash_attn",
+        help="whether or not to use flash attn",
+    )
+    parser.set_defaults(use_flash_attn=False)
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,

@@ -291,7 +291,10 @@ class CustomOPTAttention(nn.Module):
 
 
 # may be cite the author of OptFlashAttention2
-# be very careful when using this with padded input, look at the implementation of huggingface's in this case
+"""
+    be very careful when using this with padded input (it is not supported in this setting),
+    look at the implementation of huggingface's in case padding is needed
+"""
 class OptFlashAttention2(CustomOPTAttention):
     """
     OPT flash attention module. This module inherits from `OPTAttention` as the weights of the module stays untouched.

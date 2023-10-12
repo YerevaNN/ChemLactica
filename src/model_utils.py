@@ -2,7 +2,7 @@ from transformers import OPTForCausalLM, OPTConfig
 from custom_modeling_opt import CustomOPTForCausalLM
 
 
-def load_model(from_pretrained: str, flash_att=False, dtype=None, train_config=None):
+def load_model(from_pretrained: str, use_flash_attn=False, dtype=None, train_config=None):
     if from_pretrained == "small_opt":
         return OPTForCausalLM(
             OPTConfig(
@@ -16,6 +16,6 @@ def load_model(from_pretrained: str, flash_att=False, dtype=None, train_config=N
             )
         )
     model = CustomOPTForCausalLM.from_pretrained(
-        from_pretrained, use_flash_attn=flash_att, torch_dtype=dtype
+        from_pretrained, use_flash_attn=use_flash_attn, torch_dtype=dtype
     )
     return model
