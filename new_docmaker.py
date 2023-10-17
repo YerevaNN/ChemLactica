@@ -1,5 +1,6 @@
 import json
-import itertools
+
+# import itertools
 from transformers import AutoTokenizer, BatchEncoding
 
 jsonl_file_path = "/mnt/sxtn/phil/3953_start.jsonl"
@@ -8,15 +9,8 @@ CONTEXT_LENGTH = 2048
 wrong_count = 0
 
 
-def get_num_tokens(tokenized):
+def get_num_be_tokens(tokenized):
     return len(tokenized["input_ids"])
-
-
-def iter_get_num_tokens(list_ass):
-    sum = 0
-    for a in list_ass:
-        sum += get_num_tokens(a)
-    return sum
 
 
 def add_var_str(var_object):
@@ -34,11 +28,8 @@ def remove_from_all_values(dict_type, num_to_remove):
 
 
 def evenly_remove_elements_from_lists(lists, total_elements_to_remove):
-    # num_lists = len(lists)
-    # extra_elements = total_elements_to_remove % num_lists
-
-    # for i in range(num_lists):
-    #    num_to_remove = elements_per_list + (1 if i < extra_elements else 0)
+    # removes only the last description
+    # TODO: smarter removal of tokens from ends of multiple assay descriptions
     lists[-1] = remove_from_all_values(lists[-1], total_elements_to_remove)
     return lists
 
@@ -65,12 +56,34 @@ def group_the_lists(list_of_BE_lists):
     input_ids = []
     token_type_ids = []
     attention_mask = []
-    number_of_lists = len(list_of_BE_lists)
-    for index in range(number_of_lists):
-        for element in list_of_BE_lists[index]:
-            input_ids.extend(element["input_ids"])
-            token_type_ids.extend(element["token_type_ids"])
-            attention_mask.extend(element["attention_mask"])
+    var_list = list_of_BE_lists[2]
+    print("length with new modification", len(var_list))
+    print(len(var_list[0]))
+    num_iterations = len(list_of_BE_lists[0])
+    for i in range(num_iterations):
+        print("iteration index", i)
+        for index, interest_list in enumerate(list_of_BE_lists):
+            if index == 2:
+                print("in at iteration", i)
+                try:
+                    sub_var_list = interest_list[i]
+                    for actual_var in sub_var_list:
+                        # print("type of innermost element",type(actual_var))
+                        input_ids.extend(actual_var["input_ids"])
+                        token_type_ids.extend(actual_var["token_type_ids"])
+                        attention_mask.extend(actual_var["attention_mask"])
+                except Exception:
+                    pass
+            else:
+                input_ids.extend(interest_list[i]["input_ids"])
+                token_type_ids.extend(interest_list[i]["token_type_ids"])
+                attention_mask.extend(interest_list[i]["attention_mask"])
+
+    # for index in range(number_of_lists):
+    #     for element in list_of_BE_lists[index]:
+    #         input_ids.extend(element["input_ids"])
+    #         token_type_ids.extend(element["token_type_ids"])
+    #         attention_mask.extend(element["attention_mask"])
 
     combined = BatchEncoding(
         {
@@ -110,6 +123,7 @@ with open(jsonl_file_path, "r") as jsonl_file:
             ) < context_length:
                 if need_new_assay:
                     try:
+                        print("assay start")
                         assay = sorted_assays.pop()
                         variables = assay["variables"]
                         assay_num += 1
@@ -121,8 +135,8 @@ with open(jsonl_file_path, "r") as jsonl_file:
                 if doc_len_dic["name"] == 0 or need_new_assay:
                     doc_dict["names"].append(tok_ass_name)
                     doc_dict["descriptions"].append(tok_ass_desc)
-                    doc_len_dic["name"] += get_num_tokens(tok_ass_name)
-                    doc_len_dic["desc"] += get_num_tokens(tok_ass_desc)
+                    doc_len_dic["name"] += get_num_be_tokens(tok_ass_name)
+                    doc_len_dic["desc"] += get_num_be_tokens(tok_ass_desc)
                     need_new_assay = False
                     continue
 
@@ -134,7 +148,7 @@ with open(jsonl_file_path, "r") as jsonl_file:
                     continue
                 else:
                     var_tokens = tokenizer(add_var_str(variables.pop()))
-                    doc_len_dic["var"] += get_num_tokens(var_tokens)
+                    doc_len_dic["var"] += get_num_be_tokens(var_tokens)
                     tok_ass_vars.append(var_tokens)
             if tok_ass_vars:
                 doc_dict["variables"].append(tok_ass_vars)
@@ -148,15 +162,11 @@ with open(jsonl_file_path, "r") as jsonl_file:
                     doc_dict["descriptions"], difference
                 )
 
-            doc_dict["variables"] = list(
-                itertools.chain.from_iterable(doc_dict["variables"])
-            )
-
-            batch_encoding = group_the_lists(
+            doc_batch_encoding = group_the_lists(
                 [doc_dict["names"], doc_dict["descriptions"], doc_dict["variables"]]
             )
-            if get_num_tokens(batch_encoding) == context_length:
-                documents.append(batch_encoding)
+            if get_num_be_tokens(doc_batch_encoding) == context_length:
+                documents.append(doc_batch_encoding)
             else:
                 wrong_count += 1
 
@@ -166,7 +176,6 @@ with open(jsonl_file_path, "r") as jsonl_file:
             tok_ass_vars = []
         break
 
-print(tokenizer.decode(documents[2]["input_ids"]))
-print(len(documents[2]["input_ids"]))
-print(wrong_count)
-print(len(documents))
+print(tokenizer.decode(documents[0]["input_ids"]))
+print("num docs", len(documents))
+print("wrong count:", wrong_count)
