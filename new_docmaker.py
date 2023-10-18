@@ -40,23 +40,16 @@ def evenly_remove_elements_from_lists(lists, total_elements_to_remove):
 
 
 def remove_big_assays(assays):
-    for assay in assays:
-        if len(assay["description"]) > 9900:
-            assays.remove(assay)
-    return assays
+    return [assay for assay in assays if len(assay["description"]) <= 9900]
 
 
 def process_assays(assays):
-    assays = json_data["assays"]
     sorted_assays = sorted(assays, key=lambda x: len(x["description"]), reverse=False)
-
-    print("number of assays before removing big ones", len(sorted_assays))
     sorted_assays = remove_big_assays(sorted_assays)
-    print("number of assays before removing big ones", len(sorted_assays))
     return sorted_assays
 
 
-def group_the_lists(list_of_BE_lists, list_of_computed):
+def combine_batch_encoding_lists(list_of_BE_lists, list_of_computed):
     # TODO: pytorch_compatibility
     input_ids = []
     token_type_ids = []
@@ -64,18 +57,15 @@ def group_the_lists(list_of_BE_lists, list_of_computed):
 
     num_iterations = len(list_of_BE_lists[0])
     for i in range(num_iterations):
-        print("iteration index", i)
         for index, interest_list in enumerate(list_of_BE_lists):
             if index == 2:
-                print("in at iteration", i)
                 try:
                     sub_var_list = interest_list[i]
                     for actual_var in sub_var_list:
-                        # print("type of innermost element",type(actual_var))
                         input_ids.extend(actual_var["input_ids"])
                         token_type_ids.extend(actual_var["token_type_ids"])
                         attention_mask.extend(actual_var["attention_mask"])
-                except Exception:
+                except IndexError:
                     pass
             else:
                 input_ids.extend(interest_list[i]["input_ids"])
@@ -97,34 +87,43 @@ def group_the_lists(list_of_BE_lists, list_of_computed):
     return combined
 
 
+def create_assay_base(tokenizer, assay):
+    tok_ass_name = tokenizer("[ASSNAME " + assay["name"] + "]")
+    tok_ass_desc = tokenizer("[ASSDESC " + assay["description"] + "]")
+    return tok_ass_name, tok_ass_desc
+
+
+def extract_data_from_json(json_data):
+    sorted_assays = process_assays(json_data["assays"])
+
+    # smiles = json_data["SMILES"]
+    computed_dict = {}
+    for key, value in json_data.items():
+        if isinstance(value, list) or value == "SMILES":
+            continue
+        comp_val = tokenizer(f"[{str(key).upper()}" + str(value) + "]")
+        comp_len = get_num_be_tokens(comp_val)
+        computed_dict[comp_len] = comp_val
+    return sorted_assays, computed_dict
+
+
 context_length = CONTEXT_LENGTH
 need_new_assay = True
-assay_num = 0
 
 
 with open(jsonl_file_path, "r") as jsonl_file:
     for index, line in enumerate(jsonl_file):
-        # Parse the JSON compound from the current line
         json_data = json.loads(json.loads(line))
-        sorted_assays = process_assays(json_data["assays"])
-        # smiles = json_data["SMILES"]
-        computed_dict = {}
-        for key, value in json_data.items():
-            if isinstance(value, list):
-                continue
-            comp_val = tokenizer(f"[{str(key).upper()}" + str(value) + "]")
-            comp_len = get_num_be_tokens(comp_val)
-            computed_dict[comp_len] = comp_val
-        # print(computed_dict)
 
+        # Parse the compound associated data from the current line
+        sorted_assays, computed_dict = extract_data_from_json(json_data)
         need_new_assay = True
-        assay_num = 0
         documents = []
 
         # Loop until the compound has no more associated assays
         while sorted_assays:
-            doc_len_dic = {"desc": 0, "name": 0, "var": 0, "comp": 0}
-            doc_dict = {
+            doc_len = 0
+            document_content_dict = {
                 "names": [],
                 "descriptions": [],
                 "variables": [],
@@ -133,103 +132,75 @@ with open(jsonl_file_path, "r") as jsonl_file:
             tok_ass_vars = []
 
             # loop until we fill full context
-            while (
-                doc_len_dic["desc"]
-                + doc_len_dic["name"]
-                + doc_len_dic["var"]
-                + doc_len_dic["comp"]
-            ) < context_length:
+            while (doc_len) < context_length:
                 if need_new_assay:
                     try:
-                        print("assay start")
                         assay = sorted_assays.pop()
+                        tok_ass_name, tok_ass_desc = create_assay_base(tokenizer, assay)
                         variables = assay["variables"]
-                        assay_num += 1
                     except Exception as e:
                         print(e)
                         break
-                    tok_ass_name = tokenizer("[ASSNAME " + assay["name"] + "]")
-                    tok_ass_desc = tokenizer("[ASSDESC " + assay["description"] + "]")
 
-                    # doc_len_dic["name"] += ass_name_len
-                    # doc_len_dic["desc"] += ass_desc_len
-
-                if doc_len_dic["name"] == 0 or need_new_assay:
+                if doc_len == 0 or need_new_assay:
                     ass_name_len = get_num_be_tokens(tok_ass_name)
                     ass_desc_len = get_num_be_tokens(tok_ass_desc)
-                    if computed_dict and not doc_len_dic["name"] == 0:
-                        potential_next_length = (
-                            ass_name_len
-                            + ass_desc_len
-                            + doc_len_dic["desc"]
-                            + doc_len_dic["name"]
-                            + doc_len_dic["var"]
-                            + doc_len_dic["comp"]
-                        )
-                        if (
-                            ass_name_len
-                            + ass_desc_len
-                            + doc_len_dic["desc"]
-                            + doc_len_dic["name"]
-                            + doc_len_dic["var"]
-                            + doc_len_dic["comp"]
-                        ) > context_length:
-                            print("weird condition met!")
-                            diff = context_length - (
-                                doc_len_dic["desc"]
-                                + doc_len_dic["name"]
-                                + doc_len_dic["var"]
-                                + doc_len_dic["comp"]
-                            )
-                            print("the diff is", diff)
+
+                    if computed_dict and not doc_len == 0:
+                        potential_next_length = ass_name_len + ass_desc_len
+                        if (ass_name_len + ass_desc_len + doc_len) > context_length:
+                            diff = context_length - (doc_len)
                             while diff > 0:
                                 try:
                                     random_key = random.choice(
                                         list(computed_dict.keys())
                                     )
                                     value = computed_dict.pop(random_key)
-                                    doc_dict["computed"].append(value)
-                                    doc_len_dic["comp"] += random_key
+                                    document_content_dict["computed"].append(value)
+                                    doc_len += random_key
                                     diff -= random_key
                                 except Exception:
                                     break
                             continue
-                    doc_dict["names"].append(tok_ass_name)
-                    doc_dict["descriptions"].append(tok_ass_desc)
-                    doc_len_dic["name"] += ass_name_len
-                    doc_len_dic["desc"] += ass_desc_len
+                    document_content_dict["names"].append(tok_ass_name)
+                    document_content_dict["descriptions"].append(tok_ass_desc)
+                    doc_len += ass_name_len
+                    doc_len += ass_desc_len
                     need_new_assay = False
                     continue
 
                 # if current assay has no more data
                 if not variables:
-                    doc_dict["variables"].append(tok_ass_vars)
+                    document_content_dict["variables"].append(tok_ass_vars)
                     tok_ass_vars = []
                     need_new_assay = True
                     continue
                 # if it has data, add it
                 else:
                     var_tokens = tokenizer(add_var_str(variables.pop()))
-                    doc_len_dic["var"] += get_num_be_tokens(var_tokens)
+                    doc_len += get_num_be_tokens(var_tokens)
                     tok_ass_vars.append(var_tokens)
-            if tok_ass_vars:
-                doc_dict["variables"].append(tok_ass_vars)
 
-            # check how much to remove from description
-            difference = (
-                doc_len_dic["desc"]
-                + doc_len_dic["name"]
-                + doc_len_dic["var"]
-                + doc_len_dic["comp"]
-            ) - context_length
+            if tok_ass_vars:
+                document_content_dict["variables"].append(tok_ass_vars)
+
+            # check how many tokens to remove from description
+            difference = (doc_len) - context_length
+
             if difference > 0:
-                doc_dict["descriptions"] = evenly_remove_elements_from_lists(
-                    doc_dict["descriptions"], difference
+                document_content_dict[
+                    "descriptions"
+                ] = evenly_remove_elements_from_lists(
+                    document_content_dict["descriptions"], difference
                 )
 
-            doc_batch_encoding = group_the_lists(
-                [doc_dict["names"], doc_dict["descriptions"], doc_dict["variables"]],
-                doc_dict["computed"],
+            doc_batch_encoding = combine_batch_encoding_lists(
+                [
+                    document_content_dict["names"],
+                    document_content_dict["descriptions"],
+                    document_content_dict["variables"],
+                ],
+                document_content_dict["computed"],
             )
 
             if get_num_be_tokens(doc_batch_encoding) == context_length:
@@ -237,14 +208,7 @@ with open(jsonl_file_path, "r") as jsonl_file:
             else:
                 print("num tokens here", get_num_be_tokens(doc_batch_encoding))
                 wrong_count += 1
-
-            doc_dict["names"] = []
-            doc_dict["descriptions"] = []
-            doc_dict["variables"] = []
-            # doc_dict["computed"] = []
-            tok_ass_vars = []
         break
-
-print(tokenizer.decode(documents[0]["input_ids"]))
+# print(tokenizer.decode(documents[2]["input_ids"]))
 print("num docs", len(documents))
 print("wrong count:", wrong_count)
