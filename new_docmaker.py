@@ -1,13 +1,10 @@
 import json
 import random
-
-
-# import itertools
 from transformers import AutoTokenizer, BatchEncoding
 
 jsonl_file_path = "/mnt/sxtn/phil/3953_start.jsonl"
 tokenizer = AutoTokenizer.from_pretrained("facebook/galactica-125m")
-CONTEXT_LENGTH = 2048
+GALACTICA_CONTEXT_LENGTH = 2048
 wrong_count = 0
 seed_value = 42
 random.seed(seed_value)
@@ -19,11 +16,8 @@ def get_num_be_tokens(tokenized):
 
 def add_var_str(var_object):
     # TODO: decide finally assay tags
-    document = ""
-    document += "[VARNAME " + str(var_object["name"]) + "]"
-    document += "[VARDESC " + str(var_object["description"]) + "]"
-    document += "[VARVALUE " + str(var_object["value"]) + "]"
-    return document
+    var_text = f"""[VARNAME {var_object['name']}][VARDESC {var_object['description']}][VARVALUE {var_object['value']}]"""  # noqa
+    return var_text
 
 
 def remove_from_all_values(dict_type, num_to_remove):
@@ -49,16 +43,16 @@ def process_assays(assays):
     return sorted_assays
 
 
-def combine_batch_encoding_lists(list_of_BE_lists, list_of_computed):
+def combine_batch_encodings(document_content_dict):
     # TODO: pytorch_compatibility
     input_ids = []
     token_type_ids = []
     attention_mask = []
 
-    num_iterations = len(list_of_BE_lists[0])
+    num_iterations = len(document_content_dict["names"])
     for i in range(num_iterations):
-        for index, interest_list in enumerate(list_of_BE_lists):
-            if index == 2:
+        for key, interest_list in document_content_dict.items():
+            if key == "variables":
                 try:
                     sub_var_list = interest_list[i]
                     for actual_var in sub_var_list:
@@ -67,11 +61,13 @@ def combine_batch_encoding_lists(list_of_BE_lists, list_of_computed):
                         attention_mask.extend(actual_var["attention_mask"])
                 except IndexError:
                     pass
+            elif key == "computed":
+                continue
             else:
                 input_ids.extend(interest_list[i]["input_ids"])
                 token_type_ids.extend(interest_list[i]["token_type_ids"])
                 attention_mask.extend(interest_list[i]["attention_mask"])
-    for comp_prop in list_of_computed:
+    for comp_prop in document_content_dict["computed"]:
         input_ids.extend(comp_prop["input_ids"])
         token_type_ids.extend(comp_prop["token_type_ids"])
         attention_mask.extend(comp_prop["attention_mask"])
@@ -88,15 +84,14 @@ def combine_batch_encoding_lists(list_of_BE_lists, list_of_computed):
 
 
 def create_assay_base(tokenizer, assay):
-    tok_ass_name = tokenizer("[ASSNAME " + assay["name"] + "]")
-    tok_ass_desc = tokenizer("[ASSDESC " + assay["description"] + "]")
+    tok_ass_name = tokenizer(f"""[ASSNAME {str(assay["name"])}]""")
+    tok_ass_desc = tokenizer(f"""[ASSDESC {str(assay["description"])}]""")
     return tok_ass_name, tok_ass_desc
 
 
 def extract_data_from_json(json_data):
     sorted_assays = process_assays(json_data["assays"])
 
-    # smiles = json_data["SMILES"]
     computed_dict = {}
     for key, value in json_data.items():
         if isinstance(value, list) or value == "SMILES":
@@ -107,7 +102,6 @@ def extract_data_from_json(json_data):
     return sorted_assays, computed_dict
 
 
-context_length = CONTEXT_LENGTH
 need_new_assay = True
 
 
@@ -132,14 +126,13 @@ with open(jsonl_file_path, "r") as jsonl_file:
             tok_ass_vars = []
 
             # loop until we fill full context
-            while (doc_len) < context_length:
+            while (doc_len) < GALACTICA_CONTEXT_LENGTH:
                 if need_new_assay:
                     try:
                         assay = sorted_assays.pop()
                         tok_ass_name, tok_ass_desc = create_assay_base(tokenizer, assay)
                         variables = assay["variables"]
-                    except Exception as e:
-                        print(e)
+                    except IndexError:
                         break
 
                 if doc_len == 0 or need_new_assay:
@@ -148,8 +141,10 @@ with open(jsonl_file_path, "r") as jsonl_file:
 
                     if computed_dict and not doc_len == 0:
                         potential_next_length = ass_name_len + ass_desc_len
-                        if (ass_name_len + ass_desc_len + doc_len) > context_length:
-                            diff = context_length - (doc_len)
+                        if (
+                            ass_name_len + ass_desc_len + doc_len
+                        ) > GALACTICA_CONTEXT_LENGTH:
+                            diff = GALACTICA_CONTEXT_LENGTH - (doc_len)
                             while diff > 0:
                                 try:
                                     random_key = random.choice(
@@ -159,7 +154,7 @@ with open(jsonl_file_path, "r") as jsonl_file:
                                     document_content_dict["computed"].append(value)
                                     doc_len += random_key
                                     diff -= random_key
-                                except Exception:
+                                except IndexError:
                                     break
                             continue
                     document_content_dict["names"].append(tok_ass_name)
@@ -185,7 +180,7 @@ with open(jsonl_file_path, "r") as jsonl_file:
                 document_content_dict["variables"].append(tok_ass_vars)
 
             # check how many tokens to remove from description
-            difference = (doc_len) - context_length
+            difference = (doc_len) - GALACTICA_CONTEXT_LENGTH
 
             if difference > 0:
                 document_content_dict[
@@ -194,21 +189,14 @@ with open(jsonl_file_path, "r") as jsonl_file:
                     document_content_dict["descriptions"], difference
                 )
 
-            doc_batch_encoding = combine_batch_encoding_lists(
-                [
-                    document_content_dict["names"],
-                    document_content_dict["descriptions"],
-                    document_content_dict["variables"],
-                ],
-                document_content_dict["computed"],
-            )
+            doc_batch_encoding = combine_batch_encodings(document_content_dict)
 
-            if get_num_be_tokens(doc_batch_encoding) == context_length:
+            if get_num_be_tokens(doc_batch_encoding) == GALACTICA_CONTEXT_LENGTH:
                 documents.append(doc_batch_encoding)
             else:
                 print("num tokens here", get_num_be_tokens(doc_batch_encoding))
                 wrong_count += 1
         break
-# print(tokenizer.decode(documents[2]["input_ids"]))
+print(tokenizer.decode(documents[2]["input_ids"]))
 print("num docs", len(documents))
 print("wrong count:", wrong_count)
