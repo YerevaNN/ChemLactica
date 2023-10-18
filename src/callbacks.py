@@ -3,12 +3,12 @@ import time
 import hashlib
 import glob
 import gc
+import json
 
 from config.create_train_config import model_train_configs
 from dataset_utils import process_dataset
 from datasets import load_dataset
-from model_utils import load_model, CustomOPTForCausalLM
-from utils import chemlactica_special_tokens, get_tokenizer
+from model_utils import load_model
 
 from aim.hugging_face import AimCallback
 import torch
@@ -19,8 +19,7 @@ from transformers.trainer_callback import (
     ProgressCallback,
 )
 from transformers.training_args import TrainingArguments
-from transformers import AutoConfig
-from accelerate import Accelerator
+import accelerate
 from accelerate.logging import get_logger
 
 logger = get_logger(__name__)
@@ -210,16 +209,6 @@ class ReproducabilityCallback(TrainerCallback):
         with torch.no_grad():
             for i, batch in enumerate(batches):
                 model_logits.append(model(**batch))
-
-            # for cont in contexts:
-            #     max_length = 400
-            #     inputs = get_tokenizer()(cont, return_tensors="pt").to(model.device)
-            #     generated_toks = model.generate(
-            #         inputs["input_ids"],
-            #         max_length=max_length,
-            #         do_sample=False
-            #     )
-            #     model_gen_toks[cont] = generated_toks
         
         if torch.distributed.get_rank() == 0:
             print(f"Loading from checkpoint: {checkpoint_dir} (process {torch.distributed.get_rank()})")
@@ -263,3 +252,38 @@ class ReproducabilityCallback(TrainerCallback):
                 #     print(f"Checking diff generated tokens (max_length={max_length}) '{cont}': count {diff_gen_tokens}")
         
         torch.distributed.barrier()
+
+
+class JsonlDatasetResumeCallback(TrainerCallback):
+    def __init__(self, shared_jsonl_files):
+        self.shared_jsonl_files = shared_jsonl_files
+
+    def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        if args.resume_from_checkpoint: # resume training
+            print("Resuming from saved jsonl states.")
+            checkpoint_dir = os.path.join(
+                args.output_dir, f"checkpoint-{state.global_step}"
+            )
+            with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "r") as file:
+                jsonl_states = json.load(file)
+
+            assert not self.shared_jsonl_files
+            for name, state in jsonl_states.items():
+                print(f"loadeding state {name}: {state}")
+                self.shared_jsonl_files[name] = state
+
+            accelerate.skip_first_batches = lambda: None
+
+    def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        assert self.shared_jsonl_files
+        jsonl_states = {key: value for key, value in self.shared_jsonl_files.items()}
+        print(jsonl_states)
+
+        checkpoint_dir = os.path.join(
+            args.output_dir, f"checkpoint-{state.global_step}"
+        )
+        print(f"Saving jsonl states")
+        for name, state in jsonl_states.items():
+            print(name, state)
+        with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "w") as file:
+            json.dump(jsonl_states, file, indent=4)
