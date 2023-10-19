@@ -195,7 +195,6 @@ def train(
             resume_from_checkpoint=resume_from_checkpoint,
             # load_best_model=True
         )
-
         training_data_files = glob.glob(training_data_dir + "/*.jsonl")
         valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
 
