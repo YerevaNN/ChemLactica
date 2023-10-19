@@ -3,6 +3,21 @@ from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
 from utils import get_tokenizer
+from assay_doc_utils import get_compound_assay_docs
+
+
+def generate_assay_docs(examples, train_config):
+    tokenizer = get_tokenizer()
+    GALACTICA_CONTEXT_LENGTH = train_config["block_size"]
+    try:
+        compound = json.loads(json.loads((str["text"])))
+    except Exception as e:
+        print(e)
+        return ""
+    result = get_compound_assay_docs(tokenizer, compound, GALACTICA_CONTEXT_LENGTH)
+
+    result["labels"] = result["input_ids"].copy()
+    return result
 
 
 def tokenize_function(examples):
@@ -18,7 +33,7 @@ def process_str(str):
     except Exception as e:
         print(e)
         return ""
-    str["text"] = delete_empty_tags(compound)
+    compound = delete_empty_tags(compound)
     str["text"] = generate_formatted_string(compound)
     return str
 

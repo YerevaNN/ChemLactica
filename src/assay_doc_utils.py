@@ -1,8 +1,6 @@
-import json
-import argparse
 import random
 import torch
-from transformers import AutoTokenizer, BatchEncoding
+from transformers import BatchEncoding
 
 
 def get_num_be_tokens(tokenized):
@@ -326,41 +324,3 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
         else:
             wrong_count += 1
     return documents
-
-
-def main(jsonl_file_path, tokenizer_id):
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
-    GALACTICA_CONTEXT_LENGTH = 2048
-    seed_value = 42
-    # wrong_count = 0
-    random.seed(seed_value)
-
-    with open(jsonl_file_path, "r") as jsonl_file:
-        for index, line in enumerate(jsonl_file):
-            # if index<132:
-            #     continue
-            print(index)
-            json_data = json.loads(json.loads(line))
-            documents = get_compound_assay_docs(
-                tokenizer, json_data, GALACTICA_CONTEXT_LENGTH
-            )
-
-            print("num docs", len(documents))
-            if index > 10:
-                break
-        print(tokenizer.decode(documents[5]["input_ids"]))
-        print("---------------------------")
-        print(tokenizer.decode(documents[6]["input_ids"]))
-        print("----------------------------")
-        print(tokenizer.decode(documents[7]["input_ids"]))
-
-        # print("num docs", len(documents))
-        # print("wrong count:", wrong_count)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser("new doc maker test")
-    parser.add_argument("--jsonl_file_path", type=str, help="Path to the JSONL file")
-    parser.add_argument("--tokenizer", type=str, help="Tokenizer name or configuration")
-    args = parser.parse_args()
-    main(args.jsonl_file_path, args.tokenizer)
