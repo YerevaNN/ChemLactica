@@ -72,9 +72,6 @@ def train(
         train_config["vocab_size"] + len(chemlactica_special_tokens)
     )
 
-    # Converts the model to use PyTorch’s native attention implementation
-    # model = BetterTransformer.transform(model)
-
     trainer_callback_dict = {}
     experiment_hash = "none"
     communication_list = [experiment_hash]

@@ -2,7 +2,6 @@ import shutil
 from transformers import Trainer
 
 
-
 class CustomTrainer(Trainer):
     def _save_checkpoint(self, model, trial, metrics=None):
         if shutil.disk_usage('/').free > 3 * 1024 ** 3: 
