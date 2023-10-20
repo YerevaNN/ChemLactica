@@ -209,13 +209,13 @@ def train(
         is_eval=False,
         assay=True,
     )
-    shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=10000)
+    shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=100000)
     processed_eval_dataset = process_dataset(
         dataset=eval_dataset,
         train_config=train_config,
         process_batch_sizes=(50, 50),
         is_eval=True,
-        assay=False,
+        assay=True,
     )
 
     trainer = CustomTrainer(
