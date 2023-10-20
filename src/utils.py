@@ -1,10 +1,5 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from transformers.models.opt.modeling_opt import OPTForCausalLM
-import transformers
-import torch.nn as nn
+from transformers import AutoTokenizer
 import os
-from transformers import OPTModel
 
 
 chemlactica_special_tokens = [
@@ -36,6 +31,9 @@ chemlactica_special_tokens = [
     "[NUMALIPHATICHETEROCYCLES ",
     "[NUMALIPHATICCARBOCYCLES ",
     "[IUPAC ",
+    "[ASSAY_VAR",
+    "[ASSAY_NAME",
+    "[ASSAY_DESC",
 ]
 
 
