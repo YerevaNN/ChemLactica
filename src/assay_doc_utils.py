@@ -1,6 +1,5 @@
 import random
 import torch
-from transformers import BatchEncoding
 
 
 def get_num_be_tokens(tokenized):
@@ -8,7 +7,7 @@ def get_num_be_tokens(tokenized):
 
 
 def add_var_str(var_object):
-    var_text = f"""[VAR {var_object['name']} DESC {var_object['description']} VAL {var_object['value']}]"""  # noqa
+    var_text = f"""[ASSAY_VAR {var_object['name']} DESC {var_object['description']} VAL {var_object['value']}]"""  # noqa
     return var_text
 
 
@@ -38,9 +37,9 @@ def process_assays(assays):
 
 def combine_batch_encodings(document_content_dict, doc_start):
     # TODO: pytorch_compatibility
-    input_ids = torch.empty(0, dtype=torch.int)
-    token_type_ids = torch.empty(0, dtype=torch.int)
-    attention_mask = torch.empty(0, dtype=torch.int)
+    input_ids = torch.empty(0, dtype=torch.int64)
+    token_type_ids = torch.empty(0, dtype=torch.int64)
+    attention_mask = torch.empty(0, dtype=torch.int64)
     input_ids = torch.cat((input_ids, torch.tensor(doc_start["input_ids"])))
     token_type_ids = torch.cat(
         (token_type_ids, torch.tensor(doc_start["token_type_ids"]))
@@ -57,19 +56,19 @@ def combine_batch_encodings(document_content_dict, doc_start):
         input_ids = torch.cat(
             (
                 input_ids,
-                torch.tensor(smiles_prop["value"]["input_ids"], dtype=torch.int),
+                torch.tensor(smiles_prop["value"]["input_ids"], dtype=torch.int64),
             )
         )
         token_type_ids = torch.cat(
             (
                 token_type_ids,
-                torch.tensor(smiles_prop["value"]["token_type_ids"], dtype=torch.int),
+                torch.tensor(smiles_prop["value"]["token_type_ids"], dtype=torch.int64),
             )
         )
         attention_mask = torch.cat(
             (
                 attention_mask,
-                torch.tensor(smiles_prop["value"]["attention_mask"], dtype=torch.int),
+                torch.tensor(smiles_prop["value"]["attention_mask"], dtype=torch.int64),
             )
         )
 
@@ -83,14 +82,16 @@ def combine_batch_encodings(document_content_dict, doc_start):
                         input_ids = torch.cat(
                             (
                                 input_ids,
-                                torch.tensor(actual_var["input_ids"], dtype=torch.int),
+                                torch.tensor(
+                                    actual_var["input_ids"], dtype=torch.int64
+                                ),
                             )
                         )
                         token_type_ids = torch.cat(
                             (
                                 token_type_ids,
                                 torch.tensor(
-                                    actual_var["token_type_ids"], dtype=torch.int
+                                    actual_var["token_type_ids"], dtype=torch.int64
                                 ),
                             )
                         )
@@ -98,7 +99,7 @@ def combine_batch_encodings(document_content_dict, doc_start):
                             (
                                 attention_mask,
                                 torch.tensor(
-                                    actual_var["attention_mask"], dtype=torch.int
+                                    actual_var["attention_mask"], dtype=torch.int64
                                 ),
                             )
                         )
@@ -110,14 +111,14 @@ def combine_batch_encodings(document_content_dict, doc_start):
                 input_ids = torch.cat(
                     (
                         input_ids,
-                        torch.tensor(interest_list[i]["input_ids"], dtype=torch.int),
+                        torch.tensor(interest_list[i]["input_ids"], dtype=torch.int64),
                     )
                 )
                 token_type_ids = torch.cat(
                     (
                         token_type_ids,
                         torch.tensor(
-                            interest_list[i]["token_type_ids"], dtype=torch.int
+                            interest_list[i]["token_type_ids"], dtype=torch.int64
                         ),
                     )
                 )
@@ -125,42 +126,37 @@ def combine_batch_encodings(document_content_dict, doc_start):
                     (
                         attention_mask,
                         torch.tensor(
-                            interest_list[i]["attention_mask"], dtype=torch.int
+                            interest_list[i]["attention_mask"], dtype=torch.int64
                         ),
                     )
                 )
 
     for comp_prop in document_content_dict["computed"]:
         input_ids = torch.cat(
-            (input_ids, torch.tensor(comp_prop["value"]["input_ids"], dtype=torch.int))
+            (
+                input_ids,
+                torch.tensor(comp_prop["value"]["input_ids"], dtype=torch.int64),
+            )
         )
         token_type_ids = torch.cat(
             (
                 token_type_ids,
-                torch.tensor(comp_prop["value"]["token_type_ids"], dtype=torch.int),
+                torch.tensor(comp_prop["value"]["token_type_ids"], dtype=torch.int64),
             )
         )
         attention_mask = torch.cat(
             (
                 attention_mask,
-                torch.tensor(comp_prop["value"]["attention_mask"], dtype=torch.int),
+                torch.tensor(comp_prop["value"]["attention_mask"], dtype=torch.int64),
             )
         )
 
-    combined = BatchEncoding(
-        {
-            "input_ids": input_ids[:2048],
-            "token_type_ids": token_type_ids[:2048],
-            "attention_mask": attention_mask[:2048],
-        }
-    )
-
-    return combined
+    return input_ids[:2048], token_type_ids[:2048], attention_mask[:2048]
 
 
 def create_assay_base(tokenizer, assay):
-    tok_ass_name = tokenizer(f"""[ASSNAME {str(assay["name"])}]""")
-    tok_ass_desc = tokenizer(f"""[ASSDESC {str(assay["description"])}]""")
+    tok_ass_name = tokenizer(f"""[ASSAY_NAME {str(assay["name"])}]""")
+    tok_ass_desc = tokenizer(f"""[ASSAY_DESC {str(assay["description"])}]""")
     return tok_ass_name, tok_ass_desc
 
 
@@ -211,7 +207,11 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
     smiles_toks = tokenizer(smiles)
     doc_start = tokenizer("</s>")
     need_new_assay = True
-    documents = []
+    documents = {
+        "input_ids": [],
+        "token_type_ids": [],
+        "attention_mask": [],
+    }
     doc_num = 0
     wrong_count = 0
 
@@ -317,10 +317,14 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
             except Exception:
                 pass
 
-        doc_batch_encoding = combine_batch_encodings(document_content_dict, doc_start)
+        doc_input_ids, doc_token_type_ids, doc_attention_mask = combine_batch_encodings(
+            document_content_dict, doc_start
+        )
 
-        if get_num_be_tokens(doc_batch_encoding) == context_length:
-            documents.append(doc_batch_encoding)
+        if len(doc_input_ids) == context_length:
+            documents["input_ids"].append(doc_input_ids)
+            documents["token_type_ids"].append(doc_token_type_ids)
+            documents["attention_mask"].append(doc_attention_mask)
         else:
             wrong_count += 1
     return documents
