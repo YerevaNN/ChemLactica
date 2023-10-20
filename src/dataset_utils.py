@@ -7,16 +7,25 @@ from assay_doc_utils import get_compound_assay_docs
 
 
 def generate_assay_docs(examples, train_config):
+    the_str = examples["text"][0]
     tokenizer = get_tokenizer()
     GALACTICA_CONTEXT_LENGTH = train_config["block_size"]
-    try:
-        compound = json.loads(json.loads((str["text"])))
-    except Exception as e:
-        print(e)
-        return ""
-    result = get_compound_assay_docs(tokenizer, compound, GALACTICA_CONTEXT_LENGTH)
 
-    result["labels"] = result["input_ids"].copy()
+    try:
+        compound = json.loads(json.loads(the_str))
+        result = get_compound_assay_docs(tokenizer, compound, GALACTICA_CONTEXT_LENGTH)
+        result["labels"] = result["input_ids"].copy()
+        if len(result["input_ids"]) == 0:
+            raise ValueError
+
+    except Exception:
+        result = {
+            "input_ids": [torch.ones(2048, dtype=torch.int64)],
+            "token_type_ids": [torch.ones(2048, dtype=torch.int64)],
+            "attention_mask": [torch.ones(2048, dtype=torch.int64)],
+            "labels": [torch.ones(2048, dtype=torch.int64)],
+        }
+        return result
     return result
 
 
@@ -64,39 +73,51 @@ def group_texts(examples, train_config):
         # k : t[:total_length].view(-1, train_config["block_size"])
         # for k, t in concatenated_examples.items()
     }
+
     result["labels"] = result["input_ids"].copy()
     return result
 
 
-def process_dataset(dataset, train_config, process_batch_sizes: tuple, is_eval=False):
-    if is_eval:
-        dataset = dataset.map(process_str, num_proc=8)
-        tokenized_datasets = dataset.map(
-            tokenize_function,
-            batched=False,
-            remove_columns=["text"],
-            batch_size=process_batch_sizes[0],
-            num_proc=4,
-        )
-        lm_datasets = tokenized_datasets.map(
-            group_texts,
+def process_dataset(
+    dataset, train_config, process_batch_sizes: tuple, is_eval=False, assay=True
+):
+    if assay:
+        lm_datasets = dataset.map(
+            generate_assay_docs,
             batched=True,
             fn_kwargs={"train_config": train_config},
-            num_proc=4,
+            remove_columns=["text"],
+            batch_size=1,
         )
     else:
-        dataset = dataset.map(process_str)
-        tokenized_datasets = dataset.map(
-            tokenize_function,
-            batched=True,
-            batch_size=process_batch_sizes[0],
-            remove_columns=["text"],
-        )
-        lm_datasets = tokenized_datasets.map(
-            group_texts,
-            batched=True,
-            batch_size=process_batch_sizes[1],
-            fn_kwargs={"train_config": train_config},
-        )
+        if is_eval:
+            dataset = dataset.map(process_str, num_proc=8)
+            tokenized_datasets = dataset.map(
+                tokenize_function,
+                batched=False,
+                remove_columns=["text"],
+                batch_size=process_batch_sizes[0],
+                num_proc=4,
+            )
+            lm_datasets = tokenized_datasets.map(
+                group_texts,
+                batched=True,
+                fn_kwargs={"train_config": train_config},
+                num_proc=4,
+            )
+        else:
+            dataset = dataset.map(process_str)
+            tokenized_datasets = dataset.map(
+                tokenize_function,
+                batched=True,
+                batch_size=process_batch_sizes[0],
+                remove_columns=["text"],
+            )
+            lm_datasets = tokenized_datasets.map(
+                group_texts,
+                batched=True,
+                batch_size=process_batch_sizes[1],
+                fn_kwargs={"train_config": train_config},
+            )
 
     return lm_datasets

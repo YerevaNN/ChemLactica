@@ -56,7 +56,7 @@ def train(
     check_reproducability=False,
     valid_batch_size=None,
     profile=False,
-    profile_dir=None
+    profile_dir=None,
 ):
     transformers.logging.set_verbosity_info()
     transformers.utils.logging.enable_explicit_format()
@@ -65,7 +65,9 @@ def train(
 
     train_config = model_train_configs[model_config]
 
-    model = load_model(from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config)
+    model = load_model(
+        from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config
+    )
     model.resize_token_embeddings(
         train_config["vocab_size"] + len(chemlactica_special_tokens)
     )
@@ -133,7 +135,9 @@ def train(
 
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     if check_reproducability:
-        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(accelerator, model_config, use_flash_attn)
+        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
+            accelerator, model_config, use_flash_attn
+        )
     trainer_callback_dict["progress_callback"] = CustomProgressCallback()
     checkpoints_dir = os.path.join(
         checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
@@ -203,19 +207,22 @@ def train(
         train_config=train_config,
         process_batch_sizes=(50, 50),
         is_eval=False,
+        assay=True,
     )
+    shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=10000)
     processed_eval_dataset = process_dataset(
         dataset=eval_dataset,
         train_config=train_config,
         process_batch_sizes=(50, 50),
         is_eval=True,
+        assay=False,
     )
 
     trainer = CustomTrainer(
         model=model,
         args=training_args,
         compute_metrics=compute_metrics,
-        train_dataset=processed_train_dataset["train"],
+        train_dataset=shuffled_train_dataset["train"],
         eval_dataset=processed_eval_dataset["validation"],
         optimizers=[optimizer, lr_scheduler],
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
