@@ -3,31 +3,27 @@ import time
 import hashlib
 import glob
 import gc
-import pickle
 
+from config.create_train_config import model_train_configs
 from dataset_utils import process_dataset
-from utils import load_model, chemlactica_special_tokens
-from accelerate.logging import get_logger
-from utils import get_tokenizer
-import torch
-import torch.nn.functional as F
+from datasets import load_dataset
+from model_utils import load_model, CustomOPTForCausalLM
+from utils import chemlactica_special_tokens, get_tokenizer
 
 from aim.hugging_face import AimCallback
+import torch
 from transformers.trainer_callback import (
     TrainerCallback,
     TrainerControl,
     TrainerState,
     ProgressCallback,
 )
-from transformers import OPTForCausalLM
-import torch
 from transformers.training_args import TrainingArguments
-from datasets import load_dataset
+from transformers import AutoConfig
 from accelerate import Accelerator
-from optimum.bettertransformer import BetterTransformer
+from accelerate.logging import get_logger
 
 logger = get_logger(__name__)
-
 
 def calc_hash_for_binary_file(path):
     with open(path, "rb") as _file:
@@ -152,13 +148,13 @@ class EpochCallback(TrainerCallback):
 
 
 class ReproducabilityCallback(TrainerCallback):
-    def __init__(self, accelerator, model_config, train_config):
+    def __init__(self, accelerator, model_config, use_flash_attn=False):
         self.accelerator = accelerator
         self.model_config = model_config
-        self.train_config = train_config
+        self.train_config = model_train_configs[model_config]
+        self.use_flash_attn = use_flash_attn
         
     def on_save(self, args, state, control, model, **kwargs):
-        print(f"Process {torch.distributed.get_rank()}")
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -186,34 +182,20 @@ class ReproducabilityCallback(TrainerCallback):
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
         )
-        print("Loading from checkpoint:", checkpoint_dir)
 
-        accelerator = Accelerator()
-        saved_model = load_model(f"facebook/galactica-{self.model_config}", flash_att=True, dtype=torch.bfloat16)
-        saved_model.resize_token_embeddings(
-            self.train_config["vocab_size"] + len(chemlactica_special_tokens)
-        )
-        saved_model = accelerator.prepare(saved_model)
-        accelerator.load_state(checkpoint_dir)
-        saved_model.to(accelerator.device)
+        # accelerator = Accelerator()
+        # saved_model = load_model(f"facebook/galactica-{self.model_config}", use_flash_attn=self.use_flash_attn, dtype=torch.bfloat16)
+        # saved_model.resize_token_embeddings(
+        #     self.train_config["vocab_size"] + len(chemlactica_special_tokens)
+        # )
+        # saved_model = accelerator.prepare(saved_model)
+        # accelerator.load_state(checkpoint_dir)
+        # saved_model.to(accelerator.device)
 
-        # saved_model = load_model(checkpoint_dir, flash_att=True, dtype=torch.bfloat16)
-        # saved_model.to(model.device)
-
-        model.eval()
-        saved_model.eval()
-        with torch.no_grad():
-            for i, batch in enumerate(batches):
-                out = model(**batch)
-                saved_md_out = saved_model(**batch)
-                # print(i, batch)
-
-                logits_diff = torch.abs(out.logits - saved_md_out.logits)
-                print(f"Logits difference {i} min {logits_diff.min():.6f}, max {logits_diff.max():.6f}, mean {logits_diff.mean():.6f}, median {logits_diff.median():.6f}")
-                loss_diff = torch.abs(out.loss - saved_md_out.loss)
-                print(f"loss difference {loss_diff}")
-                different_tokens_count = torch.sum(out.logits.softmax(-1).argmax(-1) != saved_md_out.logits.softmax(-1).argmax(-1))
-                print("different token count", different_tokens_count.item())
+        # config = AutoConfig.from_pretrained("facebook/galactica-125m")
+        # config.vocab_size = 50028
+        # state_dict = torch.load(f"{checkpoint_dir}/pytorch_model.bin")
+        # saved_model = CustomOPTForCausalLM.from_pretrained(None, config=config, state_dict=state_dict, use_flash_attn=self.use_flash_attn, torch_dtype=torch.bfloat16).to(model.device)
 
         contexts = [
             "[CLOGP 100][START_SMILES]",
@@ -222,26 +204,62 @@ class ReproducabilityCallback(TrainerCallback):
             "random input",
         ]
 
-        # with torch.no_grad():
-        #     for cont in contexts:
-        #         max_length = 400
-        #         inputs = get_tokenizer()(cont, return_tensors="pt").to(model.device)
-        #         generated_toks = saved_model.generate(
-        #             inputs["input_ids"],
-        #             max_length=max_length,
-        #             do_sample=False
-        #         )
-        #         saved_md_generated_toks = saved_model.generate(
-        #             inputs["input_ids"],
-        #             max_length=max_length,
-        #             do_sample=False
-        #         )
-        #         generated_toks = generated_toks.squeeze()
-        #         saved_md_generated_toks = saved_md_generated_toks.squeeze()
-        #         maximum = max(len(generated_toks), len(saved_md_generated_toks))
-        #         print(len(saved_md_generated_toks), len(generated_toks), maximum)
-        #         generated_toks = F.pad(generated_toks, pad=(0, maximum - len(generated_toks)), mode='constant', value=0)
-        #         saved_md_generated_toks = F.pad(saved_md_generated_toks, pad=(0, maximum - len(saved_md_generated_toks)), mode='constant', value=0)
-        #         print(generated_toks.shape, saved_md_generated_toks.shape)
-        #         diff_gen_tokens = torch.sum(generated_toks.squeeze() != saved_md_generated_toks.squeeze())
-        #         print(f"Checking diff generated tokens (max_length={max_length}) '{cont}': count {diff_gen_tokens}")
+        model.eval()
+        model_logits = []
+        model_gen_toks = {}
+        with torch.no_grad():
+            for i, batch in enumerate(batches):
+                model_logits.append(model(**batch))
+
+            # for cont in contexts:
+            #     max_length = 400
+            #     inputs = get_tokenizer()(cont, return_tensors="pt").to(model.device)
+            #     generated_toks = model.generate(
+            #         inputs["input_ids"],
+            #         max_length=max_length,
+            #         do_sample=False
+            #     )
+            #     model_gen_toks[cont] = generated_toks
+        
+        if torch.distributed.get_rank() == 0:
+            print(f"Loading from checkpoint: {checkpoint_dir} (process {torch.distributed.get_rank()})")
+            saved_model = load_model(checkpoint_dir, use_flash_attn=self.use_flash_attn, dtype=torch.bfloat16)
+            saved_model.to(model.device)
+
+            saved_model.eval()
+            with torch.no_grad():
+                for i, batch in enumerate(batches):
+                    out = model_logits[i]
+                    saved_md_out = saved_model(**batch)
+                    # print(i, batch)
+
+                    logits_diff = torch.abs(out.logits - saved_md_out.logits)
+                    if logits_diff.max() != 0:
+                        print(f"MISMATCH: logits difference {i} min {logits_diff.min()}, max {logits_diff.max()}, mean {logits_diff.mean()}, median {logits_diff.median()}")
+                    loss_diff = torch.abs(out.loss - saved_md_out.loss)
+                    if loss_diff != 0:
+                        print(f"MISMATCH: loss difference {loss_diff}")
+                    different_tokens_count = torch.sum(out.logits.softmax(-1).argmax(-1) != saved_md_out.logits.softmax(-1).argmax(-1))
+                    if different_tokens_count != 0:
+                        print("MISMATCH: different token count", different_tokens_count.item())
+
+                # for cont in contexts:
+                #     max_length = 400
+                #     inputs = get_tokenizer()(cont, return_tensors="pt").to(saved_model.device)
+                #     generated_toks = model_gen_toks[cont]
+                #     saved_md_generated_toks = saved_model.generate(
+                #         inputs["input_ids"],
+                #         max_length=max_length,
+                #         do_sample=False
+                #     )
+                #     generated_toks = generated_toks.squeeze()
+                #     saved_md_generated_toks = saved_md_generated_toks.squeeze()
+                #     maximum = max(len(generated_toks), len(saved_md_generated_toks))
+                #     print(len(saved_md_generated_toks), len(generated_toks), maximum)
+                #     generated_toks = F.pad(generated_toks, pad=(0, maximum - len(generated_toks)), mode='constant', value=0)
+                #     saved_md_generated_toks = F.pad(saved_md_generated_toks, pad=(0, maximum - len(saved_md_generated_toks)), mode='constant', value=0)
+                #     print(generated_toks.shape, saved_md_generated_toks.shape)
+                #     diff_gen_tokens = torch.sum(generated_toks.squeeze() != saved_md_generated_toks.squeeze())
+                #     print(f"Checking diff generated tokens (max_length={max_length}) '{cont}': count {diff_gen_tokens}")
+        
+        torch.distributed.barrier()
