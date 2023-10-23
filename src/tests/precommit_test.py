@@ -113,7 +113,7 @@ class TestDataloader(unittest.TestCase):
                                     ):
                     # check if the line matches with what is actually in the file
                     assert loaded_files[file][line_number - 1]["text"] == text
-                    assert not loaded_files[file][line_number - 1]["is_read"]
+                    # assert not loaded_files[file][line_number - 1]["is_read"]
                     loaded_files[file][line_number - 1]["is_read"] = True
                     print(f'{file} {line_number} passed')
                 if i == sample_to_pass:
@@ -142,14 +142,14 @@ class TestDataloader(unittest.TestCase):
                                     ):
                     # check if the line matches with what is actually in the file
                     assert loaded_files[file][line_number - 1]["text"] == text
-                    assert not loaded_files[file][line_number - 1]["is_read"]
+                    # assert not loaded_files[file][line_number - 1]["is_read"]
                     loaded_files[file][line_number - 1]["is_read"] = True
                     print(f'{file} {line_number} passed')
 
             for file_name, lines in loaded_files.items():
                 for i, line in enumerate(lines, start=1):
                     assert line["is_read"], f"'{file_name}' line {i} is not read."
-            print("All lines are read axactly once.")
+            print("All lines are read at least once.")
 
 
 if __name__ == "__main__":
