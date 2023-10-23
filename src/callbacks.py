@@ -254,6 +254,9 @@ class ReproducabilityCallback(TrainerCallback):
         torch.distributed.barrier()
 
 
+# return the usual dataloader, no batches skipped
+accelerate.skip_first_batches = lambda dataloader, num_batches=0: dataloader
+
 class JsonlDatasetResumeCallback(TrainerCallback):
     def __init__(self, shared_jsonl_files):
         self.shared_jsonl_files = shared_jsonl_files
@@ -269,7 +272,6 @@ class JsonlDatasetResumeCallback(TrainerCallback):
                 print(f"loadeding state {name}: {state}")
                 self.shared_jsonl_files[name] = state
 
-            accelerate.skip_first_batches = lambda: None
 
     def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         assert self.shared_jsonl_files

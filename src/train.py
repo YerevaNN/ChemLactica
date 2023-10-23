@@ -249,6 +249,7 @@ def train(
         with prof_context_manager as prof:
             trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="none")
 

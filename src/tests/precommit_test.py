@@ -12,7 +12,7 @@ from transformers.trainer_utils import seed_worker
 from jsonl_dataset import samples_generator
 
 
-class TestReproducabilityOfModelOutput(unittest.TestCase):
+class TestDataloader(unittest.TestCase):
 
     def setUp(self):
         # clean up
@@ -51,7 +51,7 @@ class TestReproducabilityOfModelOutput(unittest.TestCase):
 
         return DataLoader(train_dataset, **dataloader_params)
 
-    def test_repr_of_model_output(self):
+    def test_dataloader(self):
         """
             The following code replicates the resumed training
 
@@ -99,7 +99,10 @@ class TestReproducabilityOfModelOutput(unittest.TestCase):
             loaded_files = {}
             for file in training_data_files:
                 with open(file, "r") as _f:
-                    loaded_files[file] = [line.rstrip("\n") for line in _f.readlines()]
+                    loaded_files[file] = [{
+                            "text": line.rstrip("\n"),
+                            "is_read": False
+                        } for line in _f.readlines()]
 
             sample_to_pass = 10
             for i, samples in enumerate(initial_train_dataloader):
@@ -109,7 +112,9 @@ class TestReproducabilityOfModelOutput(unittest.TestCase):
                                         samples["line_info"]["line_number"]
                                     ):
                     # check if the line matches with what is actually in the file
-                    assert loaded_files[file][line_number - 1] == text
+                    assert loaded_files[file][line_number - 1]["text"] == text
+                    assert not loaded_files[file][line_number - 1]["is_read"]
+                    loaded_files[file][line_number - 1]["is_read"] = True
                     print(f'{file} {line_number} passed')
                 if i == sample_to_pass:
                     break
@@ -136,8 +141,15 @@ class TestReproducabilityOfModelOutput(unittest.TestCase):
                                         samples["line_info"]["line_number"]
                                     ):
                     # check if the line matches with what is actually in the file
-                    assert loaded_files[file][line_number - 1] == text
+                    assert loaded_files[file][line_number - 1]["text"] == text
+                    assert not loaded_files[file][line_number - 1]["is_read"]
+                    loaded_files[file][line_number - 1]["is_read"] = True
                     print(f'{file} {line_number} passed')
+
+            for file_name, lines in loaded_files.items():
+                for i, line in enumerate(lines, start=1):
+                    assert line["is_read"], f"'{file_name}' line {i} is not read."
+            print("All lines are read axactly once.")
 
 
 if __name__ == "__main__":

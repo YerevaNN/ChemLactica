@@ -6,7 +6,7 @@ fsdp_config:
   fsdp_backward_prefetch_policy: BACKWARD_PRE
   fsdp_offload_params: false
   fsdp_sharding_strategy: 1
-  fsdp_state_dict_type: SHARDED_STATE_DICT
+  fsdp_state_dict_type: FULL_STATE_DICT
   fsdp_transformer_layer_cls_to_wrap: CustomOPTForCausalLM
 machine_rank: 0
 main_training_function: main
