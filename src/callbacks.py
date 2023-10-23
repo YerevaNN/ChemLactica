@@ -261,10 +261,7 @@ class JsonlDatasetResumeCallback(TrainerCallback):
     def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         if args.resume_from_checkpoint: # resume training
             print("Resuming from saved jsonl states.")
-            checkpoint_dir = os.path.join(
-                args.output_dir, f"checkpoint-{state.global_step}"
-            )
-            with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "r") as file:
+            with open(os.path.join(args.resume_from_checkpoint, "jsonl_states.json"), "r") as file:
                 jsonl_states = json.load(file)
 
             assert not self.shared_jsonl_files
