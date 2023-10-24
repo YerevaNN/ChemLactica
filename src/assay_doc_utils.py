@@ -99,10 +99,10 @@ def combine_batch_encodings(document_content_dict, doc_start):
 
 def create_assay_base(tokenizer, assay):
     tok_ass_name = modified_tokenizer_call(
-        tokenizer, f"""[ASSAY_NAME {str(assay["name"])}]"""
+        tokenizer, f"""[ASSAY_NAME] {str(assay["name"])}[/ASSAY_NAME]"""
     )
     tok_ass_desc = modified_tokenizer_call(
-        tokenizer, f"""[ASSAY_DESC {str(assay["description"])}]"""
+        tokenizer, f"""[ASSAY_DESC] {str(assay["description"])}[/ASSAY_DESC]"""
     )
     return tok_ass_name, tok_ass_desc
 
@@ -124,14 +124,14 @@ def extract_data_from_json(json_data, tokenizer):
                 related_count += 1
                 comp_val = modified_tokenizer_call(
                     tokenizer,
-                    f"""[SIMILARITY {str(list_val["similarity"])} SMILES {list_val["SMILES"]}]""",
+                    f"""[SIMILARITY] {str(list_val["similarity"])} {list_val["SMILES"]}[/SIMILARITY]""",  # noqa
                 )
                 computed_dict[key].append(comp_val)
             continue
         if key == "synonyms":
             for list_val in value:
                 comp_val = modified_tokenizer_call(
-                    tokenizer, f"""[SYNONYM {list_val["name"]}]"""
+                    tokenizer, f"""[SYNONYM] {list_val["name"]}[/SYNONYM]"""
                 )
                 computed_dict[key].append(comp_val)
             continue
@@ -140,13 +140,13 @@ def extract_data_from_json(json_data, tokenizer):
             for list_val in value:
                 comp_val = modified_tokenizer_call(
                     tokenizer,
-                    f"""[EXPERIMENTAL {list_val["PROPERTY_NAME"]} {list_val["PROPERTY_VALUE"]}]""",
+                    f"""[PROPERTY] {list_val["PROPERTY_NAME"]} {list_val["PROPERTY_VALUE"]}[/PROPERTY]""",  # noqa
                 )
                 computed_dict[key].append(comp_val)
             continue
         else:
             comp_val = modified_tokenizer_call(
-                tokenizer, f"""[{str(key).upper()} {str(value)}]"""
+                tokenizer, f"""[{str(key).upper()}] {str(value)}[/{str(key).upper()}]"""
             )
             computed_dict[key] = comp_val
     return sorted_assays, computed_dict
