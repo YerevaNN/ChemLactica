@@ -26,8 +26,12 @@ def add_var_str(var_object):
 
 
 def remove_from_all_values(dict_type, num_to_remove):
+    num_to_remove = num_to_remove + 1
     for key, value in dict_type.items():
-        dict_type[key] = value[: -(num_to_remove + 1)] + [value[-1]]
+        dict_type[key] = torch.cat(
+            (value[:-num_to_remove], value[-1].unsqueeze(0)), dim=0
+        )
+        # dict_type[key] = value[: -(num_to_remove + 1)] + [value[-1]]
     return dict_type
 
 
@@ -117,7 +121,7 @@ def extract_data_from_json(json_data, tokenizer):
     }
     related_count = 0
     for key, value in json_data.items():
-        if key == "SMILES":
+        if key == "SMILES" or key == "assays":
             continue
         if key == "related":
             for list_val in value:
@@ -169,12 +173,10 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
         "token_type_ids": [],
         "attention_mask": [],
     }
-    doc_num = 0
     wrong_count = 0
 
     # Loop until the compound has no more associated assays
     while sorted_assays:
-        doc_num += 1
         doc_len = 0
         document_content_dict = {
             "names": [],
@@ -267,14 +269,9 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
         difference = (doc_len) - context_length
 
         if difference > 0:
-            try:
-                document_content_dict[
-                    "descriptions"
-                ] = evenly_remove_elements_from_lists(
-                    document_content_dict["descriptions"], difference
-                )
-            except Exception:
-                pass
+            document_content_dict["descriptions"] = evenly_remove_elements_from_lists(
+                document_content_dict["descriptions"], difference
+            )
 
         doc_input_ids, doc_token_type_ids, doc_attention_mask = combine_batch_encodings(
             document_content_dict, doc_start
@@ -299,8 +296,8 @@ def main(jsonl_file_path, tokenizer_id):
 
     with open(jsonl_file_path, "r") as jsonl_file:
         for index, line in enumerate(jsonl_file):
-            # if index<0:
-            #     continue
+            if index < 0:
+                continue
             print(index)
             json_data = json.loads(json.loads(line))
             documents = get_compound_assay_docs(
@@ -308,17 +305,16 @@ def main(jsonl_file_path, tokenizer_id):
             )
 
             print("num docs", len(documents["input_ids"]))
-            if index > 1000:
+            if index > 100:
                 break
         end = time.time()
         diff = end - start
         print("time elapsed", diff)
-        # print(tokenizer.decode(documents["input_ids"][1]))
+        print(tokenizer.decode(documents["input_ids"][5]))
         # print("---------------------------")
-        # print(tokenizer.decode(documents["input_ids"][2]))
+        # print(tokenizer.decode(documents["input_ids"][6]))
         # print("----------------------------")
-        # print(tokenizer.decode(documents["input_ids"][4]))
-        # print("num docs", len(documents))
+        # print(tokenizer.decode(documents["input_ids"][8]))
         # print("wrong count:", wrong_count)
 
 
