@@ -1,6 +1,6 @@
 import shutil
 from transformers import Trainer
-
+from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP
 
 
 class CustomTrainer(Trainer):
@@ -9,6 +9,10 @@ class CustomTrainer(Trainer):
             super()._save_checkpoint(model, trial, metrics=None)
         else:
             print("**disk is full didn't save**")
+
+    def _load_from_checkpoint(self, resume_from_checkpoint, model=None):
+        if type(self.model) != FSDP: return
+        return super()._load_from_checkpoint(resume_from_checkpoint, model)
 
     # def save_model(
     #     self, output_dir: Optional[str] = None, _internal_call: bool = False

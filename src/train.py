@@ -1,20 +1,21 @@
-from config.create_train_config import model_train_configs
-import transformers
-from accelerate import logging
+import os
+import argparse
+import random
+import glob
+import multiprocessing
+from contextlib import nullcontext
 
+import numpy
+import transformers
+from transformers import TrainingArguments, get_polynomial_decay_schedule_with_warmup, ProgressCallback
+from accelerate import Accelerator, logging
 from accelerate.utils import broadcast_object_list
 import torch
 from torch.optim import AdamW
-from transformers import TrainingArguments, get_polynomial_decay_schedule_with_warmup
 from datasets import load_dataset
-from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-import argparse
-from utils import chemlactica_special_tokens
+from datasets.iterable_dataset import IterableDataset
+from datasets.dataset_dict import IterableDatasetDict
 
-# import accelerate
-from accelerate import Accelerator
-import glob
-from transformers import ProgressCallback
 from callbacks import (
     CustomAimCallback,
     WPSCounterCallback,
@@ -22,14 +23,15 @@ from callbacks import (
     EpochCallback,
     CustomProgressCallback,
     ReproducabilityCallback,
+    JsonlDatasetResumeCallback
 )
-import os
+from config.create_train_config import model_train_configs
+from eval_metrics import compute_metrics, preprocess_logits_for_metrics
+from utils import chemlactica_special_tokens
 from model_utils import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
-from contextlib import nullcontext
-import random
-import numpy
+from jsonl_dataset import samples_generator
 
 torch.manual_seed(42)
 random.seed(42)
@@ -69,9 +71,6 @@ def train(
     model.resize_token_embeddings(
         train_config["vocab_size"] + len(chemlactica_special_tokens)
     )
-
-    # Converts the model to use PyTorch’s native attention implementation
-    # model = BetterTransformer.transform(model)
 
     trainer_callback_dict = {}
     experiment_hash = "none"
@@ -135,103 +134,120 @@ def train(
     if check_reproducability:
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(accelerator, model_config, use_flash_attn)
     trainer_callback_dict["progress_callback"] = CustomProgressCallback()
-    checkpoints_dir = os.path.join(
-        checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
-    )
-    accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
-    optimizer = AdamW(
-        model.parameters(),
-        lr=train_config["max_learning_rate"],
-        betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
-        weight_decay=train_config["weight_decay"],
-    )
+    with multiprocessing.Manager() if accelerator.is_main_process else nullcontext() as manager:
+        shared_jsonl_files = None
+        if accelerator.is_main_process:
+            shared_jsonl_files = manager.dict()
+            trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback(shared_jsonl_files)
 
-    lr_scheduler = get_polynomial_decay_schedule_with_warmup(
-        optimizer,
-        num_warmup_steps=train_config["warmup_steps"],
-        num_training_steps=max_steps,
-        lr_end=0.1 * train_config["max_learning_rate"],
-        power=1.0,
-    )
+        checkpoints_dir = os.path.join(
+            checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
+        )
+        accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
-    training_args = TrainingArguments(
-        output_dir=checkpoints_dir,
-        per_device_train_batch_size=train_batch_size,
-        per_device_eval_batch_size=valid_batch_size,
-        # log_level = "info",
-        log_on_each_node=True,
-        logging_dir=track_dir,
-        # learning_rate=train_config["max_learning_rate"],
-        # lr_scheduler_type="linear",
-        # weight_decay=train_config["weight_decay"],
-        # adam_beta1=train_config["adam_beta1"],
-        # adam_beta2=train_config["adam_beta2"],
-        # warmup_steps=train_config["warmup_steps"],
-        max_grad_norm=train_config["global_gradient_norm"],
-        evaluation_strategy="steps",
-        max_steps=max_steps,
-        eval_steps=eval_steps,
-        save_steps=save_steps,
-        dataloader_drop_last=True,
-        dataloader_pin_memory=True,
-        # torch_compile=True,
-        # torch_compile requires to set use_orig_params=true
-        # which has some conflict with saving checkpoints
-        dataloader_num_workers=dataloader_num_workers,
-        logging_steps=1,
-        gradient_checkpointing=False,
-        gradient_accumulation_steps=gradient_accumulation_steps,
-        save_total_limit=4,
-        resume_from_checkpoint=resume_from_checkpoint,
-        # load_best_model=True
-    )
+        optimizer = AdamW(
+            model.parameters(),
+            lr=train_config["max_learning_rate"],
+            betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
+            weight_decay=train_config["weight_decay"],
+        )
 
-    training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-    valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-    train_dataset = load_dataset(
-        "text",
-        data_files={"train": training_data_files},
-        streaming=True,
-    )
-    eval_dataset = load_dataset(
-        "text", data_files={"validation": valid_data_files}, streaming=False
-    )
+        lr_scheduler = get_polynomial_decay_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=train_config["warmup_steps"],
+            num_training_steps=max_steps,
+            lr_end=0.1 * train_config["max_learning_rate"],
+            power=1.0,
+        )
 
-    processed_train_dataset = process_dataset(
-        dataset=train_dataset,
-        train_config=train_config,
-        process_batch_sizes=(50, 50),
-        is_eval=False,
-    )
-    processed_eval_dataset = process_dataset(
-        dataset=eval_dataset,
-        train_config=train_config,
-        process_batch_sizes=(50, 50),
-        is_eval=True,
-    )
+        training_args = TrainingArguments(
+            output_dir=checkpoints_dir,
+            per_device_train_batch_size=train_batch_size,
+            per_device_eval_batch_size=valid_batch_size,
+            # log_level = "info",
+            log_on_each_node=True,
+            logging_dir=track_dir,
+            # learning_rate=train_config["max_learning_rate"],
+            # lr_scheduler_type="linear",
+            # weight_decay=train_config["weight_decay"],
+            # adam_beta1=train_config["adam_beta1"],
+            # adam_beta2=train_config["adam_beta2"],
+            # warmup_steps=train_config["warmup_steps"],
+            max_grad_norm=train_config["global_gradient_norm"],
+            evaluation_strategy="steps",
+            max_steps=max_steps,
+            eval_steps=eval_steps,
+            save_steps=save_steps,
+            dataloader_drop_last=True,
+            dataloader_pin_memory=True,
+            # torch_compile=True,
+            # torch_compile requires to set use_orig_params=true
+            # which has some conflict with saving checkpoints
+            dataloader_num_workers=dataloader_num_workers,
+            logging_steps=1,
+            gradient_checkpointing=False,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            save_total_limit=4,
+            resume_from_checkpoint=resume_from_checkpoint,
+            # load_best_model=True
+        )
+        training_data_files = glob.glob(training_data_dir + "/*.jsonl")
+        valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
 
-    trainer = CustomTrainer(
-        model=model,
-        args=training_args,
-        compute_metrics=compute_metrics,
-        train_dataset=processed_train_dataset["train"],
-        eval_dataset=processed_eval_dataset["validation"],
-        optimizers=[optimizer, lr_scheduler],
-        preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-    )
-    trainer.remove_callback(ProgressCallback)
-    for additional_callback in list(trainer_callback_dict.values()):
-        trainer.add_callback(additional_callback)
+        # train_dataset = load_dataset(
+        #     "text",
+        #     data_files={"train": training_data_files},
+        #     streaming=True,
+        # )
 
-    prof_context_manager = (
-        trainer_callback_dict.get("profiller_callback").prof
-        if trainer_callback_dict.get("profiller_callback") is not None
-        else nullcontext()
-    )
+        train_dataset = IterableDatasetDict({
+            "train": IterableDataset.from_generator(
+                samples_generator,
+                gen_kwargs={
+                    "files": training_data_files,
+                    "shared_jsonl_files": shared_jsonl_files
+                }
+            )
+        })
+        eval_dataset = load_dataset(
+            "text", data_files={"validation": valid_data_files}, streaming=False
+        )
 
-    with prof_context_manager as prof:
-        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+        processed_train_dataset = process_dataset(
+            dataset=train_dataset,
+            train_config=train_config,
+            process_batch_sizes=(50, 50),
+            is_eval=False,
+        )
+        processed_eval_dataset = process_dataset(
+            dataset=eval_dataset,
+            train_config=train_config,
+            process_batch_sizes=(50, 50),
+            is_eval=True,
+        )
+
+        trainer = CustomTrainer(
+            model=model,
+            args=training_args,
+            compute_metrics=compute_metrics,
+            train_dataset=processed_train_dataset["train"],
+            eval_dataset=processed_eval_dataset["validation"],
+            optimizers=[optimizer, lr_scheduler],
+            preprocess_logits_for_metrics=preprocess_logits_for_metrics,
+        )
+        trainer.remove_callback(ProgressCallback)
+        for additional_callback in list(trainer_callback_dict.values()):
+            trainer.add_callback(additional_callback)
+
+        prof_context_manager = (
+            trainer_callback_dict.get("profiller_callback").prof
+            if trainer_callback_dict.get("profiller_callback") is not None
+            else nullcontext()
+        )
+
+        with prof_context_manager as prof:
+            trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
 
 if __name__ == "__main__":
