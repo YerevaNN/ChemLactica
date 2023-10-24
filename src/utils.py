@@ -2,39 +2,49 @@ from transformers import AutoTokenizer
 import os
 
 
-chemlactica_special_tokens = [
-    "[SYNONYM ",
-    "[RELATED ",
-    "[SIMILAR ",
-    "[EXPERIMENTAL ",
-    "[SAS ",
-    "[WEIGHT ",
-    "[TPSA ",
-    "[CLOGP ",
-    "[QED ",
-    "[NUMHDONORS ",
-    "[NUMHACCEPTORS ",
-    "[NUMHETEROATOMS ",
-    "[NUMROTATABLEBONDS ",
-    "[NOCOUNT ",
-    "[NHOHCOUNT ",
-    "[RINGCOUNT ",
-    "[HEAVYATOMCOUNT ",
-    "[FRACTIONCSP3 ",
-    "[NUMAROMATICRINGS ",
-    "[NUMSATURATEDRINGS ",
-    "[NUMAROMATICHETEROCYCLES ",
-    "[NUMAROMATICCARBOCYCLES ",
-    "[NUMSATURATEDHETEROCYCLES ",
-    "[NUMSATURATEDCARBOCYCLES ",
-    "[NUMALIPHATICRINGS ",
-    "[NUMALIPHATICHETEROCYCLES ",
-    "[NUMALIPHATICCARBOCYCLES ",
-    "[IUPAC ",
-    "[ASSAY_VAR",
-    "[ASSAY_NAME",
-    "[ASSAY_DESC",
+chemlactica_special_start_tokens = [
+    "[SYNONYM]",
+    "[RELATED]",
+    "[SIMILAR]",
+    "[PROPERTY]",
+    "[SAS]",
+    "[WEIGHT]",
+    "[TPSA]",
+    "[CLOGP]",
+    "[QED]",
+    "[NUMHDONORS]",
+    "[NUMHACCEPTORS]",
+    "[NUMHETEROATOMS]",
+    "[NUMROTATABLEBONDS]",
+    "[NOCOUNT]",
+    "[NHOHCOUNT]",
+    "[RINGCOUNT]",
+    "[HEAVYATOMCOUNT]",
+    "[FRACTIONCSP3]",
+    "[NUMAROMATICRINGS]",
+    "[NUMSATURATEDRINGS]",
+    "[NUMAROMATICHETEROCYCLES]",
+    "[NUMAROMATICCARBOCYCLES]",
+    "[NUMSATURATEDHETEROCYCLES]",
+    "[NUMSATURATEDCARBOCYCLES]",
+    "[NUMALIPHATICRINGS]",
+    "[NUMALIPHATICHETEROCYCLES]",
+    "[NUMALIPHATICCARBOCYCLES]",
+    "[IUPAC]",
+    "[VAR_NAME]",
+    "[VAR_DESC]",
+    "[VAR_VAL]",
+    "[ASSAY_NAME]",
+    "[ASSAY_DESC]",
 ]
+
+chemlactica_special_end_tokens = [
+    s.replace("[", "[/") for s in chemlactica_special_start_tokens
+]
+
+chemlactica_special_tokens = (
+    chemlactica_special_start_tokens + chemlactica_special_end_tokens
+)
 
 
 def get_tokenizer():
