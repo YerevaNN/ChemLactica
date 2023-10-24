@@ -1,13 +1,27 @@
 import random
+import json
+import argparse
+import time
 import torch
+from transformers import BatchEncoding, AutoTokenizer
+
+
+def modified_tokenizer_call(tokenizer, text):
+    be = tokenizer(text, return_tensors="pt")
+    for key, be_tensor in be.items():
+        be[key] = be_tensor.squeeze()
+        if be[key].dim() == 0:
+            be[key] = be[key].unsqueeze(0)
+    return be
 
 
 def get_num_be_tokens(tokenized):
-    return len(tokenized["input_ids"])
+    result = len(tokenized["input_ids"])
+    return result
 
 
 def add_var_str(var_object):
-    var_text = f"""[ASSAY_VAR {var_object['name']} DESC {var_object['description']} VAL {var_object['value']}]"""  # noqa
+    var_text = f"""[VAR_NAME] {var_object['name']}[/VAR_NAME][VAR_DESC] {var_object['description']}[/VAR_DESC][VAR_VAL]{var_object['value']}[/VAR_VAL]"""  # noqa
     return var_text
 
 
@@ -19,9 +33,6 @@ def remove_from_all_values(dict_type, num_to_remove):
 
 def evenly_remove_elements_from_lists(lists, total_elements_to_remove):
     lists[-1] = remove_from_all_values(lists[-1], total_elements_to_remove)
-    # print(type(lists[-1]))
-    # print(get_num_be_tokens(lists[-1]))
-    # assert 1==0
     return lists
 
 
@@ -35,42 +46,31 @@ def process_assays(assays):
     return sorted_assays
 
 
+def extend_be(base_be, new_be):
+    for key, be_tensor in new_be.items():
+        base_be[key] = torch.cat((base_be[key], be_tensor))
+    return base_be
+
+
 def combine_batch_encodings(document_content_dict, doc_start):
-    # TODO: pytorch_compatibility
     input_ids = torch.empty(0, dtype=torch.int64)
     token_type_ids = torch.empty(0, dtype=torch.int64)
     attention_mask = torch.empty(0, dtype=torch.int64)
-    input_ids = torch.cat((input_ids, torch.tensor(doc_start["input_ids"])))
-    token_type_ids = torch.cat(
-        (token_type_ids, torch.tensor(doc_start["token_type_ids"]))
+    doc_be = BatchEncoding(
+        {
+            "input_ids": torch.empty(0, dtype=torch.int64),
+            "token_type_ids": torch.empty(0, dtype=torch.int64),
+            "attention_mask": torch.empty(0, dtype=torch.int64),
+        }
     )
-    attention_mask = torch.cat(
-        (attention_mask, torch.tensor(doc_start["attention_mask"]))
-    )
+    doc_be = extend_be(doc_be, doc_start)
 
     for index, element in enumerate(document_content_dict["computed"]):
         if element["name"] == "SMILES":
             smiles_index = index
     if random.random() < 0.5:
         smiles_prop = document_content_dict["computed"].pop(smiles_index)
-        input_ids = torch.cat(
-            (
-                input_ids,
-                torch.tensor(smiles_prop["value"]["input_ids"], dtype=torch.int64),
-            )
-        )
-        token_type_ids = torch.cat(
-            (
-                token_type_ids,
-                torch.tensor(smiles_prop["value"]["token_type_ids"], dtype=torch.int64),
-            )
-        )
-        attention_mask = torch.cat(
-            (
-                attention_mask,
-                torch.tensor(smiles_prop["value"]["attention_mask"], dtype=torch.int64),
-            )
-        )
+        doc_be = extend_be(doc_be, smiles_prop["value"])
 
     num_iterations = len(document_content_dict["names"])
     for i in range(num_iterations):
@@ -79,84 +79,31 @@ def combine_batch_encodings(document_content_dict, doc_start):
                 try:
                     sub_var_list = interest_list[i]
                     for actual_var in sub_var_list:
-                        input_ids = torch.cat(
-                            (
-                                input_ids,
-                                torch.tensor(
-                                    actual_var["input_ids"], dtype=torch.int64
-                                ),
-                            )
-                        )
-                        token_type_ids = torch.cat(
-                            (
-                                token_type_ids,
-                                torch.tensor(
-                                    actual_var["token_type_ids"], dtype=torch.int64
-                                ),
-                            )
-                        )
-                        attention_mask = torch.cat(
-                            (
-                                attention_mask,
-                                torch.tensor(
-                                    actual_var["attention_mask"], dtype=torch.int64
-                                ),
-                            )
-                        )
+                        doc_be = extend_be(doc_be, actual_var)
                 except IndexError:
                     pass
             elif key == "computed":
                 continue
             else:
-                input_ids = torch.cat(
-                    (
-                        input_ids,
-                        torch.tensor(interest_list[i]["input_ids"], dtype=torch.int64),
-                    )
-                )
-                token_type_ids = torch.cat(
-                    (
-                        token_type_ids,
-                        torch.tensor(
-                            interest_list[i]["token_type_ids"], dtype=torch.int64
-                        ),
-                    )
-                )
-                attention_mask = torch.cat(
-                    (
-                        attention_mask,
-                        torch.tensor(
-                            interest_list[i]["attention_mask"], dtype=torch.int64
-                        ),
-                    )
-                )
+                doc_be = extend_be(doc_be, interest_list[i])
 
     for comp_prop in document_content_dict["computed"]:
-        input_ids = torch.cat(
-            (
-                input_ids,
-                torch.tensor(comp_prop["value"]["input_ids"], dtype=torch.int64),
-            )
-        )
-        token_type_ids = torch.cat(
-            (
-                token_type_ids,
-                torch.tensor(comp_prop["value"]["token_type_ids"], dtype=torch.int64),
-            )
-        )
-        attention_mask = torch.cat(
-            (
-                attention_mask,
-                torch.tensor(comp_prop["value"]["attention_mask"], dtype=torch.int64),
-            )
-        )
+        doc_be = extend_be(doc_be, comp_prop["value"])
+
+    input_ids = doc_be["input_ids"]
+    token_type_ids = doc_be["token_type_ids"]
+    attention_mask = doc_be["attention_mask"]
 
     return input_ids[:2048], token_type_ids[:2048], attention_mask[:2048]
 
 
 def create_assay_base(tokenizer, assay):
-    tok_ass_name = tokenizer(f"""[ASSAY_NAME {str(assay["name"])}]""")
-    tok_ass_desc = tokenizer(f"""[ASSAY_DESC {str(assay["description"])}]""")
+    tok_ass_name = modified_tokenizer_call(
+        tokenizer, f"""[ASSAY_NAME {str(assay["name"])}]"""
+    )
+    tok_ass_desc = modified_tokenizer_call(
+        tokenizer, f"""[ASSAY_DESC {str(assay["description"])}]"""
+    )
     return tok_ass_name, tok_ass_desc
 
 
@@ -175,28 +122,37 @@ def extract_data_from_json(json_data, tokenizer):
         if key == "related":
             for list_val in value:
                 related_count += 1
-                comp_val = tokenizer(
-                    f"""[SIMILARITY {str(list_val["similarity"])} SMILES {list_val["SMILES"]}]"""
+                comp_val = modified_tokenizer_call(
+                    tokenizer,
+                    f"""[SIMILARITY {str(list_val["similarity"])} SMILES {list_val["SMILES"]}]""",
                 )
                 computed_dict[key].append(comp_val)
             continue
         if key == "synonyms":
             for list_val in value:
-                comp_val = tokenizer(f"""[SYNONYM {list_val["name"]}]""")
+                comp_val = modified_tokenizer_call(
+                    tokenizer, f"""[SYNONYM {list_val["name"]}]"""
+                )
                 computed_dict[key].append(comp_val)
             continue
 
         if key == "experimental":
             for list_val in value:
-                comp_val = tokenizer(
-                    f"""[EXPERIMENTAL {list_val["PROPERTY_NAME"]} {list_val["PROPERTY_VALUE"]}]"""
+                comp_val = modified_tokenizer_call(
+                    tokenizer,
+                    f"""[EXPERIMENTAL {list_val["PROPERTY_NAME"]} {list_val["PROPERTY_VALUE"]}]""",
                 )
                 computed_dict[key].append(comp_val)
             continue
         else:
-            comp_val = tokenizer(f"""[{str(key).upper()} {str(value)}]""")
+            comp_val = modified_tokenizer_call(
+                tokenizer, f"""[{str(key).upper()} {str(value)}]"""
+            )
             computed_dict[key] = comp_val
     return sorted_assays, computed_dict
+
+
+# def add_computed_properties():
 
 
 def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
@@ -204,8 +160,9 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
     # Parse the compound associated data from the current line
     sorted_assays, computed_dict = extract_data_from_json(json_data, tokenizer)
     smiles = "[START_SMILES]" + json_data["SMILES"] + "[END_SMILES]"
-    smiles_toks = tokenizer(smiles)
-    doc_start = tokenizer("</s>")
+    smiles_toks = modified_tokenizer_call(tokenizer, smiles)
+    doc_start = modified_tokenizer_call(tokenizer, "</s>")
+
     need_new_assay = True
     documents = {
         "input_ids": [],
@@ -279,7 +236,7 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
 
                                 doc_len += get_num_be_tokens(value)
                                 diff -= get_num_be_tokens(value)
-                            except IndexError:
+                            except (IndexError, UnboundLocalError):
                                 break
                         continue
                 document_content_dict["names"].append(tok_ass_name)
@@ -297,7 +254,9 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
                 continue
             # if it has data, add it
             else:
-                var_tokens = tokenizer(add_var_str(variables.pop()))
+                var_tokens = modified_tokenizer_call(
+                    tokenizer, add_var_str(variables.pop())
+                )
                 doc_len += get_num_be_tokens(var_tokens)
                 tok_ass_vars.append(var_tokens)
 
@@ -328,3 +287,44 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
         else:
             wrong_count += 1
     return documents
+
+
+def main(jsonl_file_path, tokenizer_id):
+    start = time.time()
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
+    GALACTICA_CONTEXT_LENGTH = 2048
+    seed_value = 42
+    # wrong_count = 0
+    random.seed(seed_value)
+
+    with open(jsonl_file_path, "r") as jsonl_file:
+        for index, line in enumerate(jsonl_file):
+            # if index<0:
+            #     continue
+            print(index)
+            json_data = json.loads(json.loads(line))
+            documents = get_compound_assay_docs(
+                tokenizer, json_data, GALACTICA_CONTEXT_LENGTH
+            )
+
+            print("num docs", len(documents["input_ids"]))
+            if index > 1000:
+                break
+        end = time.time()
+        diff = end - start
+        print("time elapsed", diff)
+        # print(tokenizer.decode(documents["input_ids"][1]))
+        # print("---------------------------")
+        # print(tokenizer.decode(documents["input_ids"][2]))
+        # print("----------------------------")
+        # print(tokenizer.decode(documents["input_ids"][4]))
+        # print("num docs", len(documents))
+        # print("wrong count:", wrong_count)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser("new doc maker test")
+    parser.add_argument("--jsonl_file_path", type=str, help="Path to the JSONL file")
+    parser.add_argument("--tokenizer", type=str, help="Tokenizer name or configuration")
+    args = parser.parse_args()
+    main(args.jsonl_file_path, args.tokenizer)
