@@ -1,4 +1,5 @@
 import random
+import pickle
 import json
 import argparse
 import time
@@ -21,7 +22,7 @@ def get_num_be_tokens(tokenized):
 
 
 def add_var_str(var_object):
-    var_text = f"""[VAR_NAME] {var_object['name']}[/VAR_NAME][VAR_DESC] {var_object['description']}[/VAR_DESC][VAR_VAL]{var_object['value']}[/VAR_VAL]"""  # noqa
+    var_text = f"""[VAR_NAME]{var_object['name']}[/VAR_NAME][VAR_DESC]{var_object['description']}[/VAR_DESC][VAR_VAL]{var_object['value']}[/VAR_VAL]"""  # noqa
     return var_text
 
 
@@ -103,39 +104,36 @@ def combine_batch_encodings(document_content_dict, doc_start):
 
 def create_assay_base(tokenizer, assay):
     tok_ass_name = modified_tokenizer_call(
-        tokenizer, f"""[ASSAY_NAME] {str(assay["name"])}[/ASSAY_NAME]"""
+        tokenizer, f"""[ASSAY_NAME]{str(assay["name"])}[/ASSAY_NAME]"""
     )
     tok_ass_desc = modified_tokenizer_call(
-        tokenizer, f"""[ASSAY_DESC] {str(assay["description"])}[/ASSAY_DESC]"""
+        tokenizer, f"""[ASSAY_DESC]{str(assay["description"])}[/ASSAY_DESC]"""
     )
     return tok_ass_name, tok_ass_desc
 
 
-def extract_data_from_json(json_data, tokenizer):
-    sorted_assays = process_assays(json_data["assays"])
-
+def get_computed_dict(json_data, tokenizer):
     computed_dict = {
         "synonyms": [],
         "related": [],
         "experimental": [],
     }
-    related_count = 0
+
     for key, value in json_data.items():
         if key == "SMILES" or key == "assays":
             continue
         if key == "related":
             for list_val in value:
-                related_count += 1
                 comp_val = modified_tokenizer_call(
                     tokenizer,
-                    f"""[SIMILARITY] {str(list_val["similarity"])} {list_val["SMILES"]}[/SIMILARITY]""",  # noqa
+                    f"""[SIMILARITY]{str(list_val["similarity"])} {list_val["SMILES"]}[/SIMILARITY]""",  # noqa
                 )
                 computed_dict[key].append(comp_val)
             continue
         if key == "synonyms":
             for list_val in value:
                 comp_val = modified_tokenizer_call(
-                    tokenizer, f"""[SYNONYM] {list_val["name"]}[/SYNONYM]"""
+                    tokenizer, f"""[SYNONYM]{list_val["name"]}[/SYNONYM]"""
                 )
                 computed_dict[key].append(comp_val)
             continue
@@ -144,19 +142,23 @@ def extract_data_from_json(json_data, tokenizer):
             for list_val in value:
                 comp_val = modified_tokenizer_call(
                     tokenizer,
-                    f"""[PROPERTY] {list_val["PROPERTY_NAME"]} {list_val["PROPERTY_VALUE"]}[/PROPERTY]""",  # noqa
+                    f"""[PROPERTY]{list_val["PROPERTY_NAME"]} {list_val["PROPERTY_VALUE"]}[/PROPERTY]""",  # noqa
                 )
                 computed_dict[key].append(comp_val)
             continue
         else:
             comp_val = modified_tokenizer_call(
-                tokenizer, f"""[{str(key).upper()}] {str(value)}[/{str(key).upper()}]"""
+                tokenizer, f"""[{str(key).upper()}]{str(value)}[/{str(key).upper()}]"""
             )
             computed_dict[key] = comp_val
+    return computed_dict
+
+
+def extract_data_from_json(json_data, tokenizer):
+    sorted_assays = process_assays(json_data["assays"])
+    computed_dict = get_computed_dict(json_data, tokenizer)
+
     return sorted_assays, computed_dict
-
-
-# def add_computed_properties():
 
 
 def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
@@ -293,6 +295,7 @@ def main(jsonl_file_path, tokenizer_id):
     seed_value = 42
     # wrong_count = 0
     random.seed(seed_value)
+    numbers_of_docs = []
 
     with open(jsonl_file_path, "r") as jsonl_file:
         for index, line in enumerate(jsonl_file):
@@ -300,17 +303,23 @@ def main(jsonl_file_path, tokenizer_id):
                 continue
             print(index)
             json_data = json.loads(json.loads(line))
-            documents = get_compound_assay_docs(
-                tokenizer, json_data, GALACTICA_CONTEXT_LENGTH
-            )
-
-            print("num docs", len(documents["input_ids"]))
-            if index > 100:
+            try:
+                documents = get_compound_assay_docs(
+                    tokenizer, json_data, GALACTICA_CONTEXT_LENGTH
+                )
+            except Exception as e:
+                print(e)
+                continue
+            # print("num docs", len(documents["input_ids"]))
+            numbers_of_docs.append(len(documents["input_ids"]))
+            if index > 5000:
                 break
+        with open("numbers_of_docs.pkl", "wb") as file:
+            pickle.dump(numbers_of_docs, file)
         end = time.time()
         diff = end - start
         print("time elapsed", diff)
-        print(tokenizer.decode(documents["input_ids"][5]))
+        # print(tokenizer.decode(documents["input_ids"][5]))
         # print("---------------------------")
         # print(tokenizer.decode(documents["input_ids"][6]))
         # print("----------------------------")
