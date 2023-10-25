@@ -2,12 +2,18 @@ import unittest
 import gc
 import glob
 import multiprocessing
+import os
+import sys
 
 import torch
 from torch.utils.data import DataLoader
 from datasets.iterable_dataset import IterableDataset
 from datasets.dataset_dict import IterableDatasetDict
 from transformers.trainer_utils import seed_worker
+
+ # for relative imports
+SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..")
+sys.path.append(SRC_DIR)
 
 from jsonl_dataset import samples_generator
 

@@ -1,6 +1,24 @@
 from datasets import load_dataset
 from dataset_utils import process_dataset
-import logging
+
+
+def create_train_command(module, module_args, script, script_args):
+    train_command = "python3 -m "
+    train_command += (
+        f"{module} {''.join([f'--{arg} {val} ' for arg, val in module_args.items()])}"
+    )
+    train_command += (
+        f"{script} {''.join([f'--{arg} {val} ' for arg, val in script_args.items()])}"
+    )
+    return train_command
+
+
+def create_vs_code_launch(module, module_args, script, script_args):
+    """
+        this is for creating a launch file config for vs code editor to be able 
+        to easily debug the command running in the test.
+    """
+    pass
 
 
 def generate_batches_from_jsonls(jsonl_files, count):
