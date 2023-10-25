@@ -212,7 +212,7 @@
     },
     {
       "id": 50000,
-      "content": "[SYNONYM ",
+      "content": "[SYNONYM]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -221,7 +221,7 @@
     },
     {
       "id": 50001,
-      "content": "[RELATED ",
+      "content": "[RELATED]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -230,7 +230,7 @@
     },
     {
       "id": 50002,
-      "content": "[SIMILAR ",
+      "content": "[SIMILAR]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -239,7 +239,7 @@
     },
     {
       "id": 50003,
-      "content": "[EXPERIMENTAL ",
+      "content": "[PROPERTY]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -248,7 +248,7 @@
     },
     {
       "id": 50004,
-      "content": "[SAS ",
+      "content": "[SAS]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -257,7 +257,7 @@
     },
     {
       "id": 50005,
-      "content": "[WEIGHT ",
+      "content": "[WEIGHT]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -266,7 +266,7 @@
     },
     {
       "id": 50006,
-      "content": "[TPSA ",
+      "content": "[TPSA]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -275,7 +275,7 @@
     },
     {
       "id": 50007,
-      "content": "[CLOGP ",
+      "content": "[CLOGP]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -284,7 +284,7 @@
     },
     {
       "id": 50008,
-      "content": "[QED ",
+      "content": "[QED]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -293,7 +293,7 @@
     },
     {
       "id": 50009,
-      "content": "[NUMHDONORS ",
+      "content": "[NUMHDONORS]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -302,7 +302,7 @@
     },
     {
       "id": 50010,
-      "content": "[NUMHACCEPTORS ",
+      "content": "[NUMHACCEPTORS]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -311,7 +311,7 @@
     },
     {
       "id": 50011,
-      "content": "[NUMHETEROATOMS ",
+      "content": "[NUMHETEROATOMS]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -320,7 +320,7 @@
     },
     {
       "id": 50012,
-      "content": "[NUMROTATABLEBONDS ",
+      "content": "[NUMROTATABLEBONDS]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -329,7 +329,7 @@
     },
     {
       "id": 50013,
-      "content": "[NOCOUNT ",
+      "content": "[NOCOUNT]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -338,7 +338,7 @@
     },
     {
       "id": 50014,
-      "content": "[NHOHCOUNT ",
+      "content": "[NHOHCOUNT]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -347,7 +347,7 @@
     },
     {
       "id": 50015,
-      "content": "[RINGCOUNT ",
+      "content": "[RINGCOUNT]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -356,7 +356,7 @@
     },
     {
       "id": 50016,
-      "content": "[HEAVYATOMCOUNT ",
+      "content": "[HEAVYATOMCOUNT]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -365,7 +365,7 @@
     },
     {
       "id": 50017,
-      "content": "[FRACTIONCSP3 ",
+      "content": "[FRACTIONCSP3]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -374,7 +374,7 @@
     },
     {
       "id": 50018,
-      "content": "[NUMAROMATICRINGS ",
+      "content": "[NUMAROMATICRINGS]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -383,7 +383,7 @@
     },
     {
       "id": 50019,
-      "content": "[NUMSATURATEDRINGS ",
+      "content": "[NUMSATURATEDRINGS]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -392,7 +392,7 @@
     },
     {
       "id": 50020,
-      "content": "[NUMAROMATICHETEROCYCLES ",
+      "content": "[NUMAROMATICHETEROCYCLES]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -401,7 +401,7 @@
     },
     {
       "id": 50021,
-      "content": "[NUMAROMATICCARBOCYCLES ",
+      "content": "[NUMAROMATICCARBOCYCLES]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -410,7 +410,7 @@
     },
     {
       "id": 50022,
-      "content": "[NUMSATURATEDHETEROCYCLES ",
+      "content": "[NUMSATURATEDHETEROCYCLES]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -419,7 +419,7 @@
     },
     {
       "id": 50023,
-      "content": "[NUMSATURATEDCARBOCYCLES ",
+      "content": "[NUMSATURATEDCARBOCYCLES]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -428,7 +428,7 @@
     },
     {
       "id": 50024,
-      "content": "[NUMALIPHATICRINGS ",
+      "content": "[NUMALIPHATICRINGS]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -437,7 +437,7 @@
     },
     {
       "id": 50025,
-      "content": "[NUMALIPHATICHETEROCYCLES ",
+      "content": "[NUMALIPHATICHETEROCYCLES]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -446,7 +446,7 @@
     },
     {
       "id": 50026,
-      "content": "[NUMALIPHATICCARBOCYCLES ",
+      "content": "[NUMALIPHATICCARBOCYCLES]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
@@ -455,7 +455,349 @@
     },
     {
       "id": 50027,
-      "content": "[IUPAC ",
+      "content": "[IUPAC]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50028,
+      "content": "[VAR_NAME]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50029,
+      "content": "[VAR_DESC]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50030,
+      "content": "[VAR_VAL]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50031,
+      "content": "[ASSAY_NAME]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50032,
+      "content": "[ASSAY_DESC]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50033,
+      "content": "[/SYNONYM]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50034,
+      "content": "[/RELATED]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50035,
+      "content": "[/SIMILAR]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50036,
+      "content": "[/PROPERTY]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50037,
+      "content": "[/SAS]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50038,
+      "content": "[/WEIGHT]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50039,
+      "content": "[/TPSA]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50040,
+      "content": "[/CLOGP]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50041,
+      "content": "[/QED]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50042,
+      "content": "[/NUMHDONORS]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50043,
+      "content": "[/NUMHACCEPTORS]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50044,
+      "content": "[/NUMHETEROATOMS]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50045,
+      "content": "[/NUMROTATABLEBONDS]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50046,
+      "content": "[/NOCOUNT]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50047,
+      "content": "[/NHOHCOUNT]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50048,
+      "content": "[/RINGCOUNT]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50049,
+      "content": "[/HEAVYATOMCOUNT]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50050,
+      "content": "[/FRACTIONCSP3]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50051,
+      "content": "[/NUMAROMATICRINGS]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50052,
+      "content": "[/NUMSATURATEDRINGS]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50053,
+      "content": "[/NUMAROMATICHETEROCYCLES]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50054,
+      "content": "[/NUMAROMATICCARBOCYCLES]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50055,
+      "content": "[/NUMSATURATEDHETEROCYCLES]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50056,
+      "content": "[/NUMSATURATEDCARBOCYCLES]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50057,
+      "content": "[/NUMALIPHATICRINGS]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50058,
+      "content": "[/NUMALIPHATICHETEROCYCLES]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50059,
+      "content": "[/NUMALIPHATICCARBOCYCLES]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50060,
+      "content": "[/IUPAC]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50061,
+      "content": "[/VAR_NAME]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50062,
+      "content": "[/VAR_DESC]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50063,
+      "content": "[/VAR_VAL]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50064,
+      "content": "[/ASSAY_NAME]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 50065,
+      "content": "[/ASSAY_DESC]",
       "single_word": false,
       "lstrip": false,
       "rstrip": false,
