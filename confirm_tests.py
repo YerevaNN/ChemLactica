@@ -2,6 +2,7 @@ import subprocess
 import argparse
 import unittest
 import yaml
+import os
 
 
 def write_test_status(git_commit_hash: str, status: str="FAIL", file_name: str="test_status"):
@@ -22,33 +23,46 @@ if __name__ == "__main__":
         "--run",
         action="store_true",
         dest="run",
-        help="whether or not profile the training",
+        help="whether or not run tests",
     )
     parser.add_argument(
         "--no_run",
         action="store_false",
         dest="run",
-        help="whether or not profile the training",
+        help="whether or not run tests",
+    )
+    parser.add_argument(
+        "--gpus",
+        type=str,
+        dest="gpus",
+        help="comma seperated string of gpus indices to use for testing \
+              (please choose at least 2 for proper testing, default is '0, 1').",
+        required=False,
+        default="0, 1"
     )
     parser.set_defaults(run=False)
     parser.add_argument(
         "--confirm",
         action="store_true",
         dest="confirm",
-        help="whether or not profile the training",
+        help="whether or not confirm already run tests",
     )
     parser.add_argument(
         "--no_confirm",
         action="store_false",
         dest="confirm",
-        help="whether or not profile the training",
+        help="whether or not confirm already run tests",
     )
     parser.set_defaults(confirm=False)
     args = parser.parse_args()
     run = args.run
     confirm = args.confirm
+    gpus = args.gpus
     git_commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
+    assert git_commit_hash
     if run:
+        os.environ["CUDA_VISIBLE_DEVICES"] = gpus
+        print(f"NOTE: Using GPU(s) '{gpus}' for testing.")
         loader = unittest.TestLoader()
         tests = loader.discover("tests", pattern="test_*.py")
         testRunner = unittest.runner.TextTestRunner(verbosity=2)
