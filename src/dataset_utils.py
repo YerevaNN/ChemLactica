@@ -3,7 +3,7 @@ from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
 from utils import get_tokenizer
-from assay_doc_utils import get_compound_assay_docs  # , process_incomplete_docs
+from assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
 
 
 def generate_assay_docs(examples, train_config):
@@ -30,15 +30,10 @@ def generate_assay_docs(examples, train_config):
             final["attention_mask"].extend(result["attention_mask"])
         except Exception:
             continue
-    for a in final["input_ids"]:
-        if a is None:
-            print(a)
-            assert 1 == 0
-
-    # patched_documents = process_incomplete_docs(incomplete_docs,tokenizer)
-    # final["input_ids"].extend(patched_documents["input_ids"])
-    # final["token_type_ids"].extend(patched_documents["token_type_ids"])
-    # final["attention_mask"].extend(patched_documents["attention_mask"])
+    patched_documents = process_incomplete_docs(incomplete_docs, tokenizer)
+    final["input_ids"].extend(patched_documents["input_ids"])
+    final["token_type_ids"].extend(patched_documents["token_type_ids"])
+    final["attention_mask"].extend(patched_documents["attention_mask"])
 
     final["labels"] = final["input_ids"].copy()
     return final

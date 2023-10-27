@@ -299,7 +299,6 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
             inc = False
             pass
         elif difference < 0:
-            # print("hey")
             inc = True
             incomplete_doc = {
                 "doc_dic": document_content_dict,
