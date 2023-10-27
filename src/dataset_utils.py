@@ -3,30 +3,45 @@ from text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
 from utils import get_tokenizer
-from assay_doc_utils import get_compound_assay_docs
+from assay_doc_utils import get_compound_assay_docs  # , process_incomplete_docs
 
 
 def generate_assay_docs(examples, train_config):
-    the_str = examples["text"][0]
     tokenizer = get_tokenizer()
     GALACTICA_CONTEXT_LENGTH = train_config["block_size"]
+    final = {
+        "input_ids": [],
+        "token_type_ids": [],
+        "attention_mask": [],
+    }
+    incomplete_docs = []
+    for compound_str in examples["text"]:
+        try:
+            compound = json.loads(json.loads(compound_str))
+            result, incomplete_doc = get_compound_assay_docs(
+                tokenizer, compound, GALACTICA_CONTEXT_LENGTH
+            )
+            if incomplete_doc:
+                incomplete_docs.append(incomplete_doc)
+            if len(result["input_ids"]) == 0:
+                raise ValueError
+            final["input_ids"].extend(result["input_ids"])
+            final["token_type_ids"].extend(result["token_type_ids"])
+            final["attention_mask"].extend(result["attention_mask"])
+        except Exception:
+            continue
+    for a in final["input_ids"]:
+        if a is None:
+            print(a)
+            assert 1 == 0
 
-    try:
-        compound = json.loads(json.loads(the_str))
-        result = get_compound_assay_docs(tokenizer, compound, GALACTICA_CONTEXT_LENGTH)
-        result["labels"] = result["input_ids"].copy()
-        if len(result["input_ids"]) == 0:
-            raise ValueError
+    # patched_documents = process_incomplete_docs(incomplete_docs,tokenizer)
+    # final["input_ids"].extend(patched_documents["input_ids"])
+    # final["token_type_ids"].extend(patched_documents["token_type_ids"])
+    # final["attention_mask"].extend(patched_documents["attention_mask"])
 
-    except Exception:
-        result = {
-            "input_ids": [torch.ones(2048, dtype=torch.int64)],
-            "token_type_ids": [torch.ones(2048, dtype=torch.int64)],
-            "attention_mask": [torch.ones(2048, dtype=torch.int64)],
-            "labels": [torch.ones(2048, dtype=torch.int64)],
-        }
-        return result
-    return result
+    final["labels"] = final["input_ids"].copy()
+    return final
 
 
 def tokenize_function(examples):
@@ -82,13 +97,23 @@ def process_dataset(
     dataset, train_config, process_batch_sizes: tuple, is_eval=False, assay=True
 ):
     if assay:
-        lm_datasets = dataset.map(
-            generate_assay_docs,
-            batched=True,
-            fn_kwargs={"train_config": train_config},
-            remove_columns=["text"],
-            batch_size=1,
-        )
+        if is_eval:
+            lm_datasets = dataset.map(
+                generate_assay_docs,
+                batched=True,
+                fn_kwargs={"train_config": train_config},
+                remove_columns=["text"],
+                batch_size=30,
+                num_proc=4,
+            )
+        else:
+            lm_datasets = dataset.map(
+                generate_assay_docs,
+                batched=True,
+                fn_kwargs={"train_config": train_config},
+                remove_columns=["text"],
+                batch_size=30,
+            )
     else:
         if is_eval:
             dataset = dataset.map(process_str, num_proc=8)

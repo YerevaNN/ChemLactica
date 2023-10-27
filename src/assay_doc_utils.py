@@ -1,5 +1,7 @@
 import random
-import pickle
+
+# import traceback
+# import pickle
 import json
 import argparse
 import time
@@ -41,6 +43,21 @@ def evenly_remove_elements_from_lists(lists, total_elements_to_remove):
     return lists
 
 
+def sp_remove_from_all_values(dict_type, num_to_remove):
+    num_to_remove = num_to_remove + 1
+    for key, value in dict_type.items():
+        dict_type[key] = torch.cat(
+            (value[:-num_to_remove], value[-1].unsqueeze(0)), dim=0
+        )
+        # dict_type[key] = value[: -(num_to_remove + 1)] + [value[-1]]
+    return dict_type
+
+
+def sp_evenly_remove_elements_from_lists(lists, total_elements_to_remove):
+    lists[-1] = sp_remove_from_all_values(lists[-1], total_elements_to_remove)
+    return lists
+
+
 def remove_big_assays(assays):
     return [assay for assay in assays if len(assay["description"]) <= 2500]
 
@@ -58,9 +75,6 @@ def extend_be(base_be, new_be):
 
 
 def combine_batch_encodings(document_content_dict, doc_start):
-    input_ids = torch.empty(0, dtype=torch.int64)
-    token_type_ids = torch.empty(0, dtype=torch.int64)
-    attention_mask = torch.empty(0, dtype=torch.int64)
     doc_be = BatchEncoding(
         {
             "input_ids": torch.empty(0, dtype=torch.int64),
@@ -93,6 +107,15 @@ def combine_batch_encodings(document_content_dict, doc_start):
                 doc_be = extend_be(doc_be, interest_list[i])
 
     for comp_prop in document_content_dict["computed"]:
+        if comp_prop["name"] == "SMILES" and (
+            get_num_be_tokens(comp_prop["value"]) + get_num_be_tokens(doc_be) > 2048
+        ):
+            final_diff = (
+                get_num_be_tokens(doc_be) + get_num_be_tokens(comp_prop["value"]) - 2048
+            )
+            doc_be["input_ids"] = doc_be["input_ids"][:-final_diff]
+            doc_be["token_type_ids"] = doc_be["token_type_ids"][:-final_diff]
+            doc_be["attention_mask"] = doc_be["attention_mask"][:-final_diff]
         doc_be = extend_be(doc_be, comp_prop["value"])
 
     input_ids = doc_be["input_ids"]
@@ -168,14 +191,12 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
     smiles = "[START_SMILES]" + json_data["SMILES"] + "[END_SMILES]"
     smiles_toks = modified_tokenizer_call(tokenizer, smiles)
     doc_start = modified_tokenizer_call(tokenizer, "</s>")
-
-    need_new_assay = True
     documents = {
         "input_ids": [],
         "token_type_ids": [],
         "attention_mask": [],
     }
-    wrong_count = 0
+    # wrong_count = 0
 
     # Loop until the compound has no more associated assays
     while sorted_assays:
@@ -186,6 +207,7 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
             "variables": [],
             "computed": [],
         }
+        incomplete_doc = None
         tok_ass_vars = []
         # document_content_dict["computed"].append({"name": "SMILES","value":smiles_toks})
         # doc_len += get_num_be_tokens(smiles_toks)
@@ -251,6 +273,7 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
                 continue
 
             # if current assay has no more data
+
             if not variables:
                 document_content_dict["variables"].append(tok_ass_vars)
                 tok_ass_vars = []
@@ -270,21 +293,104 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
         # check how many tokens to remove from description
         difference = (doc_len) - context_length
 
+        inc = False
+
+        if difference == 0:
+            inc = False
+            pass
+        elif difference < 0:
+            # print("hey")
+            inc = True
+            incomplete_doc = {
+                "doc_dic": document_content_dict,
+                "doc_len": doc_len,
+                "doc_smiles": smiles,
+            }
+
         if difference > 0:
+            inc = False
             document_content_dict["descriptions"] = evenly_remove_elements_from_lists(
                 document_content_dict["descriptions"], difference
             )
+        if not inc:
+            (
+                doc_input_ids,
+                doc_token_type_ids,
+                doc_attention_mask,
+            ) = combine_batch_encodings(document_content_dict, doc_start)
 
-        doc_input_ids, doc_token_type_ids, doc_attention_mask = combine_batch_encodings(
-            document_content_dict, doc_start
+            if len(doc_input_ids) == context_length:
+                documents["input_ids"].append(doc_input_ids)
+                documents["token_type_ids"].append(doc_token_type_ids)
+                documents["attention_mask"].append(doc_attention_mask)
+    return documents, incomplete_doc
+
+
+def process_incomplete_docs(incomplete_docs, tokenizer):
+    doc_start = modified_tokenizer_call(tokenizer, "</s>")
+    documents = {
+        "input_ids": [],
+        "token_type_ids": [],
+        "attention_mask": [],
+    }
+    while incomplete_docs:
+        new_doc_len = 0
+        doc_be = BatchEncoding(
+            {
+                "input_ids": torch.empty(0, dtype=torch.int64),
+                "token_type_ids": torch.empty(0, dtype=torch.int64),
+                "attention_mask": torch.empty(0, dtype=torch.int64),
+            }
         )
+        while True:
+            try:
+                incomplete_doc = incomplete_docs.pop()
+                new_doc_len += incomplete_doc["doc_len"]
+            except IndexError:
+                break
+            if new_doc_len < 2048:
+                input_ids, token_type_ids, attention_mask = combine_batch_encodings(
+                    incomplete_doc["doc_dic"], doc_start
+                )
+                doc_be = extend_be(
+                    doc_be,
+                    BatchEncoding(
+                        {
+                            "input_ids": input_ids,
+                            "token_type_ids": token_type_ids,
+                            "attention_mask": attention_mask,
+                        }
+                    ),
+                )  # noqa
+            elif new_doc_len >= 2048:
+                difference = new_doc_len - 2048
+                incomplete_doc["doc_dic"][
+                    "descriptions"
+                ] = sp_evenly_remove_elements_from_lists(
+                    incomplete_doc["doc_dic"]["descriptions"], difference
+                )
+                input_ids, token_type_ids, attention_mask = combine_batch_encodings(
+                    incomplete_doc["doc_dic"], doc_start
+                )
+                len(input_ids)
+                doc_be = extend_be(
+                    doc_be,
+                    BatchEncoding(
+                        {
+                            "input_ids": input_ids,
+                            "token_type_ids": token_type_ids,
+                            "attention_mask": attention_mask,
+                        }
+                    ),
+                )  # noqa
+                break
 
-        if len(doc_input_ids) == context_length:
-            documents["input_ids"].append(doc_input_ids)
-            documents["token_type_ids"].append(doc_token_type_ids)
-            documents["attention_mask"].append(doc_attention_mask)
-        else:
-            wrong_count += 1
+        if len(doc_be["input_ids"]) > 2048:
+            documents["input_ids"].append(doc_be["input_ids"][:2048])
+            documents["token_type_ids"].append(doc_be["token_type_ids"][:2048])
+            documents["attention_mask"].append(doc_be["attention_mask"][:2048])
+        # print(tokenizer.decode(doc_be["input_ids"]))
+        # print("doc made")
     return documents
 
 
@@ -295,7 +401,8 @@ def main(jsonl_file_path, tokenizer_id):
     seed_value = 42
     # wrong_count = 0
     random.seed(seed_value)
-    numbers_of_docs = []
+    # numbers_of_docs = []
+    incomplete_docs = []
 
     with open(jsonl_file_path, "r") as jsonl_file:
         for index, line in enumerate(jsonl_file):
@@ -303,22 +410,27 @@ def main(jsonl_file_path, tokenizer_id):
                 continue
             print(index)
             json_data = json.loads(json.loads(line))
-            try:
-                documents = get_compound_assay_docs(
-                    tokenizer, json_data, GALACTICA_CONTEXT_LENGTH
-                )
-            except Exception as e:
-                print(e)
-                continue
+            # try:
+            documents, incomplete_doc = get_compound_assay_docs(
+                tokenizer, json_data, GALACTICA_CONTEXT_LENGTH
+            )
+            if incomplete_doc:
+                incomplete_docs.append(incomplete_doc)
+            # except Exception as e:
+            # print(e)
+            # continue
             # print("num docs", len(documents["input_ids"]))
-            numbers_of_docs.append(len(documents["input_ids"]))
-            if index > 5000:
+            # numbers_of_docs.append(len(documents["input_ids"]))
+            if index > 10:
                 break
-        with open("numbers_of_docs.pkl", "wb") as file:
-            pickle.dump(numbers_of_docs, file)
+        # with open("numbers_of_docs.pkl", "wb") as file:
+        #     pickle.dump(numbers_of_docs, file)
         end = time.time()
         diff = end - start
         print("time elapsed", diff)
+        fixed_docs = process_incomplete_docs(incomplete_docs, tokenizer)
+        print(len(fixed_docs["input_ids"]))
+        print(len(fixed_docs["input_ids"][0]))
         # print(tokenizer.decode(documents["input_ids"][5]))
         # print("---------------------------")
         # print(tokenizer.decode(documents["input_ids"][6]))
