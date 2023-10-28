@@ -7,7 +7,11 @@ from contextlib import nullcontext
 
 import numpy
 import transformers
-from transformers import TrainingArguments, get_polynomial_decay_schedule_with_warmup, ProgressCallback
+from transformers import (
+    TrainingArguments,
+    get_polynomial_decay_schedule_with_warmup,
+    ProgressCallback,
+)
 from accelerate import Accelerator, logging
 from accelerate.utils import broadcast_object_list
 import torch
@@ -23,7 +27,7 @@ from callbacks import (
     EpochCallback,
     CustomProgressCallback,
     ReproducabilityCallback,
-    JsonlDatasetResumeCallback
+    JsonlDatasetResumeCallback,
 )
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
@@ -143,10 +147,15 @@ def train(
         shared_jsonl_files = None
         if accelerator.is_main_process:
             shared_jsonl_files = manager.dict()
-            trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback(shared_jsonl_files)
+            trainer_callback_dict[
+                "json_dataset_resume_callback"
+            ] = JsonlDatasetResumeCallback(shared_jsonl_files)
 
         checkpoints_dir = os.path.join(
-            checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
+            checkpoints_root_dir,
+            "facebook",
+            f"galactica-{model_config}",
+            experiment_hash,
         )
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
@@ -205,15 +214,17 @@ def train(
         #     streaming=True,
         # )
 
-        train_dataset = IterableDatasetDict({
-            "train": IterableDataset.from_generator(
-                samples_generator,
-                gen_kwargs={
-                    "files": training_data_files,
-                    "shared_jsonl_files": shared_jsonl_files
-                }
-            )
-        })
+        train_dataset = IterableDatasetDict(
+            {
+                "train": IterableDataset.from_generator(
+                    samples_generator,
+                    gen_kwargs={
+                        "files": training_data_files,
+                        "shared_jsonl_files": shared_jsonl_files,
+                    },
+                )
+            }
+        )
         eval_dataset = load_dataset(
             "text", data_files={"validation": valid_data_files}, streaming=False
         )
@@ -223,19 +234,23 @@ def train(
             train_config=train_config,
             process_batch_sizes=(50, 50),
             is_eval=False,
+            assay=True,
         )
         processed_eval_dataset = process_dataset(
             dataset=eval_dataset,
             train_config=train_config,
             process_batch_sizes=(50, 50),
             is_eval=True,
+            assay=True,
         )
+
+        shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=100000)
 
         trainer = CustomTrainer(
             model=model,
             args=training_args,
             compute_metrics=compute_metrics,
-            train_dataset=processed_train_dataset["train"],
+            train_dataset=shuffled_train_dataset["train"],
             eval_dataset=processed_eval_dataset["validation"],
             optimizers=[optimizer, lr_scheduler],
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
