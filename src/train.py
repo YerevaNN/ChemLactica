@@ -244,7 +244,7 @@ def train(
             assay=True,
         )
 
-        shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=100000)
+        shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=200000)
 
         trainer = CustomTrainer(
             model=model,
