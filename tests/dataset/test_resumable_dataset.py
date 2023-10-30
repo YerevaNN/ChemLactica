@@ -11,10 +11,6 @@ from datasets.iterable_dataset import IterableDataset
 from datasets.dataset_dict import IterableDatasetDict
 from transformers.trainer_utils import seed_worker
 
- # for relative imports
-SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..")
-sys.path.append(SRC_DIR)
-
 from jsonl_dataset import samples_generator
 
 

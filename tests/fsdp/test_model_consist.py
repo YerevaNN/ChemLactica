@@ -7,10 +7,6 @@ import shutil
 
 import torch
 
-# for relative imports
-PARENT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-sys.path.append(PARENT_DIR)
-
 from test_utils import create_train_command
 
 
@@ -63,7 +59,8 @@ class TestConsistencyOfModelOutput(unittest.TestCase):
         print(f"Running command: {command}")
         out = subprocess.run(command, shell=True, capture_output=True)
         if out.returncode != 0:
-            raise Exception(f"error: {out.stderr}")
+            print(f"error: {out.stderr}")
+            raise Exception()
 
 
 if __name__ == "__main__":
