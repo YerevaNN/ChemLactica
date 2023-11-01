@@ -59,8 +59,7 @@ class TestConsistencyOfModelOutput(unittest.TestCase):
         print(f"Running command: {command}")
         out = subprocess.run(command, shell=True, capture_output=True)
         if out.returncode != 0:
-            print(f"error: {out.stderr}")
-            raise Exception()
+            raise Exception(out.stderr.decode())
 
 
 if __name__ == "__main__":
