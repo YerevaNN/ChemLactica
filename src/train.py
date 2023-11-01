@@ -1,4 +1,5 @@
 import os
+import traceback
 import argparse
 import random
 import glob
@@ -7,7 +8,11 @@ from contextlib import nullcontext
 
 import numpy
 import transformers
-from transformers import TrainingArguments, get_polynomial_decay_schedule_with_warmup, ProgressCallback
+from transformers import (
+    TrainingArguments,
+    get_polynomial_decay_schedule_with_warmup,
+    ProgressCallback,
+)
 from accelerate import Accelerator, logging
 from accelerate.utils import broadcast_object_list
 import torch
@@ -23,7 +28,7 @@ from callbacks import (
     EpochCallback,
     CustomProgressCallback,
     ReproducabilityCallback,
-    JsonlDatasetResumeCallback
+    JsonlDatasetResumeCallback,
 )
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
@@ -58,7 +63,7 @@ def train(
     check_reproducability=False,
     valid_batch_size=None,
     profile=False,
-    profile_dir=None
+    profile_dir=None,
 ):
     transformers.logging.set_verbosity_info()
     transformers.utils.logging.enable_explicit_format()
@@ -67,7 +72,9 @@ def train(
 
     train_config = model_train_configs[model_config]
 
-    model = load_model(from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config)
+    model = load_model(
+        from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config
+    )
     model.resize_token_embeddings(
         train_config["vocab_size"] + len(chemlactica_special_tokens)
     )
@@ -132,17 +139,24 @@ def train(
 
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     if check_reproducability:
-        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(accelerator, model_config, use_flash_attn)
+        trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
+            accelerator, model_config, use_flash_attn
+        )
     trainer_callback_dict["progress_callback"] = CustomProgressCallback()
 
     with multiprocessing.Manager() if accelerator.is_main_process else nullcontext() as manager:
         shared_jsonl_files = None
         if accelerator.is_main_process:
             shared_jsonl_files = manager.dict()
-            trainer_callback_dict["json_dataset_resume_callback"] = JsonlDatasetResumeCallback(shared_jsonl_files)
+            trainer_callback_dict[
+                "json_dataset_resume_callback"
+            ] = JsonlDatasetResumeCallback(shared_jsonl_files)
 
         checkpoints_dir = os.path.join(
-            checkpoints_root_dir, "facebook", f"galactica-{model_config}", experiment_hash
+            checkpoints_root_dir,
+            "facebook",
+            f"galactica-{model_config}",
+            experiment_hash,
         )
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
@@ -201,15 +215,17 @@ def train(
         #     streaming=True,
         # )
 
-        train_dataset = IterableDatasetDict({
-            "train": IterableDataset.from_generator(
-                samples_generator,
-                gen_kwargs={
-                    "files": training_data_files,
-                    "shared_jsonl_files": shared_jsonl_files
-                }
-            )
-        })
+        train_dataset = IterableDatasetDict(
+            {
+                "train": IterableDataset.from_generator(
+                    samples_generator,
+                    gen_kwargs={
+                        "files": training_data_files,
+                        "shared_jsonl_files": shared_jsonl_files,
+                    },
+                )
+            }
+        )
         eval_dataset = load_dataset(
             "text", data_files={"validation": valid_data_files}, streaming=False
         )
@@ -247,7 +263,15 @@ def train(
         )
 
         with prof_context_manager as prof:
-            trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+            try:
+                trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+            except Exception as e:
+                traceback_info = traceback.format_exc()
+                logger.error(e, traceback_info)
+            except KeyboardInterrupt:
+                logger.warning()
+                if manager is not None:
+                    manager.shutdown()
 
 
 if __name__ == "__main__":
