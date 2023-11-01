@@ -70,7 +70,7 @@ class TestDataloader(unittest.TestCase):
             shared_jsonl_files = manager.dict()
             training_data_files = glob.glob(training_data_dir + "/*.jsonl")
             # combine small train and valid to have 2 files to test
-            training_data_files.extend(glob.glob(valid_data_dir + "/*.jsonl"))
+            # training_data_files.extend(glob.glob(valid_data_dir + "/*.jsonl"))
 
             initial_train_dataset = IterableDatasetDict({
                 "train": IterableDataset.from_generator(
@@ -111,16 +111,17 @@ class TestDataloader(unittest.TestCase):
                 for text, file, line_number in zip(
                                         samples["text"],
                                         samples["line_info"]["file"],
-                                        samples["line_info"]["line_number"]
+                                        samples["line_info"]["line_number"].tolist()
                                     ):
                     # check if the line matches with what is actually in the file
                     assert loaded_files[file][line_number - 1]["text"] == text
-                    # assert not loaded_files[file][line_number - 1]["is_read"]
+                    assert not loaded_files[file][line_number - 1]["is_read"]
                     loaded_files[file][line_number - 1]["is_read"] = True
                     print(f'{file} {line_number} passed')
                 if i == sample_to_pass:
                     break
 
+            fixed_shared_jsonl_files = {k: v for k, v in shared_jsonl_files.items()}
             resumed_train_dataset = IterableDatasetDict({
                 "train": IterableDataset.from_generator(
                     samples_generator,
@@ -140,10 +141,11 @@ class TestDataloader(unittest.TestCase):
                 for text, file, line_number in zip(
                                         samples["text"],
                                         samples["line_info"]["file"],
-                                        samples["line_info"]["line_number"]
+                                        samples["line_info"]["line_number"].tolist()
                                     ):
                     # check if the line matches with what is actually in the file
                     assert loaded_files[file][line_number - 1]["text"] == text
+                    assert fixed_shared_jsonl_files[file]["line_number"] < line_number
                     # assert not loaded_files[file][line_number - 1]["is_read"]
                     loaded_files[file][line_number - 1]["is_read"] = True
                     print(f'{file} {line_number} passed')
