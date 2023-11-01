@@ -58,9 +58,9 @@ if __name__ == "__main__":
     run = args.run
     confirm = args.confirm
     gpus = args.gpus
-    git_commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
-    assert git_commit_hash
     if run:
+        git_commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
+        assert git_commit_hash
         os.environ["CUDA_VISIBLE_DEVICES"] = gpus
         print(f"NOTE: Using GPU(s) '{gpus}' for testing.")
         loader = unittest.TestLoader()
@@ -73,6 +73,8 @@ if __name__ == "__main__":
             status = "FAIL"
         write_test_status(git_commit_hash, status=status)
     elif confirm:
+        git_commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD~1']).decode().strip()
+        assert git_commit_hash
         status = read_test_status(git_commit_hash)  
         if status == "FAIL":
             raise Exception(f"Commit '{git_commit_hash}' failed.")
