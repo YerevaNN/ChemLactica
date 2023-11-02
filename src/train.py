@@ -1,11 +1,11 @@
 import os
+import signal
 import traceback
 import argparse
 import random
 import glob
 import multiprocessing
 from contextlib import nullcontext
-
 import numpy
 import transformers
 from transformers import (
@@ -32,7 +32,7 @@ from callbacks import (
 )
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils import chemlactica_special_tokens
+from utils import chemlactica_special_tokens, signal_handler
 from model_utils import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
@@ -42,6 +42,9 @@ torch.manual_seed(42)
 random.seed(42)
 numpy.random.seed(42)
 logger = logging.get_logger("transformers")
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 def train(
@@ -269,9 +272,8 @@ def train(
                 traceback_info = traceback.format_exc()
                 logger.error(e, traceback_info)
             except KeyboardInterrupt:
-                logger.warning()
-                if manager is not None:
-                    manager.shutdown()
+                with accelerator.main_process_first():
+                    logger.error("KeyboardInterrupt")
 
 
 if __name__ == "__main__":

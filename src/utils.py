@@ -1,11 +1,5 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from transformers.models.opt.modeling_opt import OPTForCausalLM
-import transformers
-import torch.nn as nn
 import os
-from transformers import OPTModel
-
+from transformers import AutoTokenizer
 
 chemlactica_special_tokens = [
     "[SYNONYM ",
@@ -70,6 +64,15 @@ def create_tokenizer():
     #     CustomTokenizer.chemlactica_special_tokens
     # )
     return tok
+
+
+class ForcedStop(RuntimeError):
+    def __init__(self, message="Forced stop occurred"):
+        super().__init__(message)
+
+
+def signal_handler(sig, frame):
+    raise ForcedStop
 
 
 if __name__ == "__main__":
