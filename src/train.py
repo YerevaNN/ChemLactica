@@ -1,5 +1,6 @@
 import os
 import argparse
+from datetime import timedelta
 import random
 import glob
 import multiprocessing
@@ -12,7 +13,7 @@ from transformers import (
     get_polynomial_decay_schedule_with_warmup,
     ProgressCallback,
 )
-from accelerate import Accelerator, logging
+from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
 import torch
 from torch.optim import AdamW
@@ -66,6 +67,9 @@ def train(
 ):
     transformers.logging.set_verbosity_info()
     transformers.utils.logging.enable_explicit_format()
+
+    kwargs = InitProcessGroupKwargs(timeout=timedelta(seconds=3600))
+    accelerator = Accelerator(kwargs_handlers=[kwargs])
 
     accelerator = Accelerator(log_with="all", project_dir=track_dir)
 
