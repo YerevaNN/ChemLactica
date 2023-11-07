@@ -15,3 +15,5 @@ for key in model_train_configs.keys():
 model_train_configs["1.3b"]["warmup_steps"] = 2000
 model_train_configs["1.3b"]["max_learning_rate"] = 1.0e-5
 model_train_configs["1.3b"]["global_gradient_norm"] = 0.1
+
+model_train_configs["125m"]["max_learning_rate"] = 5.0e-4
