@@ -23,8 +23,28 @@ def get_num_be_tokens(tokenized):
     return result
 
 
+def create_var_sub_tag(var_object, string_key, open_tag, close_tag):
+    if var_object[string_key] != "":
+        tagged_component = f"{open_tag}{var_object[string_key]}{close_tag}"
+    else:
+        tagged_component = ""
+    return tagged_component
+
+
 def add_var_str(var_object):
-    var_text = f"""[VAR_NAME]{var_object['name']}[/VAR_NAME][VAR_DESC]{var_object['description']}[/VAR_DESC][VAR_VAL]{var_object['value']}[/VAR_VAL]"""  # noqa
+    name_tag_component = create_var_sub_tag(
+        var_object, "name", "[VAR_NAME]", "[/VAR_NAME]"
+    )
+    desc_tag_component = create_var_sub_tag(
+        var_object, "description", "[VAR_DESC]", "[/VAR_DESC]"
+    )
+    val_tag_component = create_var_sub_tag(
+        var_object, "value", "[VAR_VAL]", "[/VAR_VAL]"
+    )
+    unit_tag_component = create_var_sub_tag(
+        var_object, "unit", "[VAR_UNIT]", "[/VAR_UNIT]"
+    )
+    var_text = f"""{name_tag_component}{desc_tag_component}{unit_tag_component}{val_tag_component}"""  # noqa
     return var_text
 
 
@@ -405,7 +425,7 @@ def main(jsonl_file_path, tokenizer_id):
 
     with open(jsonl_file_path, "r") as jsonl_file:
         for index, line in enumerate(jsonl_file):
-            if index < 0:
+            if index < 9:
                 continue
             print(index)
             json_data = json.loads(json.loads(line))
@@ -429,8 +449,8 @@ def main(jsonl_file_path, tokenizer_id):
         print("time elapsed", diff)
         fixed_docs = process_incomplete_docs(incomplete_docs, tokenizer)
         print(len(fixed_docs["input_ids"]))
-        print(len(fixed_docs["input_ids"][0]))
-        # print(tokenizer.decode(documents["input_ids"][5]))
+        # print(len(fixed_docs["input_ids"][0]))
+        print(tokenizer.decode(fixed_docs["input_ids"][0]))
         # print("---------------------------")
         # print(tokenizer.decode(documents["input_ids"][6]))
         # print("----------------------------")
