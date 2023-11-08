@@ -49,7 +49,16 @@ jobs:
           echo "Not in a Git repository."
           exit 1  # You can fail the workflow if not in a Git repository
         fi
-
+    - name: Setup Environment (PR)
+      if: ${{ github.event_name == 'pull_request' }}
+      shell: bash
+      run: |
+        echo "LAST_COMMIT_SHA=${{ github.event.pull_request.head.sha }}" >> ${GITHUB_ENV}
+    - name: Setup Environment (Push)
+      if: ${{ github.event_name == 'push' }}
+      shell: bash
+      run: |
+        echo "LAST_COMMIT_SHA=${GITHUB_SHA}" >> ${GITHUB_ENV}
     - name: Run unittests
       shell: bash -l {0}
       run: |
