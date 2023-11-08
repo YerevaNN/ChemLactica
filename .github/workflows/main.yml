@@ -37,7 +37,7 @@ jobs:
        pip3 install transformers==4.31.0
        pip3 install accelerate==0.21.0
        pip3 install aim==3.17.5
-       pip3 install yaml
+       pip3 install pyyaml
 
     - name: Run unittests
       shell: bash -l {0}
