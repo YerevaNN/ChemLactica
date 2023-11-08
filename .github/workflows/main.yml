@@ -42,4 +42,4 @@ jobs:
       shell: bash -l {0}
       run: |
         conda activate cl11.7
-        python3 confirm_test.py --confirm
+        python3 confirm_tests.py --confirm
