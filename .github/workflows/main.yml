@@ -27,6 +27,7 @@ jobs:
       shell: bash -l {0}
       run: |
        conda create --name cl11.7 python=3.10
+       conda activate cl11.7
        conda install pytorch=2.0.1 pytorch-cuda=11.7 -c pytorch -c nvidia --solver libmamba
        conda install -c conda-forge cudatoolkit-dev==11.7 --solver libmamba
        nvcc --version
