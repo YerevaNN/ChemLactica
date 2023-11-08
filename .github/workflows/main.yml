@@ -28,17 +28,27 @@ jobs:
       run: |
        conda create --name cl11.7 python=3.10
        conda activate cl11.7
-       conda install pytorch=2.0.1 pytorch-cuda=11.7 -c pytorch -c nvidia --solver libmamba
-       conda install -c conda-forge cudatoolkit-dev==11.7 --solver libmamba
-       nvcc --version
-       pip3 install packaging
-       pip3 install ninja
-       pip3 install flash-attn --no-build-isolation
-       pip3 install --upgrade datasets # the latest version is installed
-       pip3 install transformers==4.31.0
-       pip3 install accelerate==0.21.0
-       pip3 install aim==3.17.5
+       # conda install pytorch=2.0.1 pytorch-cuda=11.7 -c pytorch -c nvidia --solver libmamba
+       # conda install -c conda-forge cudatoolkit-dev==11.7 --solver libmamba
+       # nvcc --version
+       # pip3 install packaging
+       # pip3 install ninja
+       # pip3 install flash-attn --no-build-isolation
+       # pip3 install --upgrade datasets # the latest version is installed
+       # pip3 install transformers==4.31.0
+       # pip3 install accelerate==0.21.0
+       # pip3 install aim==3.17.5
        pip3 install pyyaml
+    - name: Check git status
+      shell: bash -l {0}
+      run: |
+        if git status &> /dev/null; then
+          echo "In a Git repository."
+          git status
+        else
+          echo "Not in a Git repository."
+          exit 1  # You can fail the workflow if not in a Git repository
+        fi
 
     - name: Run unittests
       shell: bash -l {0}
