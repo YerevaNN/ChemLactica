@@ -23,9 +23,23 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        environment-file: environment.yml
-        activate-environment: testenv
+    - name: Create Conda Environment
+      shell: bash -l {0}
+      run: |
+       conda create --name cl11.7 python=3.10
+       conda install pytorch=2.0.1 pytorch-cuda=11.7 -c pytorch -c nvidia --solver libmamba
+       conda install -c conda-forge cudatoolkit-dev==11.7 --solver libmamba
+       nvcc --version
+       pip3 install packaging
+       pip3 install ninja
+       pip3 install flash-attn --no-build-isolation
+       pip3 install --upgrade datasets # the latest version is installed
+       pip3 install transformers==4.31.0
+       pip3 install accelerate==0.21.0
+       pip3 install aim==3.17.5
 
     - name: Run unittests
       shell: bash -l {0}
-      run: python3 confirm_test.py --confirm
+      run:
+        conda activate cl11.7
+        python3 confirm_test.py --confirm
