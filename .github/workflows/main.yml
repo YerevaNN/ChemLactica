@@ -40,6 +40,6 @@ jobs:
 
     - name: Run unittests
       shell: bash -l {0}
-      run:
+      run: |
         conda activate cl11.7
         python3 confirm_test.py --confirm
