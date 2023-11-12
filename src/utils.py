@@ -33,6 +33,7 @@ chemlactica_special_start_tokens = [
     "[IUPAC]",
     "[VAR_NAME]",
     "[VAR_DESC]",
+    "[VAR_UNIT]",
     "[VAR_VAL]",
     "[ASSAY_NAME]",
     "[ASSAY_DESC]",
@@ -47,19 +48,20 @@ chemlactica_special_tokens = (
 )
 
 
-def get_tokenizer():
+def get_tokenizer(tokenizer_id):
     if getattr(get_tokenizer, "first_call", True):
-        setattr(get_tokenizer, "tokenizer", create_tokenizer())
+        setattr(get_tokenizer, "tokenizer", create_tokenizer(tokenizer_id))
         setattr(get_tokenizer, "first_call", False)
         print(f"Process {os.getpid()} created a tokenizer")
 
     return get_tokenizer.tokenizer
 
 
-def create_tokenizer():
+def create_tokenizer(tokenizer_id):
     tok = AutoTokenizer.from_pretrained(
         # f"facebook/galactica-125m"
-        "src/tokenizer/ChemLacticaTokenizer"
+        tokenizer_id
+        # "src/tokenizer/ChemLacticaTokenizer"
         # "src/tokenizer/galactica-125m"
     )
     bos_token = "<s>"
@@ -75,7 +77,7 @@ def create_tokenizer():
     tok.eos_token = eos_token
     tok.eos_token_id = eos_token_id
     # tok.add_tokens(
-    #     CustomTokenizer.chemlactica_special_tokens
+    #     chemlactica_special_tokens
     # )
     return tok
 
@@ -83,17 +85,16 @@ def create_tokenizer():
 if __name__ == "__main__":
     import glob
 
-    # from utils import CustomTokenizer
     from config.create_train_config import model_train_configs
     from datasets import load_dataset
     from dataset_utils import process_dataset
 
-    train_config = model_train_configs["125m"]
-    train_config["block_size"] = 2048
+    train_config = model_train_configs["mistral7b"]
+    tokenizer = get_tokenizer("mistralai/Mistral-7B-v0.1")
 
     # CustomTokenizer.set_model_size("125m")
     # tokenizer = CustomTokenizer.get_instance()
-    # tokenizer.save_pretrained("ChemLacticaTokenizer")
+    tokenizer.save_pretrained("Mistral-7B-v0.1Tokenizer")
     training_data_dir = ".small_data/valid"
 
     # training_data_files = glob.glob(training_data_dir + "/xae_shuf.jsonl")
@@ -109,7 +110,7 @@ if __name__ == "__main__":
         dataset=dataset, train_config=train_config, process_batch_sizes=(50, 50)
     )
 
-    sample = next(iter(processed_dataset["train"]))
+    # sample = next(iter(processed_dataset["train"]))
     prompt = "[START_SMILES] CCCCN [END_SMILES][CLOGP 0.00][SAS 123][QED]"
     # print(tokenizer.decode(sample["input_ids"]))
     # print(*sample["input_ids"].numpy())
