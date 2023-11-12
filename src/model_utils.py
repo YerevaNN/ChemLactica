@@ -1,8 +1,12 @@
 from transformers import OPTForCausalLM, OPTConfig
+import torch
+from transformers import MistralForCausalLM
 from custom_modeling_opt import CustomOPTForCausalLM
 
 
-def load_model(from_pretrained: str, use_flash_attn=False, dtype=None, train_config=None):
+def load_model(
+    from_pretrained: str, use_flash_attn=False, dtype=None, train_config=None
+):
     if from_pretrained == "small_opt":
         return OPTForCausalLM(
             OPTConfig(
@@ -15,7 +19,14 @@ def load_model(from_pretrained: str, use_flash_attn=False, dtype=None, train_con
                 word_embed_proj_dim=train_config["word_sembed_proj_dim"],
             )
         )
-    model = CustomOPTForCausalLM.from_pretrained(
-        from_pretrained, use_flash_attn=use_flash_attn, torch_dtype=dtype
-    )
+    if "galactica" in from_pretrained.lower():
+        model = CustomOPTForCausalLM.from_pretrained(
+            from_pretrained, use_flash_attn=use_flash_attn, torch_dtype=dtype
+        )
+    if "mistral" in from_pretrained.lower():
+        model = MistralForCausalLM.from_pretrained(
+            from_pretrained,
+            use_flash_attention_2=use_flash_attn,
+            torch_dtype=torch.bfloat16,
+        )
     return model
