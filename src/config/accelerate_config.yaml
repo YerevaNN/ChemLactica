@@ -7,12 +7,12 @@ fsdp_config:
   fsdp_offload_params: false
   fsdp_sharding_strategy: 1
   fsdp_state_dict_type: FULL_STATE_DICT
-  fsdp_transformer_layer_cls_to_wrap: CustomOPTForCausalLM
+  fsdp_transformer_layer_cls_to_wrap: MistralForCausalLM
 machine_rank: 0
 main_training_function: main
 mixed_precision: bf16
 num_machines: 1
-num_processes: 4
+num_processes: 8
 rdzv_backend: static
 same_network: true
 tpu_env: []

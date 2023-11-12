@@ -65,3 +65,26 @@ small_opt:
   warmup_steps: 500
   weight_decay: 0.1
   word_embed_proj_dim: 16
+mistral7b:
+  vocab_size: 32000
+  hidden_size: 4096
+  block_size: 4096
+  intermediate_size: 14336
+  num_hidden_layers: 32
+  num_attention_heads: 32
+  num_key_value_heads: 8
+  hidden_act: 'silu'
+  max_position_embeddings: 131072
+  initializer_range: 0.02
+  rms_norm_eps: 1.0e-6
+  use_cache: True
+  pad_token_id: None
+  bos_token_id: 1
+  eos_token_id: 2
+  tie_word_embeddings: False
+  rope_theta: 10000.0
+  sliding_windows: 4096
+  global_gradient_norm: 1.0
+  weight_decay: 0.1
+  adam_beta1: 0.9
+  adam_beta2: 0.95
