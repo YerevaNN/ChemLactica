@@ -7,8 +7,8 @@ from assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
 
 
 def generate_assay_docs(examples, train_config):
-    tokenizer = get_tokenizer()
-    GALACTICA_CONTEXT_LENGTH = train_config["block_size"]
+    tokenizer = get_tokenizer(train_config["tokenizer_id"])
+    MODEL_CONTEXT_LENGTH = train_config["block_size"]
     final = {
         "input_ids": [],
         "token_type_ids": [],
@@ -19,7 +19,7 @@ def generate_assay_docs(examples, train_config):
         try:
             compound = json.loads(json.loads(compound_str))
             result, incomplete_doc = get_compound_assay_docs(
-                tokenizer, compound, GALACTICA_CONTEXT_LENGTH
+                tokenizer, compound, MODEL_CONTEXT_LENGTH
             )
             if incomplete_doc:
                 incomplete_docs.append(incomplete_doc)
@@ -30,7 +30,9 @@ def generate_assay_docs(examples, train_config):
             final["attention_mask"].extend(result["attention_mask"])
         except Exception:
             continue
-    patched_documents = process_incomplete_docs(incomplete_docs, tokenizer)
+    patched_documents = process_incomplete_docs(
+        incomplete_docs, tokenizer, MODEL_CONTEXT_LENGTH
+    )
     final["input_ids"].extend(patched_documents["input_ids"])
     final["token_type_ids"].extend(patched_documents["token_type_ids"])
     final["attention_mask"].extend(patched_documents["attention_mask"])

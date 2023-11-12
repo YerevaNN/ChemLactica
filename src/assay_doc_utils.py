@@ -94,7 +94,7 @@ def extend_be(base_be, new_be):
     return base_be
 
 
-def combine_batch_encodings(document_content_dict, doc_start):
+def combine_batch_encodings(document_content_dict, doc_start, model_context_length):
     doc_be = BatchEncoding(
         {
             "input_ids": torch.empty(0, dtype=torch.int64),
@@ -128,10 +128,13 @@ def combine_batch_encodings(document_content_dict, doc_start):
 
     for comp_prop in document_content_dict["computed"]:
         if comp_prop["name"] == "SMILES" and (
-            get_num_be_tokens(comp_prop["value"]) + get_num_be_tokens(doc_be) > 2048
+            get_num_be_tokens(comp_prop["value"]) + get_num_be_tokens(doc_be)
+            > model_context_length
         ):
             final_diff = (
-                get_num_be_tokens(doc_be) + get_num_be_tokens(comp_prop["value"]) - 2048
+                get_num_be_tokens(doc_be)
+                + get_num_be_tokens(comp_prop["value"])
+                - model_context_length
             )
             doc_be["input_ids"] = doc_be["input_ids"][:-final_diff]
             doc_be["token_type_ids"] = doc_be["token_type_ids"][:-final_diff]
@@ -142,7 +145,11 @@ def combine_batch_encodings(document_content_dict, doc_start):
     token_type_ids = doc_be["token_type_ids"]
     attention_mask = doc_be["attention_mask"]
 
-    return input_ids[:2048], token_type_ids[:2048], attention_mask[:2048]
+    return (
+        input_ids[:model_context_length],
+        token_type_ids[:model_context_length],
+        attention_mask[:model_context_length],
+    )
 
 
 def create_assay_base(tokenizer, assay):
@@ -204,7 +211,7 @@ def extract_data_from_json(json_data, tokenizer):
     return sorted_assays, computed_dict
 
 
-def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
+def get_compound_assay_docs(tokenizer, json_data, model_context_length):
     need_new_assay = True
     # Parse the compound associated data from the current line
     sorted_assays, computed_dict = extract_data_from_json(json_data, tokenizer)
@@ -234,7 +241,7 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
 
         # loop until we fill full context
         doc_len += get_num_be_tokens(doc_start)
-        while (doc_len) < context_length:
+        while (doc_len) < model_context_length:
             if doc_len == get_num_be_tokens(doc_start):
                 document_content_dict["computed"].append(
                     {"name": "SMILES", "value": smiles_toks}
@@ -259,8 +266,8 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
                 if computed_dict and not doc_len == get_num_be_tokens(
                     doc_start
                 ) + get_num_be_tokens(smiles_toks):
-                    if (ass_name_len + ass_desc_len + doc_len) > context_length:
-                        diff = context_length - (doc_len)
+                    if (ass_name_len + ass_desc_len + doc_len) > model_context_length:
+                        diff = model_context_length - (doc_len)
                         while diff > 0:
                             try:
                                 random_key = random.choice(list(computed_dict.keys()))
@@ -311,7 +318,7 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
             document_content_dict["variables"].append(tok_ass_vars)
 
         # check how many tokens to remove from description
-        difference = (doc_len) - context_length
+        difference = (doc_len) - model_context_length
 
         inc = False
 
@@ -336,16 +343,18 @@ def get_compound_assay_docs(tokenizer, json_data, context_length=2048):
                 doc_input_ids,
                 doc_token_type_ids,
                 doc_attention_mask,
-            ) = combine_batch_encodings(document_content_dict, doc_start)
+            ) = combine_batch_encodings(
+                document_content_dict, doc_start, model_context_length
+            )
 
-            if len(doc_input_ids) == context_length:
+            if len(doc_input_ids) == model_context_length:
                 documents["input_ids"].append(doc_input_ids)
                 documents["token_type_ids"].append(doc_token_type_ids)
                 documents["attention_mask"].append(doc_attention_mask)
     return documents, incomplete_doc
 
 
-def process_incomplete_docs(incomplete_docs, tokenizer):
+def process_incomplete_docs(incomplete_docs, tokenizer, model_context_length):
     doc_start = modified_tokenizer_call(tokenizer, "</s>")
     documents = {
         "input_ids": [],
@@ -367,9 +376,9 @@ def process_incomplete_docs(incomplete_docs, tokenizer):
                 new_doc_len += incomplete_doc["doc_len"]
             except IndexError:
                 break
-            if new_doc_len < 2048:
+            if new_doc_len < model_context_length:
                 input_ids, token_type_ids, attention_mask = combine_batch_encodings(
-                    incomplete_doc["doc_dic"], doc_start
+                    incomplete_doc["doc_dic"], doc_start, model_context_length
                 )
                 doc_be = extend_be(
                     doc_be,
@@ -381,15 +390,15 @@ def process_incomplete_docs(incomplete_docs, tokenizer):
                         }
                     ),
                 )  # noqa
-            elif new_doc_len >= 2048:
-                difference = new_doc_len - 2048
+            elif new_doc_len >= model_context_length:
+                difference = new_doc_len - model_context_length
                 incomplete_doc["doc_dic"][
                     "descriptions"
                 ] = sp_evenly_remove_elements_from_lists(
                     incomplete_doc["doc_dic"]["descriptions"], difference
                 )
                 input_ids, token_type_ids, attention_mask = combine_batch_encodings(
-                    incomplete_doc["doc_dic"], doc_start
+                    incomplete_doc["doc_dic"], doc_start, model_context_length
                 )
                 len(input_ids)
                 doc_be = extend_be(
@@ -404,10 +413,14 @@ def process_incomplete_docs(incomplete_docs, tokenizer):
                 )  # noqa
                 break
 
-        if len(doc_be["input_ids"]) > 2048:
-            documents["input_ids"].append(doc_be["input_ids"][:2048])
-            documents["token_type_ids"].append(doc_be["token_type_ids"][:2048])
-            documents["attention_mask"].append(doc_be["attention_mask"][:2048])
+        if len(doc_be["input_ids"]) > model_context_length:
+            documents["input_ids"].append(doc_be["input_ids"][:model_context_length])
+            documents["token_type_ids"].append(
+                doc_be["token_type_ids"][:model_context_length]
+            )
+            documents["attention_mask"].append(
+                doc_be["attention_mask"][:model_context_length]
+            )
         # print(tokenizer.decode(doc_be["input_ids"]))
         # print("doc made")
     return documents
