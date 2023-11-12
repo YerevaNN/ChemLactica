@@ -174,7 +174,7 @@ def train(
             optimizer,
             num_warmup_steps=train_config["warmup_steps"],
             num_training_steps=max_steps,
-            lr_end=0.1 * train_config["max_learning_rate"],
+            lr_end=0.0 * train_config["max_learning_rate"],
             power=1.0,
         )
 
