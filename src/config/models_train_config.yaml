@@ -67,8 +67,8 @@ small_opt:
   word_embed_proj_dim: 16
 mistral7b:
   vocab_size: 32000
+  block_size: 2048
   hidden_size: 4096
-  block_size: 4096
   intermediate_size: 14336
   num_hidden_layers: 32
   num_attention_heads: 32
@@ -83,7 +83,7 @@ mistral7b:
   eos_token_id: 2
   tie_word_embeddings: False
   rope_theta: 10000.0
-  sliding_windows: 4096
+  sliding_windows: 1024
   global_gradient_norm: 1.0
   weight_decay: 0.1
   adam_beta1: 0.9
