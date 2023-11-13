@@ -9,6 +9,7 @@ from contextlib import nullcontext
 import numpy
 import transformers
 from transformers import (
+    # Trainer,
     TrainingArguments,
     get_polynomial_decay_schedule_with_warmup,
     ProgressCallback,
@@ -79,7 +80,8 @@ def train(
         from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config
     )
     model.resize_token_embeddings(
-        train_config["vocab_size"] + len(chemlactica_special_tokens)
+        train_config["vocab_size"] + len(chemlactica_special_tokens),
+        pad_to_multiple_of=8,
     )
 
     trainer_callback_dict = {}
@@ -157,8 +159,8 @@ def train(
 
         checkpoints_dir = os.path.join(
             checkpoints_root_dir,
-            "facebook",
-            f"galactica-{model_config}",
+            "mistralai",
+            "Mistral-7B-v0.1",
             experiment_hash,
         )
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
@@ -268,6 +270,7 @@ def train(
             if trainer_callback_dict.get("profiller_callback") is not None
             else nullcontext()
         )
+        torch.cuda.empty_cache()
 
         with prof_context_manager as prof:
             trainer.train(resume_from_checkpoint=resume_from_checkpoint)
