@@ -10,7 +10,7 @@ import transformers
 from transformers import (
     TrainingArguments,
     get_polynomial_decay_schedule_with_warmup,
-    ProgressCallback,
+    ProgressCallback
 )
 from accelerate import Accelerator, logging
 from accelerate.utils import broadcast_object_list
@@ -32,7 +32,7 @@ from callbacks import (
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from utils import chemlactica_special_tokens
-from model_utils import load_model
+from model_utils import load_model, load_model_from_config
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
 from jsonl_dataset import samples_generator
@@ -71,8 +71,11 @@ def train(
 
     train_config = model_train_configs[model_config]
 
-    model = load_model(
-        from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config
+    # model = load_model(
+    #     from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config
+    # )
+    model = load_model_from_config(
+        from_pretrained, use_flash_attn=use_flash_attn
     )
     model.resize_token_embeddings(
         train_config["vocab_size"] + len(chemlactica_special_tokens)

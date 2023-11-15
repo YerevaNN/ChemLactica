@@ -1,4 +1,4 @@
-from transformers import OPTForCausalLM, OPTConfig
+from transformers import OPTForCausalLM, OPTConfig, AutoConfig
 from custom_modeling_opt import CustomOPTForCausalLM
 
 
@@ -17,5 +17,13 @@ def load_model(from_pretrained: str, use_flash_attn=False, dtype=None, train_con
         )
     model = CustomOPTForCausalLM.from_pretrained(
         from_pretrained, use_flash_attn=use_flash_attn, torch_dtype=dtype
+    )
+    return model
+
+
+def load_model_from_config(from_pretrained, use_flash_attn=False):
+    model_config = AutoConfig.from_pretrained(from_pretrained)
+    model = CustomOPTForCausalLM(
+        model_config, use_flash_attn=use_flash_attn
     )
     return model
