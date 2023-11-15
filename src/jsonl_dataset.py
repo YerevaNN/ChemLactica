@@ -1,4 +1,3 @@
-from multiprocessing import Manager, Pool
 from typing import List
 import torch
 from io import StringIO
@@ -10,13 +9,15 @@ def samples_generator(
         chunk_size=25000, return_line_info=False
     ):
     if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+        print("sharded_jsonl_files", shared_jsonl_files)
         print(f"TOK_PAR: {os.environ['TOKENIZERS_PARALLELISM']}")
         print("process id", os.getpid(), files)
 
-        file_states = {file: {"position": 0, "line_number": 0} for file in files}
+        file_states = {f: {"position": 0, "line_number": 0} for f in files}
         for file in file_states.keys():
             if shared_jsonl_files.get(file):
                 jsonl_state = shared_jsonl_files[file]
+                file_states[file] = jsonl_state
                 print(f"loaded {file}: {jsonl_state['position']}")
 
         returned = True
@@ -33,7 +34,6 @@ def samples_generator(
                     batch = [line.rstrip("\n") for line in batch]
                     state["position"] = f.tell()
                     state["line_number"] += len(batch)
-
                     for i, sample in enumerate(batch, start=1):
                         returned = True
                         ret = {"text": sample}

@@ -174,7 +174,7 @@ def train(
             optimizer,
             num_warmup_steps=train_config["warmup_steps"],
             num_training_steps=max_steps,
-            lr_end=0.1 * train_config["max_learning_rate"],
+            lr_end=0.0 * train_config["max_learning_rate"],
             power=1.0,
         )
 
@@ -383,7 +383,7 @@ if __name__ == "__main__":
         help="whether or not track the training using aim",
     )
     parser.add_argument(
-        "--no-track",
+        "--no_track",
         action="store_false",
         dest="track",
         help="the directory to save the aim tracking information",
@@ -405,7 +405,7 @@ if __name__ == "__main__":
         help="whether or not profile the training",
     )
     parser.add_argument(
-        "--no-profile",
+        "--no_profile",
         action="store_false",
         dest="profile",
         help="whether or not profile the training",
@@ -421,13 +421,13 @@ if __name__ == "__main__":
         default=None,
     )
     parser.add_argument(
-        "--flash-attn",
+        "--flash_attn",
         action="store_true",
         dest="use_flash_attn",
         help="whether or not to use flash attn)",
     )
     parser.add_argument(
-        "--no-flash-attn",
+        "--no_flash_attn",
         action="store_false",
         dest="use_flash_attn",
         help="whether or not to use flash attn",
@@ -443,13 +443,13 @@ if __name__ == "__main__":
         default=1,
     )
     parser.add_argument(
-        "--check-reproducability",
+        "--check_reproducability",
         action="store_true",
         dest="check_reproducability",
         help="whether or not check reproducability (should only be use for testing)",
     )
     parser.add_argument(
-        "--no-check-reproducability",
+        "--no_check_reproducability",
         action="store_false",
         dest="check_reproducability",
         help="whether or not check reproducability (should only be use for testing)",

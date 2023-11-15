@@ -11,6 +11,12 @@ class CustomTrainer(Trainer):
             print("**disk is full didn't save**")
 
     def _load_from_checkpoint(self, resume_from_checkpoint, model=None):
+        """
+            This code is added because we had a failure when resuming training.
+            Basically, we load the model with fsdp when the model is not fsdp wrapped.
+            In the future versions transformers this issue is handled, by adding an extra check,
+            but not in 4.31.0 version. So this is our manual check addition to solve the problem.
+        """
         if type(self.model) != FSDP: return
         return super()._load_from_checkpoint(resume_from_checkpoint, model)
 
