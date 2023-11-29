@@ -33,6 +33,14 @@ def find_all_linear_names(model):
     return list(lora_module_names)
 
 
+def get_llama_token_count():
+    added_chem_token_count = len(
+        chemlactica_special_tokens["additional_special_tokens"]
+    )  # noqa
+    added_pad_token_count = 1
+    return added_chem_token_count + added_pad_token_count
+
+
 def load_model(
     from_pretrained: str,
     use_flash_attn=True,
@@ -63,6 +71,7 @@ def load_model(
             torch_dtype=torch.bfloat16,
         )
     if "llama" in from_pretrained.lower():
+        number_of_added_tokens = get_llama_token_count()
         print("it is llama")
         model = LlamaForCausalLM.from_pretrained(
             from_pretrained,
@@ -71,7 +80,7 @@ def load_model(
             quantization_config=quant_config,
         )
         model.resize_token_embeddings(
-            train_config["vocab_size"] + len(chemlactica_special_tokens),
+            train_config["vocab_size"] + number_of_added_tokens,
             pad_to_multiple_of=8,
         )
 

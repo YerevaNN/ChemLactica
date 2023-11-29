@@ -84,7 +84,7 @@ def create_tokenizer(tokenizer_id):
     # tok.pad_token_id = pad_token_id
     tok.eos_token = eos_token
     tok.eos_token_id = eos_token_id
-    tok.add_special_tokens(chemlactica_special_tokens)
+    # tok.add_special_tokens(chemlactica_special_tokens)
     return tok
 
 
