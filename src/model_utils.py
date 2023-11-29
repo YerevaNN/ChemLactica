@@ -1,4 +1,5 @@
 from transformers import OPTForCausalLM, OPTConfig, LlamaForCausalLM
+from utils import chemlactica_special_tokens
 import bitsandbytes as bnb
 from peft import get_peft_model, LoraConfig
 import torch
@@ -68,6 +69,10 @@ def load_model(
             use_flash_attention_2=True,
             token=auth_token,
             quantization_config=quant_config,
+        )
+        model.resize_token_embeddings(
+            train_config["vocab_size"] + len(chemlactica_special_tokens),
+            pad_to_multiple_of=8,
         )
 
         model.config.use_cache = False
