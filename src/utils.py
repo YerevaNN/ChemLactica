@@ -46,6 +46,12 @@ chemlactica_special_end_tokens = [
 chemlactica_special_tokens = (
     chemlactica_special_start_tokens + chemlactica_special_end_tokens
 )
+chemlactica_special_tokens = {"additional_special_tokens": chemlactica_special_tokens}
+chemlactica_special_tokens["pad_token"] = "<pad>"
+
+
+# chemlactica_special_tokens =dict(zip(chemlactica_special_tokens, chemlactica_special_tokens))
+# chemlactica_special_tokens["pad_token"] = "<pad>"
 
 
 def get_tokenizer(tokenizer_id):
@@ -58,27 +64,27 @@ def get_tokenizer(tokenizer_id):
 
 
 def create_tokenizer(tokenizer_id):
+    auth_token = os.environ["HF_TOKEN"]
     tok = AutoTokenizer.from_pretrained(
         # f"facebook/galactica-125m"
-        tokenizer_id
+        tokenizer_id,
         # "src/tokenizer/ChemLacticaTokenizer"
         # "src/tokenizer/galactica-125m"
+        token=auth_token,
     )
     bos_token = "<s>"
-    bos_token_id = 0
-    pad_token = "<pad>"
-    pad_token_id = 1
+    bos_token_id = 1
+    # pad_token = "<pad>"
+    # pad_token_id = 1
     eos_token = "</s>"
     eos_token_id = 2
     tok.bos_token = bos_token
     tok.bos_token_id = bos_token_id
-    tok.pad_token = pad_token
-    tok.pad_token_id = pad_token_id
+    # tok.pad_token = pad_token
+    # tok.pad_token_id = pad_token_id
     tok.eos_token = eos_token
     tok.eos_token_id = eos_token_id
-    # tok.add_tokens(
-    #     chemlactica_special_tokens
-    # )
+    tok.add_special_tokens(chemlactica_special_tokens)
     return tok
 
 
@@ -89,12 +95,12 @@ if __name__ == "__main__":
     from datasets import load_dataset
     from dataset_utils import process_dataset
 
-    train_config = model_train_configs["mistral7b"]
-    tokenizer = get_tokenizer("mistralai/Mistral-7B-v0.1")
+    train_config = model_train_configs["llama2"]
+    tokenizer = get_tokenizer("meta-llama/Llama-2-7b-hf")
 
     # CustomTokenizer.set_model_size("125m")
     # tokenizer = CustomTokenizer.get_instance()
-    tokenizer.save_pretrained("Mistral-7B-v0.1Tokenizer")
+    tokenizer.save_pretrained("tokenizer/chemllama2-tokenizer")
     training_data_dir = ".small_data/valid"
 
     # training_data_files = glob.glob(training_data_dir + "/xae_shuf.jsonl")
