@@ -11,13 +11,11 @@ import transformers
 from transformers import (
     # Trainer,
     TrainingArguments,
-    get_polynomial_decay_schedule_with_warmup,
     ProgressCallback,
 )
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
 import torch
-from torch.optim import AdamW
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
 from datasets.dataset_dict import IterableDatasetDict
@@ -33,7 +31,6 @@ from callbacks import (
 )
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils import chemlactica_special_tokens
 from model_utils import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
@@ -43,6 +40,7 @@ torch.manual_seed(42)
 random.seed(42)
 numpy.random.seed(42)
 logger = logging.get_logger("transformers")
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "caching_allocator"
 
 
 def train(
@@ -59,6 +57,7 @@ def train(
     dataloader_num_workers,
     use_flash_attn,
     gradient_accumulation_steps,
+    gradient_checkpointing,
     track=False,
     track_dir=None,
     check_reproducability=False,
@@ -70,18 +69,19 @@ def train(
     transformers.utils.logging.enable_explicit_format()
 
     kwargs = InitProcessGroupKwargs(timeout=timedelta(seconds=3600))
-    accelerator = Accelerator(kwargs_handlers=[kwargs])
 
-    accelerator = Accelerator(log_with="all", project_dir=track_dir)
+    accelerator = Accelerator(
+        kwargs_handlers=[kwargs], log_with="all", project_dir=track_dir
+    )
 
     train_config = model_train_configs[model_config]
 
+    auth_token = os.environ["HF_TOKEN"]
     model = load_model(
-        from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config
-    )
-    model.resize_token_embeddings(
-        train_config["vocab_size"] + len(chemlactica_special_tokens),
-        pad_to_multiple_of=8,
+        from_pretrained,
+        use_flash_attn=use_flash_attn,
+        train_config=train_config,
+        auth_token=auth_token,
     )
 
     trainer_callback_dict = {}
@@ -156,29 +156,32 @@ def train(
             trainer_callback_dict[
                 "json_dataset_resume_callback"
             ] = JsonlDatasetResumeCallback(shared_jsonl_files)
-
         checkpoints_dir = os.path.join(
             checkpoints_root_dir,
-            "mistralai",
-            "Mistral-7B-v0.1",
+            "meta-llama",
+            "Llama-2-7b-hf",
             experiment_hash,
         )
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
-        optimizer = AdamW(
-            model.parameters(),
-            lr=train_config["max_learning_rate"],
-            betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
-            weight_decay=train_config["weight_decay"],
-        )
+        # optimizer = AdamW(
+        #     model.parameters(),
+        #     lr=train_config["max_learning_rate"],
+        #     betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
+        #     weight_decay=train_config["weight_decay"],
+        # )
 
-        lr_scheduler = get_polynomial_decay_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=train_config["warmup_steps"],
-            num_training_steps=max_steps,
-            lr_end=0.0 * train_config["max_learning_rate"],
-            power=1.0,
-        )
+        # lr_scheduler = get_polynomial_decay_schedule_with_warmup(
+        #     optimizer,
+        #     num_warmup_steps=train_config["warmup_steps"],
+        #     num_training_steps=max_steps,
+        #     lr_end=0.0 * train_config["max_learning_rate"],
+        #     power=1.0,
+        # )
+        if gradient_checkpointing:
+            ddp_find_unused_parameters = False
+        else:
+            ddp_find_unused_parameters = True
 
         training_args = TrainingArguments(
             output_dir=checkpoints_dir,
@@ -186,13 +189,14 @@ def train(
             per_device_eval_batch_size=valid_batch_size,
             # log_level = "info",
             log_on_each_node=True,
+            bf16=True,
             logging_dir=track_dir,
-            # learning_rate=train_config["max_learning_rate"],
-            # lr_scheduler_type="linear",
+            learning_rate=train_config["max_learning_rate"],
             # weight_decay=train_config["weight_decay"],
-            # adam_beta1=train_config["adam_beta1"],
-            # adam_beta2=train_config["adam_beta2"],
-            # warmup_steps=train_config["warmup_steps"],
+            adam_beta1=train_config["adam_beta1"],
+            adam_beta2=train_config["adam_beta2"],
+            warmup_steps=train_config["warmup_steps"],
+            ddp_find_unused_parameters=ddp_find_unused_parameters,
             max_grad_norm=train_config["global_gradient_norm"],
             evaluation_strategy="steps",
             max_steps=max_steps,
@@ -205,10 +209,12 @@ def train(
             # which has some conflict with saving checkpoints
             dataloader_num_workers=dataloader_num_workers,
             logging_steps=1,
-            gradient_checkpointing=False,
+            gradient_checkpointing=gradient_checkpointing,
             gradient_accumulation_steps=gradient_accumulation_steps,
             save_total_limit=4,
             resume_from_checkpoint=resume_from_checkpoint,
+            lr_scheduler_type="linear",
+            optim="paged_adamw_8bit"
             # load_best_model=True
         )
         training_data_files = glob.glob(training_data_dir + "/*.jsonl")
@@ -258,7 +264,7 @@ def train(
             compute_metrics=compute_metrics,
             train_dataset=shuffled_train_dataset["train"],
             eval_dataset=processed_eval_dataset["validation"],
-            optimizers=[optimizer, lr_scheduler],
+            # optimizers=[optimizer, lr_scheduler],
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         )
         trainer.remove_callback(ProgressCallback)
@@ -441,6 +447,13 @@ if __name__ == "__main__":
         required=False,
         help="the number of steps to over which to accumulate gradients",
         default=1,
+    )
+    parser.add_argument(
+        "--gradient_checkpointing",
+        action="store_true",
+        dest="gradient_checkpointing",
+        default=False,
+        help="whether or not to use gradient_checkpointing",
     )
     parser.add_argument(
         "--check-reproducability",
