@@ -1,7 +1,7 @@
 from transformers import OPTForCausalLM, OPTConfig, LlamaForCausalLM
 from utils import chemlactica_special_tokens
 import bitsandbytes as bnb
-from peft import get_peft_model, LoraConfig
+from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
 import torch
 from transformers import MistralForCausalLM
 from custom_modeling_opt import CustomOPTForCausalLM
@@ -72,20 +72,23 @@ def load_model(
         )
     if "llama" in from_pretrained.lower():
         number_of_added_tokens = get_llama_token_count()
-        print("it is llama")
         model = LlamaForCausalLM.from_pretrained(
             from_pretrained,
             use_flash_attention_2=True,
             token=auth_token,
             quantization_config=quant_config,
+            max_position_embeddings=train_config["block_size"],
         )
         model.resize_token_embeddings(
             train_config["vocab_size"] + number_of_added_tokens,
             pad_to_multiple_of=8,
         )
+        model.config.pad_token_id = 32068
 
         model.config.use_cache = False
         model.config.pretraining_tp = 1
+        model.gradient_checkpointing_enable()
+        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
 
         modules = find_all_linear_names(model)
         peft_config = LoraConfig(
