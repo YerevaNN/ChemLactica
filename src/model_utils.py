@@ -10,7 +10,7 @@ from transformers import BitsAndBytesConfig
 
 quant_config = BitsAndBytesConfig(
     load_in_4bit=True,
-    bnb_4bit_use_double_quant=True,
+    bnb_4bit_use_double_quant=False,
     bnb_4bit_quant_type="nf4",
     bnb_4bit_compute_dtype=torch.bfloat16,
 )
@@ -92,7 +92,7 @@ def load_model(
 
         modules = find_all_linear_names(model)
         peft_config = LoraConfig(
-            lora_alpha=64,
+            lora_alpha=128,
             lora_dropout=0.1,
             r=64,
             target_modules=modules,
