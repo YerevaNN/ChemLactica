@@ -92,9 +92,9 @@ def load_model(
 
         modules = find_all_linear_names(model)
         peft_config = LoraConfig(
-            lora_alpha=128,
+            lora_alpha=256,
             lora_dropout=0.1,
-            r=64,
+            r=128,
             target_modules=modules,
             inference_mode=False,
             bias="none",
