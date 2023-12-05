@@ -32,7 +32,7 @@ from callbacks import (
 )
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils import chemlactica_special_tokens, signal_handler
+from utils import signal_handler, get_tokenizer_special_tokens
 from model_utils import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
@@ -74,13 +74,20 @@ def train(
     accelerator = Accelerator(log_with="all", project_dir=track_dir)
 
     train_config = model_train_configs[model_config]
+    if os.path.isdir(from_pretrained):
+        resume_from_checkpoint = from_pretrained
+    else:
+        resume_from_checkpoint = False
 
+    special_tokens = get_tokenizer_special_tokens()
+    print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
     model = load_model(
         from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config
     )
-    model.resize_token_embeddings(
-        train_config["vocab_size"] + len(chemlactica_special_tokens)
-    )
+    if not resume_from_checkpoint:
+        model.resize_token_embeddings(
+            train_config["vocab_size"] + len(special_tokens)
+        )
 
     trainer_callback_dict = {}
     experiment_hash = "none"
@@ -106,11 +113,6 @@ def train(
 
     if not valid_batch_size:
         valid_batch_size = train_batch_size
-
-    if os.path.isdir(from_pretrained):
-        resume_from_checkpoint = from_pretrained
-    else:
-        resume_from_checkpoint = False
 
     logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 

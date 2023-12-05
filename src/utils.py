@@ -1,36 +1,16 @@
 import os
 from transformers import AutoTokenizer
 
-chemlactica_special_tokens = [
-    "[SYNONYM ",
-    "[RELATED ",
-    "[SIMILAR ",
-    "[EXPERIMENTAL ",
-    "[SAS ",
-    "[WEIGHT ",
-    "[TPSA ",
-    "[CLOGP ",
-    "[QED ",
-    "[NUMHDONORS ",
-    "[NUMHACCEPTORS ",
-    "[NUMHETEROATOMS ",
-    "[NUMROTATABLEBONDS ",
-    "[NOCOUNT ",
-    "[NHOHCOUNT ",
-    "[RINGCOUNT ",
-    "[HEAVYATOMCOUNT ",
-    "[FRACTIONCSP3 ",
-    "[NUMAROMATICRINGS ",
-    "[NUMSATURATEDRINGS ",
-    "[NUMAROMATICHETEROCYCLES ",
-    "[NUMAROMATICCARBOCYCLES ",
-    "[NUMSATURATEDHETEROCYCLES ",
-    "[NUMSATURATEDCARBOCYCLES ",
-    "[NUMALIPHATICRINGS ",
-    "[NUMALIPHATICHETEROCYCLES ",
-    "[NUMALIPHATICCARBOCYCLES ",
-    "[IUPAC ",
-]
+
+def get_tokenizer_path():
+    return "src/tokenizer/ChemLacticaTokenizer66"
+
+
+def get_tokenizer_special_tokens():
+    import json
+    with open(os.path.join(get_tokenizer_path(), "special_tokens_map.json"), "r") as _f:
+        special_tokens_json = json.load(_f)
+    return special_tokens_json["additional_special_tokens"]
 
 
 def get_tokenizer():
@@ -44,8 +24,7 @@ def get_tokenizer():
 
 def create_tokenizer():
     tok = AutoTokenizer.from_pretrained(
-        # f"facebook/galactica-125m"
-        "src/tokenizer/ChemLacticaTokenizer"
+        "src/tokenizer/ChemLacticaTokenizer66"
         # "src/tokenizer/galactica-125m"
     )
     bos_token = "<s>"
