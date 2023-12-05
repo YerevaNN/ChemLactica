@@ -73,9 +73,12 @@ def format_key_value(key, value):
         for val in value:
             formatted_string += f"{SPECIAL_TAGS['synonym']['start']}{val['name']}{SPECIAL_TAGS['synonym']['end']}"
     else:
-        if SPECIAL_TAGS[key].get('type') is float:
-            value = "{:.2f}".format(float(value))
-            assert len(value.split(".")[-1]) == 2
+        try:
+            if SPECIAL_TAGS[key].get('type') is float:
+                value = "{:.2f}".format(float(value))
+                assert len(value.split(".")[-1]) == 2
+        except Exception as e:
+            print(e)
         start = SPECIAL_TAGS[key]["start"]
         end = SPECIAL_TAGS[key]["end"]
         return f"{start}{value}{end}"
