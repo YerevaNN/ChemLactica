@@ -24,8 +24,7 @@ def get_tokenizer():
 
 def create_tokenizer():
     tok = AutoTokenizer.from_pretrained(
-        "src/tokenizer/ChemLacticaTokenizer66"
-        # "src/tokenizer/galactica-125m"
+        get_tokenizer_path()
     )
     bos_token = "<s>"
     bos_token_id = 0
