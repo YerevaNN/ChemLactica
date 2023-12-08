@@ -90,7 +90,7 @@ def format_key_value(key, value):
             print(e)
         start = special_tags[key]["start"]
         end = special_tags[key]["end"]
-        return f"{start}{value}{end}]"
+        return f"{start}{value}{end}"
 
     return formatted_string
 
