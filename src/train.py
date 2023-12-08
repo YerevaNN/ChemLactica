@@ -85,9 +85,7 @@ def train(
         from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config
     )
     if not resume_from_checkpoint:
-        model.resize_token_embeddings(
-            train_config["vocab_size"] + len(special_tokens)
-        )
+        model.resize_token_embeddings(train_config["vocab_size"] + len(special_tokens))
 
     trainer_callback_dict = {}
     experiment_hash = "none"
@@ -187,7 +185,7 @@ def train(
             # log_level = "info",
             log_on_each_node=True,
             logging_dir=track_dir,
-            # learning_rate=train_config["max_learning_rate"],
+            learning_rate=train_config["max_learning_rate"],
             # lr_scheduler_type="linear",
             # weight_decay=train_config["weight_decay"],
             # adam_beta1=train_config["adam_beta1"],
