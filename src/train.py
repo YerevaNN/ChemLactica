@@ -274,6 +274,8 @@ def train(
             except KeyboardInterrupt:
                 with accelerator.main_process_first():
                     logger.error("KeyboardInterrupt")
+            if not (max_steps % eval_steps == 0):
+                trainer.evaluate()
 
 
 if __name__ == "__main__":
