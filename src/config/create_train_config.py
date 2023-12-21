@@ -15,7 +15,7 @@ for key in model_train_configs.keys():
         model_train_configs[key]["max_learning_rate"] *= 0.08
 
 
-model_train_configs["125m"]["max_learning_rate"] = 5.0e-4
+model_train_configs["125m"]["max_learning_rate"] = 1.4e-3
 model_train_configs["125m"]["tokenizer_id"] = "src/tokenizer/ChemLacticaTokenizer"
 
 model_train_configs["mistral7b"][

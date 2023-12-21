@@ -176,7 +176,7 @@ def get_computed_dict(json_data, tokenizer):
             for list_val in value:
                 comp_val = modified_tokenizer_call(
                     tokenizer,
-                    f"""[SIMILARITY]{str(list_val["similarity"])} {list_val["SMILES"]}[/SIMILARITY]""",  # noqa
+                    f"""[SIMILAR]{str(list_val["similarity"])} {list_val["SMILES"]}[/SIMILAR]""",  # noqa
                 )
                 computed_dict[key].append(comp_val)
             continue
