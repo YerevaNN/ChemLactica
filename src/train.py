@@ -83,6 +83,8 @@ def train(
         train_config=train_config,
         auth_token=auth_token,
     )
+    if not resume_from_checkpoint:
+        model.resize_token_embeddings(train_config["vocab_size"])
 
     trainer_callback_dict = {}
     experiment_hash = "none"
