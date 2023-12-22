@@ -83,6 +83,12 @@ def train(
         train_config=train_config,
         auth_token=auth_token,
     )
+
+    if os.path.isdir(from_pretrained):
+        resume_from_checkpoint = from_pretrained
+    else:
+        resume_from_checkpoint = False
+
     if not resume_from_checkpoint:
         model.resize_token_embeddings(train_config["vocab_size"])
 
@@ -111,10 +117,6 @@ def train(
     if not valid_batch_size:
         valid_batch_size = train_batch_size
 
-    if os.path.isdir(from_pretrained):
-        resume_from_checkpoint = from_pretrained
-    else:
-        resume_from_checkpoint = False
 
     logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 

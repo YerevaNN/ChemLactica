@@ -28,7 +28,7 @@
   max_learning_rate: 6.0e-4
   n_heads: 12
   n_layers: 12
-  vocab_size: 50000
+  vocab_size: 50066
   warmup_steps: 500
   weight_decay: 0.1
 6.7b:
