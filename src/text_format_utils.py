@@ -1,51 +1,49 @@
 import random
 import time
 import os
+from functools import cache
 
 
+@cache
 def get_special_tags():
-    if getattr(get_special_tags, "first_call", True):
-        SPECIAL_TAGS = {
-            "SMILES": {"start": "[START_SMILES]", "end": "[END_SMILES]"},
-            "synonym": {"start": "[SYNONYM]", "end": "[/SYNONYM]"},
-            "RELATED": {"start": "[RELATED]", "end": "[/RELATED]"},
-            "similarity": {"start": "[SIMILAR]", "end": "[/SIMILAR]", "type": float},
-            "PROPERTY": {"start": "[PROPERTY]", "end": "[/PROPERTY]"},
-            "SAS": {"start": "[SAS]", "end": "[/SAS]", "type": float},
-            "WEIGHT": {"start": "[WEIGHT]", "end": "[/WEIGHT]", "type": float},
-            "TPSA": {"start": "[TPSA]", "end": "[/TPSA]", "type": float},
-            "CLOGP": {"start": "[CLOGP]", "end": "[/CLOGP]", "type": float},
-            "QED": {"start": "[QED]", "end": "[/QED]", "type": float},
-            "NUMHDONORS": {"start": "[NUMHDONORS]", "end": "[/NUMHDONORS]"},
-            "NUMHACCEPTORS": {"start": "[NUMHACCEPTORS]", "end": "[/NUMHACCEPTORS]"},
-            "NUMHETEROATOMS": {"start": "[NUMHETEROATOMS]", "end": "[/NUMHETEROATOMS]"},
-            "NUMROTATABLEBONDS": {"start": "[NUMROTATABLEBONDS]", "end": "[/NUMROTATABLEBONDS]"},
-            "NOCOUNT": {"start": "[NOCOUNT]", "end": "[/NOCOUNT]"},
-            "NHOHCOUNT": {"start": "[NHOHCOUNT]", "end": "[/NHOHCOUNT]"},
-            "RINGCOUNT": {"start": "[RINGCOUNT]", "end": "[/RINGCOUNT]"},
-            "HEAVYATOMCOUNT": {"start": "[HEAVYATOMCOUNT]", "end": "[/HEAVYATOMCOUNT]"},
-            "FRACTIONCSP3": {"start": "[FRACTIONCSP3]", "end": "[/FRACTIONCSP3]", "type": float},
-            "NUMAROMATICRINGS": {"start": "[NUMAROMATICRINGS]", "end": "[/NUMAROMATICRINGS]"},
-            "NUMSATURATEDRINGS": {"start": "[NUMSATURATEDRINGS]", "end": "[/NUMSATURATEDRINGS]"},
-            "NUMAROMATICHETEROCYCLES": {"start": "[NUMAROMATICHETEROCYCLES]", "end": "[/NUMAROMATICHETEROCYCLES]"},
-            "NUMAROMATICCARBOCYCLES": {"start": "[NUMAROMATICCARBOCYCLES]", "end": "[/NUMAROMATICCARBOCYCLES]"},
-            "NUMSATURATEDHETEROCYCLES": {"start": "[NUMSATURATEDHETEROCYCLES]", "end": "[/NUMSATURATEDHETEROCYCLES]"},
-            "NUMSATURATEDCARBOCYCLES": {"start": "[NUMSATURATEDCARBOCYCLES]", "end": "[/NUMSATURATEDCARBOCYCLES]"},
-            "NUMALIPHATICRINGS": {"start": "[NUMALIPHATICRINGS]", "end": "[/NUMALIPHATICRINGS]"},
-            "NUMALIPHATICHETEROCYCLES": {"start": "[NUMALIPHATICHETEROCYCLES]", "end": "[/NUMALIPHATICHETEROCYCLES]"},
-            "NUMALIPHATICCARBOCYCLES": {"start": "[NUMALIPHATICCARBOCYCLES]", "end": "[/NUMALIPHATICCARBOCYCLES]"},
-            "IUPAC": {"start": "[IUPAC]", "end": "[/IUPAC]"},
-            "VAR_NAME": {"start": "[VAR_NAME]", "end": "[/VAR_NAME]"},
-            "VAR_DESC": {"start": "[VAR_DESC]", "end": "[/VAR_DESC]"},
-            "VAR_VAL": {"start": "[VAR_VAL]", "end": "[/VAR_VAL]"},
-            "ASSAY_NAME": {"start": "[ASSAY_NAME]", "end": "[/ASSAY_NAME]"},
-            "ASSAY_DESC": {"start": "[ASSAY_DESC]", "end": "[/ASSAY_DESC]"}
-        }
-        setattr(get_special_tags, "special_tags", SPECIAL_TAGS)
-        setattr(get_special_tags, "first_call", False)
-        print(f"Process {os.getpid()} created special tags")
-
-    return get_special_tags.special_tags
+    SPECIAL_TAGS = {
+        "SMILES": {"start": "[START_SMILES]", "end": "[END_SMILES]"},
+        "synonym": {"start": "[SYNONYM]", "end": "[/SYNONYM]"},
+        "RELATED": {"start": "[RELATED]", "end": "[/RELATED]"},
+        "similarity": {"start": "[SIMILAR]", "end": "[/SIMILAR]", "type": float},
+        "PROPERTY": {"start": "[PROPERTY]", "end": "[/PROPERTY]"},
+        "SAS": {"start": "[SAS]", "end": "[/SAS]", "type": float},
+        "WEIGHT": {"start": "[WEIGHT]", "end": "[/WEIGHT]", "type": float},
+        "TPSA": {"start": "[TPSA]", "end": "[/TPSA]", "type": float},
+        "CLOGP": {"start": "[CLOGP]", "end": "[/CLOGP]", "type": float},
+        "QED": {"start": "[QED]", "end": "[/QED]", "type": float},
+        "NUMHDONORS": {"start": "[NUMHDONORS]", "end": "[/NUMHDONORS]"},
+        "NUMHACCEPTORS": {"start": "[NUMHACCEPTORS]", "end": "[/NUMHACCEPTORS]"},
+        "NUMHETEROATOMS": {"start": "[NUMHETEROATOMS]", "end": "[/NUMHETEROATOMS]"},
+        "NUMROTATABLEBONDS": {"start": "[NUMROTATABLEBONDS]", "end": "[/NUMROTATABLEBONDS]"},
+        "NOCOUNT": {"start": "[NOCOUNT]", "end": "[/NOCOUNT]"},
+        "NHOHCOUNT": {"start": "[NHOHCOUNT]", "end": "[/NHOHCOUNT]"},
+        "RINGCOUNT": {"start": "[RINGCOUNT]", "end": "[/RINGCOUNT]"},
+        "HEAVYATOMCOUNT": {"start": "[HEAVYATOMCOUNT]", "end": "[/HEAVYATOMCOUNT]"},
+        "FRACTIONCSP3": {"start": "[FRACTIONCSP3]", "end": "[/FRACTIONCSP3]", "type": float},
+        "NUMAROMATICRINGS": {"start": "[NUMAROMATICRINGS]", "end": "[/NUMAROMATICRINGS]"},
+        "NUMSATURATEDRINGS": {"start": "[NUMSATURATEDRINGS]", "end": "[/NUMSATURATEDRINGS]"},
+        "NUMAROMATICHETEROCYCLES": {"start": "[NUMAROMATICHETEROCYCLES]", "end": "[/NUMAROMATICHETEROCYCLES]"},
+        "NUMAROMATICCARBOCYCLES": {"start": "[NUMAROMATICCARBOCYCLES]", "end": "[/NUMAROMATICCARBOCYCLES]"},
+        "NUMSATURATEDHETEROCYCLES": {"start": "[NUMSATURATEDHETEROCYCLES]", "end": "[/NUMSATURATEDHETEROCYCLES]"},
+        "NUMSATURATEDCARBOCYCLES": {"start": "[NUMSATURATEDCARBOCYCLES]", "end": "[/NUMSATURATEDCARBOCYCLES]"},
+        "NUMALIPHATICRINGS": {"start": "[NUMALIPHATICRINGS]", "end": "[/NUMALIPHATICRINGS]"},
+        "NUMALIPHATICHETEROCYCLES": {"start": "[NUMALIPHATICHETEROCYCLES]", "end": "[/NUMALIPHATICHETEROCYCLES]"},
+        "NUMALIPHATICCARBOCYCLES": {"start": "[NUMALIPHATICCARBOCYCLES]", "end": "[/NUMALIPHATICCARBOCYCLES]"},
+        "IUPAC": {"start": "[IUPAC]", "end": "[/IUPAC]"},
+        "VAR_NAME": {"start": "[VAR_NAME]", "end": "[/VAR_NAME]"},
+        "VAR_DESC": {"start": "[VAR_DESC]", "end": "[/VAR_DESC]"},
+        "VAR_VAL": {"start": "[VAR_VAL]", "end": "[/VAR_VAL]"},
+        "ASSAY_NAME": {"start": "[ASSAY_NAME]", "end": "[/ASSAY_NAME]"},
+        "ASSAY_DESC": {"start": "[ASSAY_DESC]", "end": "[/ASSAY_DESC]"}
+    }
+    print(f"Process {os.getpid()} created special tags")
+    return SPECIAL_TAGS
 
 
 def delete_empty_tags(compound_json):

@@ -188,32 +188,6 @@ class ReproducabilityCallback(TrainerCallback):
         checkpoint_dir = os.path.join(
             args.output_dir, f"checkpoint-{state.global_step}"
         )
-
-        # accelerator = Accelerator()
-        # saved_model = load_model(f"facebook/galactica-{self.model_config}",
-        # use_flash_attn=self.use_flash_attn, dtype=torch.bfloat16)
-        # saved_model.resize_token_embeddings(
-        #     self.train_config["vocab_size"] + len(chemlactica_special_tokens)
-        # )
-        # saved_model = accelerator.prepare(saved_model)
-        # accelerator.load_state(checkpoint_dir)
-        # saved_model.to(accelerator.device)
-
-        # config = AutoConfig.from_pretrained("facebook/galactica-125m")
-        # config.vocab_size = 50028
-        # state_dict = torch.load(f"{checkpoint_dir}/pytorch_model.bin")
-        # saved_model = CustomOPTForCausalLM.from_pretrained(
-        # None, config=config, state_dict=state_dict,
-        # use_flash_attn=self.use_flash_attn,
-        # torch_dtype=torch.bfloat16).to(model.device)
-
-        # contexts = [
-        #     "[CLOGP 100][START_SMILES]",
-        #     "[SAS 1][START_SMILES]",
-        #     "[WEIGHT 41.123][START_SMILES]",
-        #     "random input",
-        # ]
-
         model.eval()
         model_logits = []
         # model_gen_toks = {}
