@@ -67,16 +67,16 @@ chemlactica_special_tokens["pad_token"] = "<pad>"
 # chemlactica_special_tokens["pad_token"] = "<pad>"
 
 
-def get_tokenizer(tokenizer_id):
+def get_tokenizer():
     if getattr(get_tokenizer, "first_call", True):
-        setattr(get_tokenizer, "tokenizer", create_tokenizer(tokenizer_id))
+        setattr(get_tokenizer, "tokenizer", create_tokenizer())
         setattr(get_tokenizer, "first_call", False)
         print(f"Process {os.getpid()} created a tokenizer")
 
     return get_tokenizer.tokenizer
 
 
-def create_tokenizer(tokenizer_id):
+def create_tokenizer():
     # auth_token = os.environ["HF_TOKEN"]
     tok = AutoTokenizer.from_pretrained(
         # f"facebook/galactica-125m"

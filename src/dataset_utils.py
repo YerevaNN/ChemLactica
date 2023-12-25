@@ -7,7 +7,7 @@ from assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
 
 
 def generate_assay_docs(examples, train_config):
-    tokenizer = get_tokenizer(train_config["tokenizer_id"])
+    tokenizer = get_tokenizer()
     MODEL_CONTEXT_LENGTH = train_config["block_size"]
     final = {
         "input_ids": [],

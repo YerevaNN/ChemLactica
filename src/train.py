@@ -1,4 +1,5 @@
 import os
+from datasets import interleave_datasets
 import signal
 import traceback
 import argparse
@@ -52,7 +53,8 @@ signal.signal(signal.SIGTERM, signal_handler)
 def train(
     from_pretrained,
     model_config,
-    training_data_dir,
+    training_data_dirs,
+    dir_data_types,
     valid_data_dir,
     max_steps,
     eval_steps,
@@ -229,8 +231,6 @@ def train(
             optim="adamw_torch"
             # load_best_model=True
         )
-        training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-        valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
 
         # train_dataset = load_dataset(
         #     "text",
@@ -238,28 +238,73 @@ def train(
         #     streaming=True,
         # )
 
-        train_dataset = IterableDatasetDict(
-            {
-                "train": IterableDataset.from_generator(
+        assert len(training_data_dirs) == len(dir_data_types)
+        train_data_dict = {}
+        split_identifier = 0
+        for training_data_dir,dir_data_type in zip(training_data_dirs,dir_data_types):
+            training_data_files = glob.glob(training_data_dir + "/*.jsonl")
+            train_data_dict[f"{dir_data_type}_1"] = IterableDataset.from_generator(
                     samples_generator,
-                    gen_kwargs={
-                        "files": training_data_files,
-                        "shared_jsonl_files": shared_jsonl_files,
-                    },
+                    gen_kwargs = {
+                        "files" : training_data_files,
+                        "shared_jsonl_files" : shared_jsonl_files
+                    }
                 )
-            }
+            split_identifier+=1
+
+
+        train_dataset = IterableDatasetDict(
+                train_data_dict
+                # "train": IterableDataset.from_generator(
+                #     samples_generator,
+                #     gen_kwargs={
+                #         "files": training_data_files,
+                #         "shared_jsonl_files": shared_jsonl_files,
+                #     },
+                # )
         )
+        valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
         eval_dataset = load_dataset(
             "text", data_files={"validation": valid_data_files}, streaming=False
         )
+        print(train_dataset.keys())
 
-        processed_train_dataset = process_dataset(
-            dataset=train_dataset,
-            train_config=train_config,
-            process_batch_sizes=(50, 50),
-            is_eval=False,
-            assay=True,
-        )
+        for split_name in train_dataset.keys():
+            is_assay_split = "assay" in split_name
+            train_dataset[split_name] = process_dataset(
+                    dataset=train_dataset[split_name],
+                    train_config = train_config,
+                    process_batch_sizes=(50,50),
+                    is_eval = False,
+                    assay = is_assay_split
+            )
+            if is_assay_split:
+                train_dataset[split_name].shuffle(buffer_size = 2)
+
+        split_train_datasets = [train_dataset[split] for split in train_dataset.keys()]
+        print("we have this many datasets",len(split_train_datasets))
+        #processed_train_dataset =concatenate_datasets(split_datasets)
+        final_train_dataset = interleave_datasets(split_train_datasets)
+        print(final_train_dataset)
+        # processed_train_dataset = process_dataset(
+        #     dataset=train_dataset,
+        #     train_config=train_config,
+        #     process_batch_sizes=(50, 50),
+        #     is_eval=False,
+        #     assay=True,
+        # )
+
+        
+
+        # for i, sample in enumerate(final_train_dataset):
+        # This code section is useful to verify interleaving
+        #     if i >= 5: # change 5 to the number of samples you want to inspect
+        #         break
+        #     print(f"Sample {i}:")
+        #     print(max(sample["input_ids"]))
+        #     #print(sample)
+
+
         processed_eval_dataset = process_dataset(
             dataset=eval_dataset,
             train_config=train_config,
@@ -268,13 +313,13 @@ def train(
             assay=True,
         )
 
-        shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=200000)
+        #shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=2)
 
         trainer = CustomTrainer(
             model=model,
             args=training_args,
             compute_metrics=compute_metrics,
-            train_dataset=shuffled_train_dataset["train"],
+            train_dataset = final_train_dataset,
             eval_dataset=processed_eval_dataset["validation"],
             # optimizers=[optimizer, lr_scheduler],
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
@@ -323,12 +368,22 @@ if __name__ == "__main__":
         help="the model configuration to use",
     )
     parser.add_argument(
-        "--training_data_dir",
+        "--training_data_dirs",
         type=str,
         metavar="DT",
-        dest="training_data_dir",
+        nargs='*',
+        dest="training_data_dirs",
         required=True,
         help="path to directory containing training data",
+    )
+    parser.add_argument(
+        "--dir_data_types",
+        type=str,
+        metavar="DD",
+        nargs='*',
+        dest="dir_data_types",
+        required=True,
+        help="corresponding type of data for directory (in same order)",
     )
     parser.add_argument(
         "--valid_data_dir",
