@@ -267,7 +267,6 @@ def train(
         eval_dataset = load_dataset(
             "text", data_files={"validation": valid_data_files}, streaming=False
         )
-        print(train_dataset.keys())
 
         for split_name in train_dataset.keys():
             is_assay_split = "assay" in split_name
@@ -282,10 +281,8 @@ def train(
                 train_dataset[split_name].shuffle(buffer_size = 200000)
 
         split_train_datasets = [train_dataset[split] for split in train_dataset.keys()]
-        print("we have this many datasets",len(split_train_datasets))
         #processed_train_dataset =concatenate_datasets(split_datasets)
         final_train_dataset = interleave_datasets(split_train_datasets)
-        print(final_train_dataset)
         # processed_train_dataset = process_dataset(
         #     dataset=train_dataset,
         #     train_config=train_config,
