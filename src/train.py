@@ -279,7 +279,7 @@ def train(
                     assay = is_assay_split
             )
             if is_assay_split:
-                train_dataset[split_name].shuffle(buffer_size = 2)
+                train_dataset[split_name].shuffle(buffer_size = 200000)
 
         split_train_datasets = [train_dataset[split] for split in train_dataset.keys()]
         print("we have this many datasets",len(split_train_datasets))
