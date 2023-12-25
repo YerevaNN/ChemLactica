@@ -1,17 +1,19 @@
 import os
+import signal
+import traceback
 import argparse
 from datetime import timedelta
 import random
 import glob
 import multiprocessing
 from contextlib import nullcontext
-
 import numpy
 import transformers
 from transformers import (
     # Trainer,
     TrainingArguments,
     ProgressCallback,
+    # get_polynomial_decay_schedule_with_warmup,
 )
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
@@ -31,6 +33,7 @@ from callbacks import (
 )
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
+from utils import signal_handler, get_tokenizer_special_tokens
 from model_utils import load_model
 from custom_trainer import CustomTrainer
 from dataset_utils import process_dataset
@@ -41,6 +44,9 @@ random.seed(42)
 numpy.random.seed(42)
 logger = logging.get_logger("transformers")
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "caching_allocator"
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 def train(
@@ -75,14 +81,20 @@ def train(
     )
 
     train_config = model_train_configs[model_config]
+    if os.path.isdir(from_pretrained):
+        resume_from_checkpoint = from_pretrained
+    else:
+        resume_from_checkpoint = False
 
-    auth_token = os.environ["HF_TOKEN"]
+    # auth_token = os.environ["HF_TOKEN"]
     model = load_model(
         from_pretrained,
         use_flash_attn=use_flash_attn,
         train_config=train_config,
-        auth_token=auth_token,
+        # auth_token=auth_token,
     )
+    special_tokens = get_tokenizer_special_tokens()
+    print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
 
     if os.path.isdir(from_pretrained):
         resume_from_checkpoint = from_pretrained
@@ -90,7 +102,7 @@ def train(
         resume_from_checkpoint = False
 
     if not resume_from_checkpoint:
-        model.resize_token_embeddings(train_config["vocab_size"])
+        model.resize_token_embeddings(train_config["vocab_size"] + len(special_tokens))
 
     trainer_callback_dict = {}
     experiment_hash = "none"
@@ -116,7 +128,6 @@ def train(
 
     if not valid_batch_size:
         valid_batch_size = train_batch_size
-
 
     logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
@@ -162,8 +173,8 @@ def train(
             ] = JsonlDatasetResumeCallback(shared_jsonl_files)
         checkpoints_dir = os.path.join(
             checkpoints_root_dir,
-            "meta-llama",
-            "Llama-2-7b-hf",
+            "facebook",
+            f"galactica-{model_config}",
             experiment_hash,
         )
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
@@ -182,10 +193,6 @@ def train(
         #     lr_end=0.0 * train_config["max_learning_rate"],
         #     power=1.0,
         # )
-        if gradient_checkpointing:
-            ddp_find_unused_parameters = False
-        else:
-            ddp_find_unused_parameters = True
 
         training_args = TrainingArguments(
             output_dir=checkpoints_dir,
@@ -197,11 +204,11 @@ def train(
             fp16=False,
             logging_dir=track_dir,
             learning_rate=train_config["max_learning_rate"],
-            weight_decay=train_config["weight_decay"],
-            adam_beta1=train_config["adam_beta1"],
-            adam_beta2=train_config["adam_beta2"],
-            warmup_steps=train_config["warmup_steps"],
-            ddp_find_unused_parameters=ddp_find_unused_parameters,
+            # lr_scheduler_type="linear",
+            # weight_decay=train_config["weight_decay"],
+            # adam_beta1=train_config["adam_beta1"],
+            # adam_beta2=train_config["adam_beta2"],
+            # warmup_steps=train_config["warmup_steps"],
             max_grad_norm=train_config["global_gradient_norm"],
             evaluation_strategy="steps",
             max_steps=max_steps,
@@ -219,7 +226,7 @@ def train(
             save_total_limit=4,
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type="linear",
-            optim="paged_adamw_8bit"
+            optim="adamw_torch"
             # load_best_model=True
         )
         training_data_files = glob.glob(training_data_dir + "/*.jsonl")
@@ -284,7 +291,16 @@ def train(
         torch.cuda.empty_cache()
 
         with prof_context_manager as prof:
-            trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+            try:
+                trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+            except Exception as e:
+                traceback_info = traceback.format_exc()
+                logger.error(e, traceback_info)
+            except KeyboardInterrupt:
+                with accelerator.main_process_first():
+                    logger.error("KeyboardInterrupt")
+            if not (max_steps % eval_steps == 0):
+                trainer.evaluate()
 
 
 if __name__ == "__main__":
@@ -394,7 +410,7 @@ if __name__ == "__main__":
         help="whether or not track the training using aim",
     )
     parser.add_argument(
-        "--no-track",
+        "--no_track",
         action="store_false",
         dest="track",
         help="the directory to save the aim tracking information",
@@ -416,7 +432,7 @@ if __name__ == "__main__":
         help="whether or not profile the training",
     )
     parser.add_argument(
-        "--no-profile",
+        "--no_profile",
         action="store_false",
         dest="profile",
         help="whether or not profile the training",
@@ -432,13 +448,13 @@ if __name__ == "__main__":
         default=None,
     )
     parser.add_argument(
-        "--flash-attn",
+        "--flash_attn",
         action="store_true",
         dest="use_flash_attn",
         help="whether or not to use flash attn)",
     )
     parser.add_argument(
-        "--no-flash-attn",
+        "--no_flash_attn",
         action="store_false",
         dest="use_flash_attn",
         help="whether or not to use flash attn",
@@ -467,7 +483,7 @@ if __name__ == "__main__":
         help="whether or not check reproducability (should only be use for testing)",
     )
     parser.add_argument(
-        "--no-check-reproducability",
+        "--no_check_reproducability",
         action="store_false",
         dest="check_reproducability",
         help="whether or not check reproducability (should only be use for testing)",

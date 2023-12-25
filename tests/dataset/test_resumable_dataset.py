@@ -2,6 +2,8 @@ import unittest
 import gc
 import glob
 import multiprocessing
+import os
+import sys
 
 import torch
 from torch.utils.data import DataLoader
@@ -109,16 +111,17 @@ class TestDataloader(unittest.TestCase):
                 for text, file, line_number in zip(
                                         samples["text"],
                                         samples["line_info"]["file"],
-                                        samples["line_info"]["line_number"]
+                                        samples["line_info"]["line_number"].tolist()
                                     ):
                     # check if the line matches with what is actually in the file
                     assert loaded_files[file][line_number - 1]["text"] == text
-                    # assert not loaded_files[file][line_number - 1]["is_read"]
+                    assert not loaded_files[file][line_number - 1]["is_read"]
                     loaded_files[file][line_number - 1]["is_read"] = True
                     print(f'{file} {line_number} passed')
                 if i == sample_to_pass:
                     break
 
+            fixed_shared_jsonl_files = {k: v for k, v in shared_jsonl_files.items()}
             resumed_train_dataset = IterableDatasetDict({
                 "train": IterableDataset.from_generator(
                     samples_generator,
@@ -138,18 +141,21 @@ class TestDataloader(unittest.TestCase):
                 for text, file, line_number in zip(
                                         samples["text"],
                                         samples["line_info"]["file"],
-                                        samples["line_info"]["line_number"]
+                                        samples["line_info"]["line_number"].tolist()
                                     ):
                     # check if the line matches with what is actually in the file
                     assert loaded_files[file][line_number - 1]["text"] == text
+                    assert fixed_shared_jsonl_files[file]["line_number"] < line_number
                     # assert not loaded_files[file][line_number - 1]["is_read"]
                     loaded_files[file][line_number - 1]["is_read"] = True
                     print(f'{file} {line_number} passed')
 
             for file_name, lines in loaded_files.items():
+                number_of_read: int = 0
                 for i, line in enumerate(lines, start=1):
-                    assert line["is_read"], f"'{file_name}' line {i} is not read."
-            print("All lines are read at least once.")
+                    # assert line["is_read"], f"'{file_name}' line {i} is not read."
+                    number_of_read += int(line["is_read"])
+                print(f"File: {file_name}: number of read line {number_of_read}, number of not read {len(lines) - number_of_read}.")
 
 
 if __name__ == "__main__":

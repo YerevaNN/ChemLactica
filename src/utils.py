@@ -43,6 +43,19 @@ chemlactica_special_end_tokens = [
     s.replace("[", "[/") for s in chemlactica_special_start_tokens
 ]
 
+
+def get_tokenizer_path():
+    return "src/tokenizer/ChemLacticaTokenizer66"
+
+
+def get_tokenizer_special_tokens():
+    import json
+
+    with open(os.path.join(get_tokenizer_path(), "special_tokens_map.json"), "r") as _f:
+        special_tokens_json = json.load(_f)
+    return special_tokens_json["additional_special_tokens"]
+
+
 chemlactica_special_tokens = (
     chemlactica_special_start_tokens + chemlactica_special_end_tokens
 )
@@ -64,13 +77,12 @@ def get_tokenizer(tokenizer_id):
 
 
 def create_tokenizer(tokenizer_id):
-    auth_token = os.environ["HF_TOKEN"]
+    # auth_token = os.environ["HF_TOKEN"]
     tok = AutoTokenizer.from_pretrained(
         # f"facebook/galactica-125m"
-        tokenizer_id,
         # "src/tokenizer/ChemLacticaTokenizer"
         # "src/tokenizer/galactica-125m"
-        token=auth_token,
+        get_tokenizer_path()
     )
     bos_token = "<s>"
     bos_token_id = 1
@@ -86,6 +98,15 @@ def create_tokenizer(tokenizer_id):
     tok.eos_token_id = eos_token_id
     # tok.add_special_tokens(chemlactica_special_tokens)
     return tok
+
+
+class ForcedStop(RuntimeError):
+    def __init__(self, message="Forced stop occurred"):
+        super().__init__(message)
+
+
+def signal_handler(sig, frame):
+    raise ForcedStop
 
 
 if __name__ == "__main__":
