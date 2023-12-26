@@ -13,18 +13,18 @@ def get_tokenizer_special_tokens():
     return special_tokens_json["additional_special_tokens"]
 
 
-def get_tokenizer():
+def get_tokenizer(tokenizer_path: str=None):
     if getattr(get_tokenizer, "first_call", True):
-        setattr(get_tokenizer, "tokenizer", create_tokenizer())
+        setattr(get_tokenizer, "tokenizer", create_tokenizer(tokenizer_path))
         setattr(get_tokenizer, "first_call", False)
         print(f"Process {os.getpid()} created a tokenizer")
 
     return get_tokenizer.tokenizer
 
 
-def create_tokenizer():
+def create_tokenizer(tokenizer_path: str=None):
     tok = AutoTokenizer.from_pretrained(
-        get_tokenizer_path()
+        tokenizer_path if tokenizer_path is not None else get_tokenizer_path()
     )
     bos_token = "<s>"
     bos_token_id = 0
