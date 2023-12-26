@@ -76,7 +76,7 @@ def train(
     transformers.logging.set_verbosity_info()
     transformers.utils.logging.enable_explicit_format()
 
-    kwargs = InitProcessGroupKwargs(timeout=timedelta(seconds=3600))
+    kwargs = InitProcessGroupKwargs(timeout=timedelta(seconds=7200))
 
     accelerator = Accelerator(
         kwargs_handlers=[kwargs], log_with="all", project_dir=track_dir
@@ -165,6 +165,8 @@ def train(
             accelerator, model_config, use_flash_attn
         )
     trainer_callback_dict["progress_callback"] = CustomProgressCallback()
+
+    accelerator.wait_for_everyone()
 
     with multiprocessing.Manager() if accelerator.is_main_process else nullcontext() as manager:
         shared_jsonl_files = None
@@ -277,12 +279,10 @@ def train(
                     is_eval = False,
                     assay = is_assay_split
             )
-            if is_assay_split:
-                train_dataset[split_name].shuffle(buffer_size = 200000)
-
         split_train_datasets = [train_dataset[split] for split in train_dataset.keys()]
         #processed_train_dataset =concatenate_datasets(split_datasets)
         final_train_dataset = interleave_datasets(split_train_datasets)
+        final_train_dataset = final_train_dataset.shuffle(buffer_size = 400000)
         # processed_train_dataset = process_dataset(
         #     dataset=train_dataset,
         #     train_config=train_config,
@@ -307,7 +307,7 @@ def train(
             train_config=train_config,
             process_batch_sizes=(50, 50),
             is_eval=True,
-            assay=True,
+            assay=False,
         )
 
         #shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=2)
