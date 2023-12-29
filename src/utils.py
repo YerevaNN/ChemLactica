@@ -1,46 +1,44 @@
 import os
+import json
 from transformers import AutoTokenizer
+from functools import cache
 
 
-def get_tokenizer_path():
-    return "src/tokenizer/ChemLacticaTokenizer66"
+default_tokenizer_path = "src/tokenizer/ChemLacticaTokenizer66"
 
 
-def get_tokenizer_special_tokens():
-    import json
-    with open(os.path.join(get_tokenizer_path(), "special_tokens_map.json"), "r") as _f:
+@cache
+def get_start2end_tags_map(tokenizer_path: str=default_tokenizer_path):
+    with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
+        special_tokens_map = json.load(_f)
+    additional_tokens = special_tokens_map["additional_special_tokens"]
+    n = len(additional_tokens)
+    assert (n & 1) == 0 # should be even
+    return {
+        additional_tokens[i]: additional_tokens[n // 2 + i] for i in range(n // 2)
+    } | {"[START_SMILES]": "[END_SMILES]"}
+
+
+def get_tokenizer_special_tokens(tokenizer_path: str=default_tokenizer_path):
+    with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
         special_tokens_json = json.load(_f)
     return special_tokens_json["additional_special_tokens"]
 
 
-def get_tokenizer(tokenizer_path: str=None):
-    if getattr(get_tokenizer, "first_call", True):
-        setattr(get_tokenizer, "tokenizer", create_tokenizer(tokenizer_path))
-        setattr(get_tokenizer, "first_call", False)
-        print(f"Process {os.getpid()} created a tokenizer")
-
-    return get_tokenizer.tokenizer
+@cache
+def get_tokenizer(tokenizer_path: str=default_tokenizer_path):
+    return create_tokenizer(tokenizer_path)
 
 
-def create_tokenizer(tokenizer_path: str=None):
-    tok = AutoTokenizer.from_pretrained(
-        tokenizer_path if tokenizer_path is not None else get_tokenizer_path()
-    )
-    bos_token = "<s>"
-    bos_token_id = 0
-    pad_token = "<pad>"
-    pad_token_id = 1
-    eos_token = "</s>"
-    eos_token_id = 2
-    tok.bos_token = bos_token
-    tok.bos_token_id = bos_token_id
-    tok.pad_token = pad_token
-    tok.pad_token_id = pad_token_id
-    tok.eos_token = eos_token
-    tok.eos_token_id = eos_token_id
-    # tok.add_tokens(
-    #     CustomTokenizer.chemlactica_special_tokens
-    # )
+def create_tokenizer(tokenizer_path):
+    tok = AutoTokenizer.from_pretrained(tokenizer_path)
+    tok.bos_token = "<s>"
+    tok.bos_token_id = 0
+    tok.pad_token = "<pad>"
+    tok.pad_token_id = 1
+    tok.eos_token = "</s>"
+    tok.eos_token_id = 2
+    print(f"Process {os.getpid()} created a tokenizer")
     return tok
 
 

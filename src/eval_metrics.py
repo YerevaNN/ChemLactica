@@ -87,7 +87,7 @@ def perplexity(logits: torch.Tensor, labels: torch.Tensor, base=2):
 
 @torch.no_grad()
 def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
-    # batch_size = labels.size(0)
+    batch_size = labels.size(0)
 
     logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
     labels = labels[..., 1:].contiguous().view(-1)
