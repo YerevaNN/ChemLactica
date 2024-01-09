@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import math
 from collections import namedtuple
+from utils import get_start2end_tags_map
 
 
 PropertyEntry = namedtuple(
@@ -92,16 +93,21 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
     logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
     labels = labels[..., 1:].contiguous().view(-1)
 
-    # print("input:", CustomTokenizer.get_instance().decode(labels))
-    # print(batch_size)
-
-    # property_entries = get_property_entries()
-    # property_entries = []
-
+    # metrics_tensor is matrix containing perplexities related to properties
+    # metrics_tensor[i][0] shows the perplexity of the ith property
+    # metrics_tensor[i][1] shows the number of times the ith property occured
     metrics_tensor = torch.zeros(2, len(property_names), device=labels.device)
     metrics_tensor[0][0] = perplexity(logits, labels)
     metrics_tensor[1][0] = 1
 
+    start2end_tags = get_start2end_tags_map()
+
+    # start_brackets = torch.where(
+    #     torch.bitwise_or(
+    #         labels == CustomTokenizer.precomuted_ids["["][0],
+    #         labels == CustomTokenizer.precomuted_ids["[START_SMILES]"][0],
+    #     )
+    # )[0].to(labels.device)
     # start_brackets = torch.where(
     #     torch.bitwise_or(
     #         labels == CustomTokenizer.precomuted_ids["["][0],
