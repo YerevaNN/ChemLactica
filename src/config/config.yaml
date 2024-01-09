@@ -19,4 +19,4 @@ tpu_env: []
 tpu_use_cluster: false
 tpu_use_sudo: false
 use_cpu: false
-# main_process_port: 30001
+main_process_port: 30001
