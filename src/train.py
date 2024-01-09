@@ -265,7 +265,6 @@ def train(
             else nullcontext()
         )
 
-        trainer.evaluate()
         with prof_context_manager as prof:
             try:
                 trainer.train(resume_from_checkpoint=resume_from_checkpoint)
