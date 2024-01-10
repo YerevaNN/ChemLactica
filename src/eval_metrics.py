@@ -69,7 +69,6 @@ property_names = (
 #     construct_prop_entries function once and return the already created instance when requested.
 # """
 
-@cache
 def get_prop2index_map(start2end_tags: dict):
     prop2index_map = {start: i for i, start in enumerate(start2end_tags.keys())}
     def inner_func(prop: str):
@@ -77,7 +76,6 @@ def get_prop2index_map(start2end_tags: dict):
     return inner_func
 
 
-@cache
 def get_index2prop_map(start2end_tags: dict):
     index2prop_map = [start for start in start2end_tags.keys()]
     def inner_func(index: int):
@@ -109,13 +107,13 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
     # print(tokenizer.decode(labels))
 
     # metrics_tensor is matrix containing perplexities related to properties
-    # metrics_tensor[i][0] shows the perplexity of the ith property
-    # metrics_tensor[i][1] shows the number of times the ith property occured
-    # metrics_tensor[-1] is for the perplexity of the whole sequence
+    # metrics_tensor[0][i] shows the perplexity of the ith property
+    # metrics_tensor[1][i] shows the number of times the ith property occured
+    # metrics_tensor[...][-1] is for the perplexity of the whole sequence
     start2end_tags = get_start2end_tags_map()
-    metrics_tensor = torch.zeros(len(start2end_tags) + 1, 2, device=labels.device)
-    metrics_tensor[-1][0] = perplexity(logits, labels)
-    metrics_tensor[-1][1] = 1
+    metrics_tensor = torch.zeros(2, len(start2end_tags) + 1, device=labels.device)
+    metrics_tensor[0][-1] = perplexity(logits, labels)
+    metrics_tensor[1][-1] = 1
 
     start_tags_mask = torch.zeros(labels.size(0), dtype=torch.bool, device=labels.device)
     end_tags_mask = torch.zeros(labels.size(0), dtype=torch.bool, device=labels.device)
@@ -144,8 +142,8 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
             end_index = end_tags_indices[second_ptr]
             index = prop2index(tokenizer.decode(labels[start_index]))
             # print(tokenizer.decode(labels[start_index]), ":", index, "perp", perplexity(logits[start_index+1:end_index], labels[start_index+1:end_index]))
-            metrics_tensor[index][0] += perplexity(logits[start_index+1:end_index], labels[start_index+1:end_index])
-            metrics_tensor[index][1] += 1
+            metrics_tensor[0][index] += perplexity(logits[start_index+1:end_index], labels[start_index+1:end_index])
+            metrics_tensor[1][index] += 1
         first_ptr += 1
 
     # start_brackets = torch.where(
@@ -201,8 +199,11 @@ def compute_metrics(eval_pred: transformers.EvalPrediction):
     properties_count = logits[1::2].sum(axis=0)
     properties_count = torch.max(torch.ones_like(properties_count), properties_count)
 
-    prep = {
-        property_names[i]: loss
-        for i, loss in enumerate(properties_perp / properties_count)
+    index2prop = get_index2prop_map(get_start2end_tags_map())
+    propwise_perp = {
+        index2prop(i)[1:-1]: loss
+        for i, loss in enumerate(properties_perp[:-1] / properties_count[:-1])
     }
-    return prep
+    propwise_perp["perplexity"] = properties_perp[-1] / properties_count[-1]
+    propwise_perp["SMILES"] = propwise_perp.pop("START_SMILES")
+    return propwise_perp
