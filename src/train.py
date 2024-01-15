@@ -83,7 +83,7 @@ def train(
     print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
     model = load_model(
         from_pretrained, use_flash_attn=use_flash_attn, train_config=train_config
-    ).to(accelerator.device)
+    )
     if not resume_from_checkpoint:
         model.resize_token_embeddings(train_config["vocab_size"] + len(special_tokens))
 
