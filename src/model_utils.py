@@ -1,5 +1,5 @@
 from transformers import OPTForCausalLM, OPTConfig
-from utils import chemlactica_special_tokens
+from utils import get_tokenizer_special_tokens
 import bitsandbytes as bnb
 from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
 import torch
@@ -33,9 +33,7 @@ def find_all_linear_names(model):
 
 
 def get_llama_token_count():
-    added_chem_token_count = len(
-        chemlactica_special_tokens["additional_special_tokens"]
-    )  # noqa
+    added_chem_token_count = len(get_tokenizer_special_tokens())
     added_pad_token_count = 1
     return added_chem_token_count + added_pad_token_count
 
