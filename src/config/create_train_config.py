@@ -28,11 +28,11 @@ model_train_configs["mistral7b"]["warmup_steps"] = 2000
 
 model_train_configs["125m"]["max_learning_rate"] = 0.0014
 
-model_train_configs["1.3b"]["warmup_steps"] = 2000
-model_train_configs["1.3b"]["max_learning_rate"] = 1.0e-5
-model_train_configs["1.3b"]["global_gradient_norm"] = 0.1
-
 model_train_configs["llama2"]["tokenizer_id"] = "src/tokenizer/chemllama2-tokenizer"
 model_train_configs["llama2"]["warmup_steps"] = 500
 model_train_configs["llama2"]["max_learning_rate"] = 3.0e-5
 model_train_configs["llama2"]["global_gradient_norm"] = 0.1
+
+model_train_configs["1.3b"]["warmup_steps"] = 500
+model_train_configs["1.3b"]["max_learning_rate"] = 0.0014
+model_train_configs["1.3b"]["global_gradient_norm"] = 1.0

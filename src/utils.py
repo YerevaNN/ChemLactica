@@ -54,8 +54,6 @@ def signal_handler(sig, frame):
 if __name__ == "__main__":
     import sys
     import glob
-    print(len(get_tokenizer_special_tokens()))
-    sys.exit()
 
     # from utils import CustomTokenizer
     from config.create_train_config import model_train_configs

@@ -14,7 +14,7 @@ from transformers import (
     # Trainer,
     TrainingArguments,
     ProgressCallback,
-    # get_polynomial_decay_schedule_with_warmup,
+    get_polynomial_decay_schedule_with_warmup,
 )
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
@@ -175,6 +175,7 @@ def train(
             trainer_callback_dict[
                 "json_dataset_resume_callback"
             ] = JsonlDatasetResumeCallback(shared_jsonl_files)
+            print(f"shared jsonl files {shared_jsonl_files}")
         checkpoints_dir = os.path.join(
             checkpoints_root_dir,
             "facebook",
@@ -210,8 +211,8 @@ def train(
             learning_rate=train_config["max_learning_rate"],
             # lr_scheduler_type="linear",
             # weight_decay=train_config["weight_decay"],
-            # adam_beta1=train_config["adam_beta1"],
-            # adam_beta2=train_config["adam_beta2"],
+            adam_beta1=train_config["adam_beta1"],
+            adam_beta2=train_config["adam_beta2"],
             # warmup_steps=train_config["warmup_steps"],
             max_grad_norm=train_config["global_gradient_norm"],
             evaluation_strategy="steps",
