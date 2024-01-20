@@ -7,9 +7,7 @@ import shutil
 
 import torch
 
-from test_utils import create_train_command
-
-test_directory = "/tmp/chemlactica_fsdp_precommit_test"
+from test_utils import create_train_command, TEST_DIR, TD_PATH
 
 
 class TestModelTraining(unittest.TestCase):
@@ -19,14 +17,14 @@ class TestModelTraining(unittest.TestCase):
         gc.collect()
         torch.cuda.empty_cache()
 
-        if os.path.exists(test_directory):
-            print(f"Removing {test_directory}")
-            shutil.rmtree(test_directory)
-        os.mkdir(test_directory)
-        os.mkdir(f"{test_directory}/checkpoints")
+        if os.path.exists(TEST_DIR):
+            print(f"Removing {TEST_DIR}")
+            shutil.rmtree(TEST_DIR)
+        os.mkdir(TEST_DIR)
+        os.mkdir(os.path.join(TEST_DIR, "checkpoints"))
 
     def tearDown(self):
-        shutil.rmtree(test_directory)
+        shutil.rmtree(TEST_DIR)
 
         # clean up
         gc.collect()
@@ -44,14 +42,16 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
-                "training_data_dir": ".small_data/train",
-                "valid_data_dir": ".small_data/valid",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
+                "dir_data_types": "comp assay",
+                "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
+                "shuffle_buffer_size": 4,
                 "max_steps": 1000,
                 "eval_steps": 2000,
                 "save_steps": 2000,
                 "dataloader_num_workers": 1,
-                "checkpoints_root_dir": f"{test_directory}/checkpoints",
+                "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
                 "experiment_name": "fsdp_model_train",
                 "gradient_accumulation_steps": 1,
                 "no_track": "",
@@ -78,14 +78,15 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
-                "training_data_dir": ".small_data/train",
-                "valid_data_dir": ".small_data/valid",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
+                "dir_data_types": "comp assay",
+                "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
                 "max_steps": 100,
                 "eval_steps": 10,
                 "save_steps": 2000,
                 "dataloader_num_workers": 1,
-                "checkpoints_root_dir": f"{test_directory}/checkpoints",
+                "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
                 "experiment_name": "fsdp_model_valid",
                 "gradient_accumulation_steps": 1,
                 "no_track": "",
@@ -112,14 +113,15 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
-                "training_data_dir": ".small_data/train",
-                "valid_data_dir": ".small_data/valid",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
+                "dir_data_types": "comp assay",
+                "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
                 "max_steps": 20,
                 "eval_steps": 10,
                 "save_steps": 10,
                 "dataloader_num_workers": 1,
-                "checkpoints_root_dir": f"{test_directory}/checkpoints",
+                "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
                 "experiment_name": "fsdp_model_resume",
                 "gradient_accumulation_steps": 1,
                 "no_track": "",
@@ -139,16 +141,17 @@ class TestModelTraining(unittest.TestCase):
             module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
             script="src/train.py",
             script_args={
-                "from_pretrained": f"{test_directory}/checkpoints/facebook/galactica-125m/none/checkpoint-{20}",
+                "from_pretrained": os.path.join(TEST_DIR, "/checkpoints/facebook/galactica-125m/none/checkpoint-20"),
                 "model_config": "125m",
-                "training_data_dir": ".small_data/train",
-                "valid_data_dir": ".small_data/valid",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
+                "dir_data_types": "comp assay",
+                "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
                 "max_steps": 40,
                 "eval_steps": 10,
                 "save_steps": 10,
                 "dataloader_num_workers": 1,
-                "checkpoints_root_dir": f"{test_directory}/checkpoints",
+                "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
                 "experiment_name": "fsdp_model_resume",
                 "gradient_accumulation_steps": 1,
                 "no_track": "", 

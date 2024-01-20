@@ -60,6 +60,7 @@ def train(
     eval_steps,
     save_steps,
     train_batch_size,
+    shuffle_buffer_size,
     experiment_name,
     checkpoints_root_dir,
     dataloader_num_workers,
@@ -209,8 +210,7 @@ def train(
             fp16=False,
             logging_dir=track_dir,
             learning_rate=train_config["max_learning_rate"],
-            # lr_scheduler_type="linear",
-            # weight_decay=train_config["weight_decay"],
+            weight_decay=train_config["weight_decay"],
             adam_beta1=train_config["adam_beta1"],
             adam_beta2=train_config["adam_beta2"],
             # warmup_steps=train_config["warmup_steps"],
@@ -235,55 +235,59 @@ def train(
             # load_best_model=True
         )
 
-        # train_dataset = load_dataset(
-        #     "text",
-        #     data_files={"train": training_data_files},
-        #     streaming=True,
-        # )
-
-        print("TRAINING directories", training_data_dirs, dir_data_types)
+        # print("TRAINING directories", training_data_dirs, dir_data_types)
         assert len(training_data_dirs) == len(dir_data_types)
-        train_data_dict = {}
-        split_identifier = 0
-        for training_data_dir,dir_data_type in zip(training_data_dirs,dir_data_types):
+        train_dataset_dict = {}
+        print("---Training dataset names---")
+        for i, (training_data_dir, dir_data_type) in enumerate(zip(training_data_dirs, dir_data_types)):
             training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-            train_data_dict[f"{dir_data_type}_1"] = IterableDataset.from_generator(
-                    samples_generator,
-                    gen_kwargs = {
-                        "files" : training_data_files,
-                        "shared_jsonl_files" : shared_jsonl_files
-                    }
-                )
-            split_identifier+=1
+            ds_name = f"{dir_data_type}_1"
+            is_assay_split = "assay" in dir_data_type
+            dataset = IterableDataset.from_generator(
+                samples_generator,
+                gen_kwargs = {
+                    "files" : training_data_files,
+                    "shared_jsonl_files" : shared_jsonl_files
+                }
+            )
+            dataset = process_dataset(
+                dataset=dataset,
+                train_config=train_config,
+                process_batch_sizes=(50, 50),
+                is_eval=False,
+                assay=is_assay_split
+            )
+            if is_assay_split:
+                dataset.shuffle(buffer_size=shuffle_buffer_size)
+            print(f"Dataset {i}: {ds_name}")
+            train_dataset_dict[ds_name] = dataset
 
-        train_dataset = IterableDatasetDict(
-                train_data_dict
-                # "train": IterableDataset.from_generator(
-                #     samples_generator,
-                #     gen_kwargs={
-                #         "files": training_data_files,
-                #         "shared_jsonl_files": shared_jsonl_files,
-                #     },
-                # )
-        )
         valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
         eval_dataset = load_dataset(
             "text", data_files={"validation": valid_data_files}, streaming=False
         )
 
-        for split_name in train_dataset.keys():
-            is_assay_split = "assay" in split_name
-            train_dataset[split_name] = process_dataset(
-                    dataset=train_dataset[split_name],
-                    train_config = train_config,
-                    process_batch_sizes=(50,50),
-                    is_eval = False,
-                    assay = is_assay_split
-            )
-        split_train_datasets = [train_dataset[split] for split in train_dataset.keys()]
-        # processed_train_dataset =concatenate_datasets(split_datasets)
-        final_train_dataset = interleave_datasets(split_train_datasets)
-        final_train_dataset = final_train_dataset.shuffle(buffer_size=2)
+        # for split_name in train_dataset.keys():
+        #     is_assay_split = "assay" in split_name
+        #     train_dataset[split_name] = process_dataset(
+        #         dataset=train_dataset[split_name],
+        #         train_config=train_config,
+        #         process_batch_sizes=(50, 50),
+        #         is_eval=False,
+        #         assay=is_assay_split
+        #     )
+        #     if is_assay_split:
+        #         train_dataset.shuffle(buffer_size=shuffle_buffer_size)
+
+        train_dataset = list(train_dataset_dict.values())
+        if len(train_dataset) > 1:
+            train_dataset = interleave_datasets(train_dataset)
+        else:
+            train_dataset = train_dataset[0]
+
+        # processed_train_dataset = concatenate_datasets(split_datasets)
+        # final_train_dataset = interleave_datasets(split_train_datasets)
+        # final_train_dataset = final_train_dataset.shuffle(buffer_size=shuffle_buffer_size)
         # processed_train_dataset = process_dataset(
         #     dataset=train_dataset,
         #     train_config=train_config,
@@ -308,13 +312,11 @@ def train(
             assay=False,
         )
 
-        # shuffled_train_dataset = processed_train_dataset.shuffle(buffer_size=2)
-
         trainer = CustomTrainer(
             model=model,
             args=training_args,
             compute_metrics=compute_metrics,
-            train_dataset=final_train_dataset,
+            train_dataset=train_dataset,
             eval_dataset=processed_eval_dataset["validation"],
             # optimizers=[optimizer, lr_scheduler],
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
@@ -328,6 +330,9 @@ def train(
             if trainer_callback_dict.get("profiller_callback") is not None
             else nullcontext()
         )
+
+        for sample in train_dataset:
+            print(sample)
 
         with prof_context_manager as prof:
             try:
@@ -423,6 +428,15 @@ if __name__ == "__main__":
         required=False,
         help="valid batch size (per GPU when using dist validation)",
         default=None,
+    )
+    parser.add_argument(
+        "--shuffle_buffer_size",
+        type=int,
+        metavar="SBS",
+        dest="shuffle_buffer_size",
+        required=False,
+        help="the buffer size of the buffered shuffle",
+        default=4
     )
     parser.add_argument(
         "--experiment_name",

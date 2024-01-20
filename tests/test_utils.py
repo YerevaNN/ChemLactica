@@ -1,3 +1,8 @@
+# testing data path
+TD_PATH = "/nfs/dgx/raid/chem/testing_data"
+TEST_DIR = "./testing"
+
+
 def create_train_command(module, module_args, script, script_args):
     train_command = "python3 -m "
     train_command += (

@@ -10,9 +10,6 @@ import torch
 from test_utils import create_train_command
 
 
-test_directory = "/tmp/chemlactica_fsdp_precommit_test"
-
-
 class TestConsistencyOfModelOutput(unittest.TestCase):
 
     def setUp(self):
@@ -20,9 +17,9 @@ class TestConsistencyOfModelOutput(unittest.TestCase):
         gc.collect()
         torch.cuda.empty_cache()
 
-        if os.path.exists(test_directory):
-            print(f"Removing {test_directory}")
-            shutil.rmtree(test_directory)
+        if os.path.exists(TEST_DIR):
+            print(f"Removing {TEST_DIR}")
+            shutil.rmtree(TEST_DIR)
         os.mkdir(test_directory)
         os.mkdir(f"{test_directory}/checkpoints")
 
