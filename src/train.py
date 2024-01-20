@@ -331,9 +331,6 @@ def train(
             else nullcontext()
         )
 
-        for sample in train_dataset:
-            print(sample)
-
         with prof_context_manager as prof:
             try:
                 trainer.train(resume_from_checkpoint=resume_from_checkpoint)

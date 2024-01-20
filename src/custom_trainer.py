@@ -1,9 +1,28 @@
 import shutil
+from typing import Any, Dict
+from torch._tensor import Tensor
+from torch.nn.modules import Module
+from torch.optim.optimizer import Optimizer as Optimizer
 from transformers import Trainer
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP
+from utils import get_tokenizer
 
 
 class CustomTrainer(Trainer):
+
+    def __init__(self, *args, **kwargs):
+        # the number of samples to print when the training begins, for debugging purposes
+        self.num_samples_to_print = 5
+        super().__init__(*args, **kwargs)
+
+    def training_step(self, model: Module, inputs: Dict[str, Tensor | Any]) -> Tensor:
+        if self.num_samples_to_print:
+            tokeinzer = get_tokenizer()
+            for i in range(min(inputs["input_ids"].size(0), self.num_samples_to_print)):
+                print(f"Sample {i + 1}:", tokeinzer.decode(inputs["input_ids"][i]))
+            self.num_samples_to_print = None
+        return super().training_step(model, inputs)
+
     def _save_checkpoint(self, model, trial, metrics=None):
         if shutil.disk_usage('/').free > 3 * 1024 ** 3: 
             super()._save_checkpoint(model, trial, metrics=None)
