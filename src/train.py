@@ -535,7 +535,7 @@ if __name__ == "__main__":
         help="whether or not to use gradient_checkpointing",
     )
     parser.add_argument(
-        "--check-reproducability",
+        "--check_reproducability",
         action="store_true",
         dest="check_reproducability",
         help="whether or not check reproducability (should only be use for testing)",

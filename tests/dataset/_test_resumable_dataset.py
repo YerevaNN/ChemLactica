@@ -12,6 +12,7 @@ from datasets.dataset_dict import IterableDatasetDict
 from transformers.trainer_utils import seed_worker
 
 from jsonl_dataset import samples_generator
+from test_utils import TD_PATH
 
 
 class TestDataloader(unittest.TestCase):
@@ -63,11 +64,39 @@ class TestDataloader(unittest.TestCase):
             2. We do 2 stages, the first one is a dataset starting from scratch
             and the second one a dataset (fast) resumed
         """
-        training_data_dir = ".small_data/train"
-        valid_data_dir = ".small_data/valid"
 
         with multiprocessing.Manager() as manager:
             shared_jsonl_files = manager.dict()
+
+            training_data_dirs = [os.path.join(TD_PATH, "comp_train"), os.path.join(TD_PATH, "assay_train")]
+            valid_data_dir = os.path.join(TD_PATH, "comp_valid")
+            shuffle_buffer_size = 4
+
+            train_dataset_dict = {}
+            print("---Training dataset names---")
+            for i, (training_data_dir, dir_data_type) in enumerate(zip(training_data_dirs, dir_data_types)):
+                training_data_files = glob.glob(training_data_dir + "/*.jsonl")
+                ds_name = f"{dir_data_type}_1"
+                is_assay_split = "assay" in dir_data_type
+                dataset = IterableDataset.from_generator(
+                    samples_generator,
+                    gen_kwargs = {
+                        "files" : training_data_files,
+                        "shared_jsonl_files" : shared_jsonl_files
+                    }
+                )
+                dataset = process_dataset(
+                    dataset=dataset,
+                    train_config=train_config,
+                    process_batch_sizes=(50, 50),
+                    is_eval=False,
+                    assay=is_assay_split
+                )
+                if is_assay_split:
+                    dataset.shuffle(buffer_size=shuffle_buffer_size)
+                print(f"Dataset {i}: {ds_name}")
+                train_dataset_dict[ds_name] = dataset
+
             training_data_files = glob.glob(training_data_dir + "/*.jsonl")
             # combine small train and valid to have 2 files to test
             training_data_files.extend(glob.glob(valid_data_dir + "/*.jsonl"))

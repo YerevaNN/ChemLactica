@@ -42,15 +42,15 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
-                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
-                "dir_data_types": "comp assay",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'assay_train')}",
+                "dir_data_types": "assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
                 "shuffle_buffer_size": 4,
                 "max_steps": 1000,
                 "eval_steps": 2000,
                 "save_steps": 2000,
-                "dataloader_num_workers": 1,
+                "dataloader_num_workers": 8,
                 "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
                 "experiment_name": "fsdp_model_train",
                 "gradient_accumulation_steps": 1,
@@ -60,11 +60,43 @@ class TestModelTraining(unittest.TestCase):
         )
 
         print(f"Running command: {command}")
-        out = subprocess.run(command, shell=True, capture_output=True)
+        out = subprocess.run(command, shell=True, capture_output=False)
         if out.returncode != 0:
             raise Exception(out.stderr.decode())
-        else:
-            print(out.stdout.decode())
+
+    def test_model_train_interleaved(self):
+        # clean up
+        gc.collect()
+        torch.cuda.empty_cache()
+
+        command = create_train_command(
+            module="accelerate.commands.launch",
+            module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
+            script="src/train.py",
+            script_args={
+                "from_pretrained": "facebook/galactica-125m",
+                "model_config": "125m",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
+                "dir_data_types": "comp assay",
+                "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
+                "train_batch_size": 4,
+                "shuffle_buffer_size": 4,
+                "max_steps": 1000,
+                "eval_steps": 2000,
+                "save_steps": 2000,
+                "dataloader_num_workers": 8,
+                "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
+                "experiment_name": "fsdp_model_train",
+                "gradient_accumulation_steps": 1,
+                "no_track": "",
+                "flash_attn": "",
+            }
+        )
+
+        print(f"Running command: {command}")
+        out = subprocess.run(command, shell=True, capture_output=False)
+        if out.returncode != 0:
+            raise Exception(out.stderr.decode())
 
     def test_model_valid(self):
         # clean up
@@ -85,7 +117,7 @@ class TestModelTraining(unittest.TestCase):
                 "max_steps": 100,
                 "eval_steps": 10,
                 "save_steps": 2000,
-                "dataloader_num_workers": 1,
+                "dataloader_num_workers": 8,
                 "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
                 "experiment_name": "fsdp_model_valid",
                 "gradient_accumulation_steps": 1,
@@ -95,11 +127,9 @@ class TestModelTraining(unittest.TestCase):
         )
 
         print(f"Running command: {command}")
-        out = subprocess.run(command, shell=True, capture_output=True)
+        out = subprocess.run(command, shell=True, capture_output=False)
         if out.returncode != 0:
             raise Exception(out.stderr.decode())
-        else:
-            print(out.stdout.decode())
 
     def test_model_resume(self):
         # clean up
@@ -120,7 +150,7 @@ class TestModelTraining(unittest.TestCase):
                 "max_steps": 20,
                 "eval_steps": 10,
                 "save_steps": 10,
-                "dataloader_num_workers": 1,
+                "dataloader_num_workers": 8,
                 "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
                 "experiment_name": "fsdp_model_resume",
                 "gradient_accumulation_steps": 1,
@@ -130,18 +160,16 @@ class TestModelTraining(unittest.TestCase):
         )
 
         print(f"Running command: {first_command}")
-        out = subprocess.run(first_command, shell=True, capture_output=True)
+        out = subprocess.run(first_command, shell=True, capture_output=False)
         if out.returncode != 0:
             raise Exception(out.stderr.decode())
-        else:
-            print(out.stdout.decode())
 
         second_command = create_train_command(
             module="accelerate.commands.launch",
             module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
             script="src/train.py",
             script_args={
-                "from_pretrained": os.path.join(TEST_DIR, "/checkpoints/facebook/galactica-125m/none/checkpoint-20"),
+                "from_pretrained": os.path.join(TEST_DIR, "checkpoints/facebook/galactica-125m/none/checkpoint-20"),
                 "model_config": "125m",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
                 "dir_data_types": "comp assay",
@@ -150,7 +178,7 @@ class TestModelTraining(unittest.TestCase):
                 "max_steps": 40,
                 "eval_steps": 10,
                 "save_steps": 10,
-                "dataloader_num_workers": 1,
+                "dataloader_num_workers": 8,
                 "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
                 "experiment_name": "fsdp_model_resume",
                 "gradient_accumulation_steps": 1,
@@ -160,11 +188,9 @@ class TestModelTraining(unittest.TestCase):
         )
 
         print(f"Running command: {second_command}")
-        out = subprocess.run(second_command, shell=True, capture_output=True)
+        out = subprocess.run(second_command, shell=True, capture_output=False)
         if out.returncode != 0:
             raise Exception(out.stderr.decode())
-        else:
-            print(out.stdout.decode())
 
 
 if __name__ == "__main__":

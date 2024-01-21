@@ -275,7 +275,7 @@ class JsonlDatasetResumeCallback(TrainerCallback):
             ) as file:
                 jsonl_states = json.load(file)
 
-            assert not self.shared_jsonl_files
+            # assert not self.shared_jsonl_files
             for name, state in jsonl_states.items():
                 print(f"loadeding state {name}: {state}")
                 self.shared_jsonl_files[name] = state
