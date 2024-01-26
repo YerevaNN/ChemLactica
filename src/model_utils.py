@@ -3,8 +3,8 @@ from utils import get_tokenizer_special_tokens
 import bitsandbytes as bnb
 from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
 import torch
-from custom_modeling_opt import CustomOPTForCausalLM
 from transformers import BitsAndBytesConfig
+from custom_modeling_opt import OPTForCausalLM
 
 
 quant_config = BitsAndBytesConfig(
@@ -58,7 +58,6 @@ def load_model(
             )
         )
     if "galactica" in from_pretrained.lower():
-        model = CustomOPTForCausalLM.from_pretrained(
-            from_pretrained, use_flash_attn=use_flash_attn, torch_dtype=dtype
-        )
+        model = OPTForCausalLM.from_pretrained(
+        from_pretrained, use_flash_attn=use_flash_attn, torch_dtype=dtype, attn_implementation="flash_attention_2")
     return model
