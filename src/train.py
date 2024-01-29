@@ -14,14 +14,15 @@ from transformers import (
     # Trainer,
     TrainingArguments,
     ProgressCallback,
-    get_polynomial_decay_schedule_with_warmup,
+    # get_polynomial_decay_schedule_with_warmup,
 )
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
 import torch
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
-from datasets.dataset_dict import IterableDatasetDict
+
+# from datasets.dataset_dict import IterableDatasetDict
 
 from callbacks import (
     CustomAimCallback,
@@ -227,6 +228,7 @@ def train(
             dataloader_num_workers=dataloader_num_workers,
             logging_steps=1,
             gradient_checkpointing=gradient_checkpointing,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
             gradient_accumulation_steps=gradient_accumulation_steps,
             save_total_limit=4,
             resume_from_checkpoint=resume_from_checkpoint,
@@ -239,23 +241,25 @@ def train(
         assert len(training_data_dirs) == len(dir_data_types)
         train_dataset_dict = {}
         print("---Training dataset names---")
-        for i, (training_data_dir, dir_data_type) in enumerate(zip(training_data_dirs, dir_data_types)):
+        for i, (training_data_dir, dir_data_type) in enumerate(
+            zip(training_data_dirs, dir_data_types)
+        ):
             training_data_files = glob.glob(training_data_dir + "/*.jsonl")
             ds_name = f"{dir_data_type}_1"
             is_assay_split = "assay" in dir_data_type
             dataset = IterableDataset.from_generator(
                 samples_generator,
-                gen_kwargs = {
-                    "files" : training_data_files,
-                    "shared_jsonl_files" : shared_jsonl_files
-                }
+                gen_kwargs={
+                    "files": training_data_files,
+                    "shared_jsonl_files": shared_jsonl_files,
+                },
             )
             dataset = process_dataset(
                 dataset=dataset,
                 train_config=train_config,
                 process_batch_sizes=(50, 50),
                 is_eval=False,
-                assay=is_assay_split
+                assay=is_assay_split,
             )
             if is_assay_split:
                 dataset.shuffle(buffer_size=shuffle_buffer_size)
@@ -366,7 +370,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--training_data_dirs",
         metavar="DT",
-        nargs='*',
+        nargs="*",
         dest="training_data_dirs",
         required=True,
         help="path to directory containing training data",
@@ -374,7 +378,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dir_data_types",
         metavar="DD",
-        nargs='*',
+        nargs="*",
         dest="dir_data_types",
         required=True,
         help="corresponding type of data for directory (in same order)",
@@ -433,7 +437,7 @@ if __name__ == "__main__":
         dest="shuffle_buffer_size",
         required=False,
         help="the buffer size of the buffered shuffle",
-        default=4
+        default=4,
     )
     parser.add_argument(
         "--experiment_name",
