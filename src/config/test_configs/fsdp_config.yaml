@@ -7,7 +7,7 @@ fsdp_config:
   fsdp_offload_params: false
   fsdp_sharding_strategy: 1
   fsdp_state_dict_type: FULL_STATE_DICT
-  fsdp_transformer_layer_cls_to_wrap: CustomOPTForCausalLM
+  fsdp_transformer_layer_cls_to_wrap: OPTForCausalLM
 machine_rank: 0
 main_training_function: main
 mixed_precision: bf16
