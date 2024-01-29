@@ -1,10 +1,11 @@
 from transformers import OPTForCausalLM, OPTConfig
 from utils import get_tokenizer_special_tokens
+
 import bitsandbytes as bnb
-from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
+
+# from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
 import torch
 from transformers import BitsAndBytesConfig
-from custom_modeling_opt import OPTForCausalLM
 
 
 quant_config = BitsAndBytesConfig(
@@ -32,6 +33,16 @@ def find_all_linear_names(model):
     return list(lora_module_names)
 
 
+def select_attention_implementation(use_flash_attn):
+    # flash attention 1 not even supported in huggingface
+    # also, we have no special need for it regardless
+    # see: https://github.com/huggingface/transformers/blob/da3c79b245afcce88f5db79ada10bf5b7c200ab1/src/transformers/models/opt/modeling_opt.py#L496 # noqa
+    if use_flash_attn:
+        return "flash_attention_2"
+    else:
+        return "eager"
+
+
 def get_llama_token_count():
     added_chem_token_count = len(get_tokenizer_special_tokens())
     added_pad_token_count = 1
@@ -45,6 +56,7 @@ def load_model(
     train_config=None,
     auth_token=None,
 ):
+    attn_implementation = select_attention_implementation(use_flash_attn)
     if from_pretrained == "small_opt":
         return OPTForCausalLM(
             OPTConfig(
@@ -59,5 +71,6 @@ def load_model(
         )
     if "galactica" in from_pretrained.lower():
         model = OPTForCausalLM.from_pretrained(
-        from_pretrained, use_flash_attn=use_flash_attn, torch_dtype=dtype, attn_implementation="flash_attention_2")
+            from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
+        )
     return model
