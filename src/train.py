@@ -97,7 +97,7 @@ def train(
         train_config=train_config,
         # auth_token=auth_token,
     )
-    special_tokens = get_tokenizer_special_tokens()
+    special_tokens = get_tokenizer_special_tokens(train_config["tokenizer_path"])
     print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
 
     if os.path.isdir(from_pretrained):
@@ -106,6 +106,7 @@ def train(
         resume_from_checkpoint = False
 
     if not resume_from_checkpoint:
+        # if we are continuing training, embeddings already resized
         model.resize_token_embeddings(train_config["vocab_size"] + len(special_tokens))
 
     trainer_callback_dict = {}
@@ -233,7 +234,7 @@ def train(
             save_total_limit=4,
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type="linear",
-            optim="adamw_torch"
+            optim="paged_adamw_8bit",
             # load_best_model=True
         )
 
