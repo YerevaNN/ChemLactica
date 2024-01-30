@@ -1,4 +1,4 @@
-from transformers import OPTForCausalLM, OPTConfig
+from transformers import OPTForCausalLM, OPTConfig, MistralForCausalLM
 from utils import get_tokenizer_special_tokens
 
 import bitsandbytes as bnb
@@ -71,6 +71,10 @@ def load_model(
         )
     if "galactica" in from_pretrained.lower():
         model = OPTForCausalLM.from_pretrained(
+            from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
+        )
+    if "mistral" in from_pretrained.lower():
+        model = MistralForCausalLM.from_pretrained(
             from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
         )
     return model
