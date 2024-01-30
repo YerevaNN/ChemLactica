@@ -7,7 +7,7 @@ from assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
 
 
 def generate_assay_docs(examples, train_config):
-    tokenizer = get_tokenizer()
+    tokenizer = get_tokenizer(train_config["tokenizer_path"])
     MODEL_CONTEXT_LENGTH = train_config["block_size"]
     final = {
         "input_ids": [],
@@ -41,8 +41,8 @@ def generate_assay_docs(examples, train_config):
     return final
 
 
-def tokenize_function(examples):
-    tokenizer = get_tokenizer()
+def tokenize_function(examples, train_config):
+    tokenizer = get_tokenizer(train_config["tokenizer_path"])
     # print(f"Process id: {os.getpid()}, {tokenizer}")
     return tokenizer(examples["text"])
 
@@ -63,9 +63,12 @@ def group_texts(examples, train_config):
     # Concatenate all texts.
     concatenated_examples = {
         "input_ids": torch.as_tensor(
-            sum(examples["input_ids"], [get_tokenizer().eos_token_id])
+            sum(
+                examples["input_ids"],
+                [get_tokenizer(train_config["tokenizer_path"]).eos_token_id],
+            )
         ),
-        "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
+        # "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
         "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),
     }
 
@@ -117,6 +120,7 @@ def process_dataset(
             tokenized_datasets = dataset.map(
                 tokenize_function,
                 batched=False,
+                fn_kwargs={"train_config": train_config},
                 remove_columns=["text"],
                 batch_size=process_batch_sizes[0],
                 num_proc=4,
@@ -132,6 +136,7 @@ def process_dataset(
             tokenized_datasets = dataset.map(
                 tokenize_function,
                 batched=True,
+                fn_kwargs={"train_config": train_config},
                 batch_size=process_batch_sizes[0],
                 remove_columns=["text"],
             )
