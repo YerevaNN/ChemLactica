@@ -34,10 +34,12 @@ def calc_hash_for_binary_file(path):
 
 
 class CustomProgressCallback(ProgressCallback):
-    def __init__(self, early_stopping_steps):
+    def __init__(self, early_stopping_steps, total_theoretical_peak_flops):
         self.training_bar = None
         self.prediction_bar = None
         self.early_stopping_steps = early_stopping_steps
+        self._start_flos = 0
+        self._total_theoretical_peak_flops = total_theoretical_peak_flops
 
     def on_train_begin(self, args, state, control, **kwargs):
         if state.is_world_process_zero:
@@ -45,10 +47,18 @@ class CustomProgressCallback(ProgressCallback):
                 total=self.early_stopping_steps, dynamic_ncols=True
             )
         self.current_step = 0
+        self._start_time = time.time()
 
     def on_log(self, args, state, control, logs=None, **kwargs):
+        elapsed_time = time.time() - self._start_time
+        new_flos = state.total_flos
+        elapsed_flos = (new_flos - self._start_flos) / elapsed_time
+        mfu = (elapsed_flos / self._total_theoretical_peak_flops) * 100
+        self._start_time = time.time()
+        self._start_flos = new_flos
         if state.is_local_process_zero and self.training_bar is not None:
             _ = logs.pop("total_flos", None)
+            logs.update({"mfu": mfu})
             self.training_bar.write(str(logs))
             logger.info(str(logs))
 

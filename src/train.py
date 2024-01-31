@@ -207,7 +207,9 @@ def train(
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
             accelerator, model_config, use_flash_attn
         )
-    trainer_callback_dict["progress_callback"] = CustomProgressCallback(max_steps)
+    trainer_callback_dict["progress_callback"] = CustomProgressCallback(
+        max_steps, total_theoretical_peak_flops
+    )
 
     accelerator.wait_for_everyone()
 
