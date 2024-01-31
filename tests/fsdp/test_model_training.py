@@ -2,7 +2,8 @@ import subprocess
 import unittest
 import gc
 import os
-import sys
+
+# import sys
 import shutil
 
 import torch
@@ -11,7 +12,6 @@ from test_utils import create_train_command, TEST_DIR, TD_PATH
 
 
 class TestModelTraining(unittest.TestCase):
-
     def setUp(self):
         # clean up
         gc.collect()
@@ -56,7 +56,7 @@ class TestModelTraining(unittest.TestCase):
                 "gradient_accumulation_steps": 1,
                 "no_track": "",
                 "flash_attn": "",
-            }
+            },
         )
 
         print(f"Running command: {command}")
@@ -76,8 +76,8 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
-                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
-                "dir_data_types": "comp assay",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
+                "dir_data_types": "computed assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
                 "shuffle_buffer_size": 4,
@@ -90,7 +90,7 @@ class TestModelTraining(unittest.TestCase):
                 "gradient_accumulation_steps": 1,
                 "no_track": "",
                 "flash_attn": "",
-            }
+            },
         )
 
         print(f"Running command: {command}")
@@ -110,8 +110,8 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
-                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
-                "dir_data_types": "comp assay",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
+                "dir_data_types": "computed assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
                 "max_steps": 100,
@@ -123,7 +123,7 @@ class TestModelTraining(unittest.TestCase):
                 "gradient_accumulation_steps": 1,
                 "no_track": "",
                 "flash_attn": "",
-            }
+            },
         )
 
         print(f"Running command: {command}")
@@ -143,8 +143,8 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
-                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
-                "dir_data_types": "comp assay",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
+                "dir_data_types": "computed assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
                 "max_steps": 20,
@@ -156,7 +156,7 @@ class TestModelTraining(unittest.TestCase):
                 "gradient_accumulation_steps": 1,
                 "no_track": "",
                 "flash_attn": "",
-            }
+            },
         )
 
         print(f"Running command: {first_command}")
@@ -169,10 +169,12 @@ class TestModelTraining(unittest.TestCase):
             module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
             script="src/train.py",
             script_args={
-                "from_pretrained": os.path.join(TEST_DIR, "checkpoints/facebook/galactica-125m/none/checkpoint-20"),
+                "from_pretrained": os.path.join(
+                    TEST_DIR, "checkpoints/facebook/galactica-125m/none/checkpoint-20"
+                ),
                 "model_config": "125m",
-                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
-                "dir_data_types": "comp assay",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
+                "dir_data_types": "computed assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
                 "max_steps": 40,
@@ -182,9 +184,9 @@ class TestModelTraining(unittest.TestCase):
                 "checkpoints_root_dir": os.path.join(TEST_DIR, "checkpoints"),
                 "experiment_name": "fsdp_model_resume",
                 "gradient_accumulation_steps": 1,
-                "no_track": "", 
+                "no_track": "",
                 "flash_attn": "",
-            }
+            },
         )
 
         print(f"Running command: {second_command}")
