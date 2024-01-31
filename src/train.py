@@ -38,7 +38,7 @@ from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from utils import signal_handler, get_tokenizer_special_tokens
 from model_utils import load_model
 from custom_trainer import CustomTrainer
-from dataset_utils import process_dataset
+from dataset_utils import process_dataset, DIR_DATA_TYPES
 from jsonl_dataset import samples_generator
 
 torch.manual_seed(42)
@@ -85,11 +85,14 @@ def train(
     )
 
     train_config = model_train_configs[model_config]
+    checkpoint_path_components = from_pretrained.split(os.path.sep)
     if os.path.isdir(from_pretrained):
-        resume_from_checkpoint = from_pretrained
+        organization = checkpoint_path_components[-4]
+        model_name = checkpoint_path_components[-3]
     else:
         resume_from_checkpoint = False
-
+        organization = checkpoint_path_components[-2]
+        model_name = checkpoint_path_components[-1]
     # auth_token = os.environ["HF_TOKEN"]
     model = load_model(
         from_pretrained,
@@ -97,6 +100,12 @@ def train(
         train_config=train_config,
         # auth_token=auth_token,
     )
+
+    if gradient_checkpointing:
+        model.use_cache = (
+            False  # use cache true doesn't work with gradient checkpointing
+        )
+
     special_tokens = get_tokenizer_special_tokens(train_config["tokenizer_path"])
     print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
 
@@ -181,8 +190,8 @@ def train(
             print(f"shared jsonl files {shared_jsonl_files}")
         checkpoints_dir = os.path.join(
             checkpoints_root_dir,
-            "facebook",
-            f"galactica-{model_config}",
+            organization,
+            f"{model_name}",
             experiment_hash,
         )
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
@@ -245,8 +254,13 @@ def train(
         for i, (training_data_dir, dir_data_type) in enumerate(
             zip(training_data_dirs, dir_data_types)
         ):
+            if dir_data_type.lower() not in DIR_DATA_TYPES:
+                raise ValueError(
+                    f"""Unknown data type {dir_data_type},
+                    the following data types are supported: {DIR_DATA_TYPES}"""
+                )
             training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-            ds_name = f"{dir_data_type}_1"
+            ds_name = f"{dir_data_type}_{i}"
             is_assay_split = "assay" in dir_data_type
             dataset = IterableDataset.from_generator(
                 samples_generator,
