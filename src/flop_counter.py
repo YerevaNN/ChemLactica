@@ -8,6 +8,20 @@ from torch.utils._python_dispatch import TorchDispatchMode
 aten = torch.ops.aten
 
 
+GPU_PRECISION_PEAK_FLOPS = {
+    "NVIDIA RTX A6000": {
+        "bf16": 40000000000000,
+        "fp32": 38700000000000,
+        "fp16": 40000000000000,
+    },
+    "A100 40GB SXM": {
+        "bf16": 312000000000000,
+        "fp32": 19500000000000,
+        "fp16": 19500000000000,
+    },
+}
+
+
 def get_shape(i):
     return i.shape
 

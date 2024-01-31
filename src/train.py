@@ -1,4 +1,5 @@
 import os
+import accelerate
 from datasets import interleave_datasets
 import signal
 import traceback
@@ -21,6 +22,7 @@ from accelerate.utils import broadcast_object_list
 import torch
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
+from flop_counter import GPU_PRECISION_PEAK_FLOPS
 
 # from datasets.dataset_dict import IterableDatasetDict
 
@@ -95,6 +97,29 @@ def train(
         resume_from_checkpoint = False
         organization = checkpoint_path_components[-2]
         model_name = checkpoint_path_components[-1]
+
+    gpus = []
+    gpus.append(torch.cuda.get_device_properties(accelerator.device.index).name)
+    accelerator.wait_for_everyone()
+    gathered_gpus = accelerate.utils.gather_object(gpus)
+    # if accelerator.is_main_process:
+
+    accelerator.wait_for_everyone()
+    if accelerator.is_main_process:
+        print(gathered_gpus)
+    total_theoretical_peak_flops = 0
+
+    if accelerator.mixed_precision == "no":
+        precision = "fp32"
+    else:
+        precision = str(accelerator.mixed_precision)
+
+    for gpu_name in gathered_gpus:
+        total_theoretical_peak_flops += GPU_PRECISION_PEAK_FLOPS[str(gpu_name)][
+            precision
+        ]
+    print(total_theoretical_peak_flops)
+
     # auth_token = os.environ["HF_TOKEN"]
     model = load_model(
         from_pretrained,
