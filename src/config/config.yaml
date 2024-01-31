@@ -8,7 +8,7 @@ fsdp_config:
   fsdp_sharding_strategy: 1
   fsdp_state_dict_type: FULL_STATE_DICT
   fsdp_use_orig_params: true
-  fsdp_transformer_layer_cls_to_wrap: MistralDecoderLayer,MistralRMSNorm
+  fsdp_transformer_layer_cls_to_wrap: OPTForCausalLM
   fsdp_activation_checkpointing: true
 machine_rank: 0
 main_training_function: main
