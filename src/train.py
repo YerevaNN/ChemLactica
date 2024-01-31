@@ -32,6 +32,7 @@ from callbacks import (
     CustomProgressCallback,
     ReproducabilityCallback,
     JsonlDatasetResumeCallback,
+    EarlyStoppingCallback,
 )
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
@@ -58,6 +59,7 @@ def train(
     dir_data_types,
     valid_data_dir,
     max_steps,
+    scheduler_max_steps,
     eval_steps,
     save_steps,
     train_batch_size,
@@ -171,12 +173,16 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
+    trainer_callback_dict["early stop callback"] = EarlyStoppingCallback(
+        early_stopping_steps=(max_steps)
+    )
+
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     if check_reproducability:
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
             accelerator, model_config, use_flash_attn
         )
-    trainer_callback_dict["progress_callback"] = CustomProgressCallback()
+    trainer_callback_dict["progress_callback"] = CustomProgressCallback(max_steps)
 
     accelerator.wait_for_everyone()
 
@@ -196,20 +202,10 @@ def train(
         )
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
-        # optimizer = AdamW(
-        #     model.parameters(),
-        #     lr=train_config["max_learning_rate"],
-        #     betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
-        #     weight_decay=train_config["weight_decay"],
-        # )
-
-        # lr_scheduler = get_polynomial_decay_schedule_with_warmup(
-        #     optimizer,
-        #     num_warmup_steps=train_config["warmup_steps"],
-        #     num_training_steps=max_steps,
-        #     lr_end=0.0 * train_config["max_learning_rate"],
-        #     power=1.0,
-        # )
+        if not scheduler_max_steps:
+            # If we don't explicitly specify when the scheduler should plan to finish:
+            # it will finish at max_steps when training ends so we anneal to 0 LR.
+            scheduler_max_steps = max_steps
 
         training_args = TrainingArguments(
             output_dir=checkpoints_dir,
@@ -224,10 +220,10 @@ def train(
             weight_decay=train_config["weight_decay"],
             adam_beta1=train_config["adam_beta1"],
             adam_beta2=train_config["adam_beta2"],
-            # warmup_steps=train_config["warmup_steps"],
+            warmup_steps=train_config["warmup_steps"],
             max_grad_norm=train_config["global_gradient_norm"],
             evaluation_strategy="steps",
-            max_steps=max_steps,
+            max_steps=scheduler_max_steps,
             eval_steps=eval_steps,
             save_steps=save_steps,
             dataloader_drop_last=True,
@@ -413,6 +409,15 @@ if __name__ == "__main__":
         dest="max_steps",
         required=True,
         help="the number of steps to train (overrides the n_epochs)",
+    )
+    parser.add_argument(
+        "--scheduler_max_steps",
+        type=int,
+        metavar="SMS",
+        dest="scheduler_max_steps",
+        required=False,
+        default=None,
+        help="the number of steps the scheduler should run",
     )
     parser.add_argument(
         "--eval_steps",
