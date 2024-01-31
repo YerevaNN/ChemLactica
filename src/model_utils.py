@@ -75,6 +75,9 @@ def load_model(
         )
     if "mistral" in from_pretrained.lower():
         model = MistralForCausalLM.from_pretrained(
-            from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
+            from_pretrained,
+            torch_dtype=dtype,
+            attn_implementation=attn_implementation,
+            sliding_window=train_config["sliding_window"],
         )
     return model
