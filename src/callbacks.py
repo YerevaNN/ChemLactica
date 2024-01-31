@@ -9,6 +9,7 @@ from config.create_train_config import model_train_configs
 from dataset_utils import process_dataset
 from datasets import load_dataset
 from model_utils import load_model
+from tqdm.auto import tqdm
 
 from aim.hugging_face import AimCallback
 import torch
@@ -33,6 +34,18 @@ def calc_hash_for_binary_file(path):
 
 
 class CustomProgressCallback(ProgressCallback):
+    def __init__(self, early_stopping_steps):
+        self.training_bar = None
+        self.prediction_bar = None
+        self.early_stopping_steps = early_stopping_steps
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        if state.is_world_process_zero:
+            self.training_bar = tqdm(
+                total=self.early_stopping_steps, dynamic_ncols=True
+            )
+        self.current_step = 0
+
     def on_log(self, args, state, control, logs=None, **kwargs):
         if state.is_local_process_zero and self.training_bar is not None:
             _ = logs.pop("total_flos", None)
@@ -299,3 +312,12 @@ class JsonlDatasetResumeCallback(TrainerCallback):
             print(name, state)
         with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "w") as file:
             json.dump(jsonl_states, file, indent=4)
+
+
+class EarlyStoppingCallback(TrainerCallback):
+    def __init__(self, early_stopping_steps):
+        self.early_stopping_steps = early_stopping_steps
+
+    def on_step_end(self, args, state, control, **kwargs):
+        if state.global_step >= self.early_stopping_steps:
+            control.should_training_stop = True

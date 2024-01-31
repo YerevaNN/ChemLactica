@@ -8,25 +8,25 @@ default_tokenizer_path = "src/tokenizer/ChemLacticaTokenizer66"
 
 
 @cache
-def get_start2end_tags_map(tokenizer_path: str=default_tokenizer_path):
+def get_start2end_tags_map(tokenizer_path: str = default_tokenizer_path):
     with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
         special_tokens_map = json.load(_f)
     additional_tokens = special_tokens_map["additional_special_tokens"]
     n = len(additional_tokens)
-    assert (n & 1) == 0 # should be even
+    assert (n & 1) == 0  # should be even, every opening tag needs a closing tag
     return {
         additional_tokens[i]: additional_tokens[n // 2 + i] for i in range(n // 2)
     } | {"[START_SMILES]": "[END_SMILES]"}
 
 
-def get_tokenizer_special_tokens(tokenizer_path: str=default_tokenizer_path):
+def get_tokenizer_special_tokens(tokenizer_path: str = default_tokenizer_path):
     with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
         special_tokens_json = json.load(_f)
     return special_tokens_json["additional_special_tokens"]
 
 
 @cache
-def get_tokenizer(tokenizer_path: str=default_tokenizer_path):
+def get_tokenizer(tokenizer_path: str = default_tokenizer_path):
     return create_tokenizer(tokenizer_path)
 
 
@@ -52,7 +52,7 @@ def signal_handler(sig, frame):
 
 
 if __name__ == "__main__":
-    import sys
+    # import sys
     import glob
 
     # from utils import CustomTokenizer

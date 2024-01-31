@@ -14,14 +14,15 @@ from transformers import (
     # Trainer,
     TrainingArguments,
     ProgressCallback,
-    get_polynomial_decay_schedule_with_warmup,
+    # get_polynomial_decay_schedule_with_warmup,
 )
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
 import torch
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
-from datasets.dataset_dict import IterableDatasetDict
+
+# from datasets.dataset_dict import IterableDatasetDict
 
 from callbacks import (
     CustomAimCallback,
@@ -31,13 +32,14 @@ from callbacks import (
     CustomProgressCallback,
     ReproducabilityCallback,
     JsonlDatasetResumeCallback,
+    EarlyStoppingCallback,
 )
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from utils import signal_handler, get_tokenizer_special_tokens
 from model_utils import load_model
 from custom_trainer import CustomTrainer
-from dataset_utils import process_dataset
+from dataset_utils import process_dataset, DIR_DATA_TYPES
 from jsonl_dataset import samples_generator
 
 torch.manual_seed(42)
@@ -57,6 +59,7 @@ def train(
     dir_data_types,
     valid_data_dir,
     max_steps,
+    scheduler_max_steps,
     eval_steps,
     save_steps,
     train_batch_size,
@@ -84,11 +87,14 @@ def train(
     )
 
     train_config = model_train_configs[model_config]
+    checkpoint_path_components = from_pretrained.split(os.path.sep)
     if os.path.isdir(from_pretrained):
-        resume_from_checkpoint = from_pretrained
+        organization = checkpoint_path_components[-4]
+        model_name = checkpoint_path_components[-3]
     else:
         resume_from_checkpoint = False
-
+        organization = checkpoint_path_components[-2]
+        model_name = checkpoint_path_components[-1]
     # auth_token = os.environ["HF_TOKEN"]
     model = load_model(
         from_pretrained,
@@ -96,7 +102,13 @@ def train(
         train_config=train_config,
         # auth_token=auth_token,
     )
-    special_tokens = get_tokenizer_special_tokens()
+
+    if gradient_checkpointing:
+        model.use_cache = (
+            False  # use cache true doesn't work with gradient checkpointing
+        )
+
+    special_tokens = get_tokenizer_special_tokens(train_config["tokenizer_path"])
     print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
 
     if os.path.isdir(from_pretrained):
@@ -105,6 +117,7 @@ def train(
         resume_from_checkpoint = False
 
     if not resume_from_checkpoint:
+        # if we are continuing training, embeddings already resized
         model.resize_token_embeddings(train_config["vocab_size"] + len(special_tokens))
 
     trainer_callback_dict = {}
@@ -160,12 +173,16 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
+    trainer_callback_dict["early stop callback"] = EarlyStoppingCallback(
+        early_stopping_steps=(max_steps)
+    )
+
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     if check_reproducability:
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
             accelerator, model_config, use_flash_attn
         )
-    trainer_callback_dict["progress_callback"] = CustomProgressCallback()
+    trainer_callback_dict["progress_callback"] = CustomProgressCallback(max_steps)
 
     accelerator.wait_for_everyone()
 
@@ -179,26 +196,16 @@ def train(
             print(f"shared jsonl files {shared_jsonl_files}")
         checkpoints_dir = os.path.join(
             checkpoints_root_dir,
-            "facebook",
-            f"galactica-{model_config}",
+            organization,
+            f"{model_name}",
             experiment_hash,
         )
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
-        # optimizer = AdamW(
-        #     model.parameters(),
-        #     lr=train_config["max_learning_rate"],
-        #     betas=[train_config["adam_beta1"], train_config["adam_beta2"]],
-        #     weight_decay=train_config["weight_decay"],
-        # )
-
-        # lr_scheduler = get_polynomial_decay_schedule_with_warmup(
-        #     optimizer,
-        #     num_warmup_steps=train_config["warmup_steps"],
-        #     num_training_steps=max_steps,
-        #     lr_end=0.0 * train_config["max_learning_rate"],
-        #     power=1.0,
-        # )
+        if not scheduler_max_steps:
+            # If we don't explicitly specify when the scheduler should plan to finish:
+            # it will finish at max_steps when training ends so we anneal to 0 LR.
+            scheduler_max_steps = max_steps
 
         training_args = TrainingArguments(
             output_dir=checkpoints_dir,
@@ -213,10 +220,10 @@ def train(
             weight_decay=train_config["weight_decay"],
             adam_beta1=train_config["adam_beta1"],
             adam_beta2=train_config["adam_beta2"],
-            # warmup_steps=train_config["warmup_steps"],
+            warmup_steps=train_config["warmup_steps"],
             max_grad_norm=train_config["global_gradient_norm"],
             evaluation_strategy="steps",
-            max_steps=max_steps,
+            max_steps=scheduler_max_steps,
             eval_steps=eval_steps,
             save_steps=save_steps,
             dataloader_drop_last=True,
@@ -227,11 +234,12 @@ def train(
             dataloader_num_workers=dataloader_num_workers,
             logging_steps=1,
             gradient_checkpointing=gradient_checkpointing,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
             gradient_accumulation_steps=gradient_accumulation_steps,
             save_total_limit=4,
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type="linear",
-            optim="adamw_torch"
+            optim="adamw_torch",
             # load_best_model=True
         )
 
@@ -239,23 +247,30 @@ def train(
         assert len(training_data_dirs) == len(dir_data_types)
         train_dataset_dict = {}
         print("---Training dataset names---")
-        for i, (training_data_dir, dir_data_type) in enumerate(zip(training_data_dirs, dir_data_types)):
+        for i, (training_data_dir, dir_data_type) in enumerate(
+            zip(training_data_dirs, dir_data_types)
+        ):
+            if dir_data_type.lower() not in DIR_DATA_TYPES:
+                raise ValueError(
+                    f"""Unknown data type {dir_data_type},
+                    the following data types are supported: {DIR_DATA_TYPES}"""
+                )
             training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-            ds_name = f"{dir_data_type}_1"
+            ds_name = f"{dir_data_type}_{i}"
             is_assay_split = "assay" in dir_data_type
             dataset = IterableDataset.from_generator(
                 samples_generator,
-                gen_kwargs = {
-                    "files" : training_data_files,
-                    "shared_jsonl_files" : shared_jsonl_files
-                }
+                gen_kwargs={
+                    "files": training_data_files,
+                    "shared_jsonl_files": shared_jsonl_files,
+                },
             )
             dataset = process_dataset(
                 dataset=dataset,
                 train_config=train_config,
                 process_batch_sizes=(50, 50),
                 is_eval=False,
-                assay=is_assay_split
+                assay=is_assay_split,
             )
             if is_assay_split:
                 dataset.shuffle(buffer_size=shuffle_buffer_size)
@@ -366,7 +381,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--training_data_dirs",
         metavar="DT",
-        nargs='*',
+        nargs="*",
         dest="training_data_dirs",
         required=True,
         help="path to directory containing training data",
@@ -374,7 +389,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dir_data_types",
         metavar="DD",
-        nargs='*',
+        nargs="*",
         dest="dir_data_types",
         required=True,
         help="corresponding type of data for directory (in same order)",
@@ -394,6 +409,15 @@ if __name__ == "__main__":
         dest="max_steps",
         required=True,
         help="the number of steps to train (overrides the n_epochs)",
+    )
+    parser.add_argument(
+        "--scheduler_max_steps",
+        type=int,
+        metavar="SMS",
+        dest="scheduler_max_steps",
+        required=False,
+        default=None,
+        help="the number of steps the scheduler should run",
     )
     parser.add_argument(
         "--eval_steps",
@@ -433,7 +457,7 @@ if __name__ == "__main__":
         dest="shuffle_buffer_size",
         required=False,
         help="the buffer size of the buffered shuffle",
-        default=4
+        default=4,
     )
     parser.add_argument(
         "--experiment_name",
