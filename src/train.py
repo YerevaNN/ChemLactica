@@ -243,7 +243,7 @@ def train(
             save_total_limit=4,
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type="linear",
-            optim="paged_adamw_8bit",
+            optim="adamw_torch",
             # load_best_model=True
         )
 
