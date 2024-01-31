@@ -6,12 +6,15 @@ from utils import get_tokenizer
 from assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
 
 
+DIR_DATA_TYPES = {"computed", "assay"}
+
+
 def generate_assay_docs(examples, train_config):
     tokenizer = get_tokenizer(train_config["tokenizer_path"])
     MODEL_CONTEXT_LENGTH = train_config["block_size"]
     final = {
         "input_ids": [],
-        "token_type_ids": [],
+        # "token_type_ids": [],
         "attention_mask": [],
     }
     incomplete_docs = []
@@ -26,7 +29,7 @@ def generate_assay_docs(examples, train_config):
             if len(result["input_ids"]) == 0:
                 raise ValueError
             final["input_ids"].extend(result["input_ids"])
-            final["token_type_ids"].extend(result["token_type_ids"])
+            # final["token_type_ids"].extend(result["token_type_ids"])
             final["attention_mask"].extend(result["attention_mask"])
         except Exception:
             continue
@@ -34,7 +37,7 @@ def generate_assay_docs(examples, train_config):
         incomplete_docs, tokenizer, MODEL_CONTEXT_LENGTH
     )
     final["input_ids"].extend(patched_documents["input_ids"])
-    final["token_type_ids"].extend(patched_documents["token_type_ids"])
+    # final["token_type_ids"].extend(patched_documents["token_type_ids"])
     final["attention_mask"].extend(patched_documents["attention_mask"])
 
     final["labels"] = final["input_ids"].copy()
@@ -44,7 +47,7 @@ def generate_assay_docs(examples, train_config):
 def tokenize_function(examples, train_config):
     tokenizer = get_tokenizer(train_config["tokenizer_path"])
     # print(f"Process id: {os.getpid()}, {tokenizer}")
-    return tokenizer(examples["text"])
+    return tokenizer(examples["text"], return_token_type_ids=False)
 
 
 def process_str(str):
