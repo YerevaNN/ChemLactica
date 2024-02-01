@@ -4,11 +4,12 @@ from torch._tensor import Tensor
 from torch.nn.modules import Module
 from torch.optim.optimizer import Optimizer as Optimizer
 from transformers import Trainer
+from trl import IterativeSFTTrainer
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP
 from utils import get_tokenizer
 
 
-class CustomTrainer(Trainer):
+class CustomIterativeSFTTrainer(IterativeSFTTrainer):
 
     def __init__(self, *args, **kwargs):
         # the number of samples to print when the training begins, for debugging purposes
@@ -22,12 +23,6 @@ class CustomTrainer(Trainer):
                 print(f"Sample {i + 1}:", tokeinzer.decode(inputs["input_ids"][i]))
             self.num_samples_to_print = None
         return super().training_step(model, inputs)
-
-    def _save_checkpoint(self, model, trial, metrics=None):
-        if shutil.disk_usage('/').free > 3 * 1024 ** 3: 
-            super()._save_checkpoint(model, trial, metrics=None)
-        else:
-            print("**disk is full didn't save**")
 
     def _load_from_checkpoint(self, resume_from_checkpoint, model=None):
         """

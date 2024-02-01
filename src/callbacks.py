@@ -153,8 +153,7 @@ class EpochCallback(TrainerCallback):
 
 
 class ReproducabilityCallback(TrainerCallback):
-    def __init__(self, accelerator, model_config, use_flash_attn=False):
-        self.accelerator = accelerator
+    def __init__(self, model_config, use_flash_attn=False):
         self.model_config = model_config
         self.train_config = model_train_configs[model_config]
         self.use_flash_attn = use_flash_attn
