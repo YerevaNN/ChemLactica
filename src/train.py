@@ -72,6 +72,7 @@ def train(
     use_flash_attn,
     gradient_accumulation_steps,
     gradient_checkpointing,
+    evaluate_only,
     track=False,
     track_dir=None,
     check_reproducability=False,
@@ -596,6 +597,13 @@ if __name__ == "__main__":
         action="store_false",
         dest="check_reproducability",
         help="whether or not check reproducability (should only be use for testing)",
+    )
+    parser.add_argument(
+        "--evaluate_only",
+        action="store_true",
+        dest="evaluate_only",
+        default=False,
+        help="Whether to only call evaluation, this is for slurm use",
     )
     parser.set_defaults(profile=False)
 
