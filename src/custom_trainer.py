@@ -14,17 +14,8 @@ class CustomTrainer(Trainer):
         # the number of samples to print when the training begins, for debugging purposes
         self.num_samples_to_print = 5
         super().__init__(*args, **kwargs)
-        self.state.elapsed_flos = 0
 
     def training_step(self, model: Module, inputs: Dict[str, Tensor | Any]) -> Tensor:
-        if self.state.global_step == 0:
-            pass
-            # flop_counter = FlopCounterMode(model)
-            # with flop_counter:
-            #     output = super().training_step(model, inputs)
-            #     self.iteration_gflops = flop_counter.get_gflops()
-            #     print("the stored iteration_gflops:", self.iteration_gflops)
-            # return output
         if self.num_samples_to_print:
             tokeinzer = get_tokenizer()
             for i in range(min(inputs["input_ids"].size(0), self.num_samples_to_print)):
