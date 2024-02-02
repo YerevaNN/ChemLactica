@@ -30,7 +30,7 @@ from callbacks import (
     CustomProgressCallback,
     ReproducabilityCallback,
 )
-from config.create_train_config import model_train_configs
+from config.create_train_config import model_fine_tune_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from utils import signal_handler, get_tokenizer_special_tokens
 from model_utils import load_model
@@ -148,7 +148,7 @@ def fine_tine(
 
     device = "cuda:0"
 
-    train_config = model_train_configs[model_config]
+    train_config = model_fine_tune_configs[model_config]
     if os.path.isdir(from_pretrained):
         resume_from_checkpoint = from_pretrained
     else:
@@ -264,6 +264,8 @@ def fine_tine(
         # load_best_model=True
     )
 
+    print("Warmup steps", train_config["warmup_steps"])
+
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
     eval_dataset = load_dataset(
         "text", data_files={"validation": valid_data_files}, streaming=False
@@ -307,18 +309,18 @@ def fine_tine(
 
     generator_model = load_model(from_pretrained, use_flash_attn=True, dtype=torch.bfloat16).to(device)
     sample_gen_args = {
-        "max_new_tokens": 30,
+        "max_new_tokens": 50,
         "temperature": 1.0,
         "repetition_penalty": 1.0,
         "do_sample": True,
         "eos_token_id": 2
     }
     rej_sample_args = {
-        "max_new_tokens": 30,
-        "temperature": 1.0,
+        "max_new_tokens": 50,
+        "temperature": 1.3,
         "repetition_penalty": 1.0,
         "do_sample": True,
-        "num_return_sequences": 80,
+        "num_return_sequences": 160,
         "eos_token_id": 2
     }
     def next_input_sample(lead: str):
