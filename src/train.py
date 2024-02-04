@@ -91,9 +91,11 @@ def train(
 
     train_config = model_train_configs[model_config]
     checkpoint_path_components = from_pretrained.split(os.path.sep)
+    experiment_hash = "none"
     if os.path.isdir(from_pretrained):
         organization = checkpoint_path_components[-4]
         model_name = checkpoint_path_components[-3]
+        experiment_hash = str(checkpoint_path_components[-2])
     else:
         resume_from_checkpoint = False
         organization = checkpoint_path_components[-2]
@@ -103,7 +105,6 @@ def train(
     gpus.append(torch.cuda.get_device_properties(accelerator.device.index).name)
     accelerator.wait_for_everyone()
     gathered_gpus = accelerate.utils.gather_object(gpus)
-    # if accelerator.is_main_process:
 
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
@@ -147,7 +148,6 @@ def train(
         model.resize_token_embeddings(train_config["vocab_size"] + len(special_tokens))
 
     trainer_callback_dict = {}
-    experiment_hash = "none"
     communication_list = [experiment_hash]
     if track:
         if accelerator.is_main_process:
@@ -157,8 +157,8 @@ def train(
                 experiment=experiment_name,
                 model=model,
                 blocksize=train_config["block_size"],
+                run_hash=experiment_hash if experiment_hash != "none" else None,
             )
-
             trainer_callback_dict["aim_callback"] = aim_callback
 
             experiment_hash = aim_callback._run_hash
@@ -236,12 +236,14 @@ def train(
             scheduler_max_steps = max_steps
 
         training_args = TrainingArguments(
+            do_train=not evaluate_only,
             output_dir=checkpoints_dir,
             per_device_train_batch_size=train_batch_size,
             per_device_eval_batch_size=valid_batch_size,
             # log_level = "info",
             log_on_each_node=True,
             bf16=True,
+            bf16_full_eval=True,
             fp16=False,
             logging_dir=track_dir,
             learning_rate=train_config["max_learning_rate"],
@@ -306,9 +308,6 @@ def train(
             train_dataset_dict[ds_name] = dataset
 
         valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-        eval_dataset = load_dataset(
-            "text", data_files={"validation": valid_data_files}, streaming=False
-        )
 
         # for split_name in train_dataset.keys():
         #     is_assay_split = "assay" in split_name
@@ -328,39 +327,28 @@ def train(
         else:
             train_dataset = train_dataset[0]
 
-        # processed_train_dataset = concatenate_datasets(split_datasets)
-        # final_train_dataset = interleave_datasets(split_train_datasets)
-        # final_train_dataset = final_train_dataset.shuffle(buffer_size=shuffle_buffer_size)
-        # processed_train_dataset = process_dataset(
-        #     dataset=train_dataset,
-        #     train_config=train_config,
-        #     process_batch_sizes=(50, 50),
-        #     is_eval=False,
-        #     assay=True,
-        # )
-
-        # for i, sample in enumerate(final_train_dataset):
-        # This code section is useful to verify interleaving
-        #     if i >= 5: # change 5 to the number of samples you want to inspect
-        #         break
-        #     print(f"Sample {i}:")
-        #     print(max(sample["input_ids"]))
-        #     # print(sample)
-
-        processed_eval_dataset = process_dataset(
-            dataset=eval_dataset,
-            train_config=train_config,
-            process_batch_sizes=(50, 50),
-            is_eval=True,
-            assay=False,
-        )
+        if evaluate_only:
+            eval_dataset = load_dataset(
+                "text", data_files={"validation": valid_data_files}, streaming=False
+            )
+            processed_eval_dataset = process_dataset(
+                dataset=eval_dataset,
+                train_config=train_config,
+                process_batch_sizes=(50, 50),
+                is_eval=True,
+                assay=False,
+            )
+        else:
+            processed_eval_dataset = None
 
         trainer = CustomTrainer(
             model=model,
             args=training_args,
             compute_metrics=compute_metrics,
-            train_dataset=train_dataset,
-            eval_dataset=processed_eval_dataset["validation"],
+            train_dataset=train_dataset if not evaluate_only else None,
+            eval_dataset=processed_eval_dataset["validation"]
+            if evaluate_only
+            else None,
             # optimizers=[optimizer, lr_scheduler],
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         )
@@ -376,14 +364,17 @@ def train(
 
         with prof_context_manager as prof:
             try:
-                trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+                if not evaluate_only:
+                    trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+                else:
+                    pass
             except Exception as e:
                 traceback_info = traceback.format_exc()
                 logger.error(e, traceback_info)
             except KeyboardInterrupt:
                 with accelerator.main_process_first():
                     logger.error("KeyboardInterrupt")
-            if not (max_steps % eval_steps == 0):
+            if evaluate_only:
                 trainer.evaluate()
 
 

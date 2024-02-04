@@ -40,6 +40,7 @@ class CustomProgressCallback(ProgressCallback):
         self.early_stopping_steps = early_stopping_steps
         self._start_flos = 0
         self._total_theoretical_peak_flops = total_theoretical_peak_flops
+        self._start_time = time.time()
 
     def on_train_begin(self, args, state, control, **kwargs):
         if state.is_world_process_zero:
@@ -47,7 +48,6 @@ class CustomProgressCallback(ProgressCallback):
                 total=self.early_stopping_steps, dynamic_ncols=True
             )
         self.current_step = 0
-        self._start_time = time.time()
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         elapsed_time = time.time() - self._start_time
@@ -64,10 +64,13 @@ class CustomProgressCallback(ProgressCallback):
 
 
 class CustomAimCallback(AimCallback):
-    def __init__(self, checkpoints_dict_name, model, blocksize, *args, **kwargs):
+    def __init__(
+        self, checkpoints_dict_name, model, blocksize, run_hash, *args, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self._checkpoints_dict_name = checkpoints_dict_name
         self.model = model
+        self._run_hash = run_hash
         self.setup()
         self.embedding_norm_1 = 0
         self.embedding_norm_2 = 0
