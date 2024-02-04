@@ -303,7 +303,7 @@ def fine_tine(
     for additional_callback in list(trainer_callback_dict.values()):
         trainer.add_callback(additional_callback)
 
-    pubchem_molecules_file = open("/mnt/sxtn/chem/pubchem_inchi/CID-SMILES")
+    pubchem_molecules_file = open("/mnt/sxtn/chem/pubchem_inchi/CID-SMILES-SHUF")
     def next_molecule():
         return pubchem_molecules_file.readline().split("\t")[-1].rstrip("\n")
 
@@ -325,6 +325,7 @@ def fine_tine(
     }
     def next_input_sample(lead: str):
         num_of_similar = random.randint(0, 5)
+        # num_of_similar = 5
         input_text = "</s>"
         try:
             lead_molecule = MoleculeEntry(
@@ -389,6 +390,8 @@ def fine_tine(
         for target_mol in np.unique(candidate_target_molecules)[::-1]:
             if target_mol not in similar_molecules_in_prompt:
                 input_text += f"{target_mol.smiles}[END_SMILES]</s>"
+                if len(tokenizer(input_text)["input_ids"]) > 500:
+                    return None
                 return input_text
 
     trainer.evaluate()
