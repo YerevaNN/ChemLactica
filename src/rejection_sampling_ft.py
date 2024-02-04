@@ -227,7 +227,7 @@ def fine_tine(
         optimizer,
         num_warmup_steps=train_config["warmup_steps"],
         num_training_steps=max_steps,
-        lr_end=0.0 * train_config["max_learning_rate"],
+        lr_end=0.1 * train_config["max_learning_rate"],
         power=1.0,
     )
 
@@ -320,17 +320,20 @@ def fine_tine(
         "temperature": 1.3,
         "repetition_penalty": 1.0,
         "do_sample": True,
-        "num_return_sequences": 160,
+        "num_return_sequences": 80,
         "eos_token_id": 2
     }
     def next_input_sample(lead: str):
         num_of_similar = random.randint(0, 5)
         input_text = "</s>"
-        lead_molecule = MoleculeEntry(
-            smiles=lead, qed=compute_qed(lead),
-            morgan_sim_to_lead=random.uniform(0.9, 0.99),
-            inchi=get_inchi(lead)
-        )
+        try:
+            lead_molecule = MoleculeEntry(
+                smiles=lead, qed=compute_qed(lead),
+                morgan_sim_to_lead=random.uniform(0.9, 0.99),
+                inchi=get_inchi(lead)
+            )
+        except Exception:
+            return None
         similar_molecules_in_prompt = []
         if num_of_similar:
             sample_gen_args["num_return_sequences"] = num_of_similar * 2
