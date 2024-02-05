@@ -61,6 +61,9 @@ class CustomTrainer(Trainer):
     def _maybe_log_save_evaluate(
         self, tr_loss, model, trial, epoch, ignore_keys_for_eval
     ):
+        # this method is being overwritten because it currently
+        # runs evaluation prior to saving.
+        # For offling evaluation this doesn't work.
         if (
             self.control.should_log
             and self.state.global_step > self._globalstep_last_logged
