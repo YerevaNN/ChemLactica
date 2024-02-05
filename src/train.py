@@ -99,6 +99,7 @@ def train(
         organization = checkpoint_path_components[-4]
         model_name = checkpoint_path_components[-3]
         experiment_hash = str(checkpoint_path_components[-2])
+        resume_from_checkpoint = from_pretrained
     else:
         resume_from_checkpoint = False
         organization = checkpoint_path_components[-2]
@@ -113,15 +114,8 @@ def train(
         # auth_token=auth_token,
     )
 
-    total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)
-
     special_tokens = get_tokenizer_special_tokens(train_config["tokenizer_path"])
     print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
-
-    if os.path.isdir(from_pretrained):
-        resume_from_checkpoint = from_pretrained
-    else:
-        resume_from_checkpoint = False
 
     if not resume_from_checkpoint:
         # if we are continuing training, embeddings already resized
@@ -188,6 +182,8 @@ def train(
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
             accelerator, model_config, flash_attn
         )
+
+    total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)
     trainer_callback_dict["progress_callback"] = CustomProgressCallback(
         max_steps, total_theoretical_peak_flops
     )
@@ -291,18 +287,6 @@ def train(
             train_dataset_dict[ds_name] = dataset
 
         valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-
-        # for split_name in train_dataset.keys():
-        #     is_assay_split = "assay" in split_name
-        #     train_dataset[split_name] = process_dataset(
-        #         dataset=train_dataset[split_name],
-        #         train_config=train_config,
-        #         process_batch_sizes=(50, 50),
-        #         is_eval=False,
-        #         assay=is_assay_split
-        #     )
-        #     if is_assay_split:
-        #         train_dataset.shuffle(buffer_size=shuffle_buffer_size)
 
         train_dataset = list(train_dataset_dict.values())
         if len(train_dataset) > 1:
