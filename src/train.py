@@ -109,13 +109,9 @@ def train(
         from_pretrained,
         use_flash_attn=flash_attn,
         train_config=train_config,
+        gradient_checkpointing=gradient_checkpointing,
         # auth_token=auth_token,
     )
-
-    if gradient_checkpointing:
-        model.use_cache = (
-            False  # use cache true doesn't work with gradient checkpointing
-        )
 
     total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)
 

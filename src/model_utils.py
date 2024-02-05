@@ -55,6 +55,7 @@ def load_model(
     dtype=None,
     train_config=None,
     auth_token=None,
+    gradient_checkpointing=True,
 ):
     attn_implementation = select_attention_implementation(use_flash_attn)
     if from_pretrained == "small_opt":
@@ -79,5 +80,10 @@ def load_model(
             torch_dtype=dtype,
             attn_implementation=attn_implementation,
             sliding_window=train_config["sliding_window"],
+        )
+
+    if gradient_checkpointing:
+        model.use_cache = (
+            False  # use cache true doesn't work with gradient checkpointing
         )
     return model
