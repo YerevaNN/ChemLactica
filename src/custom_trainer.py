@@ -1,12 +1,30 @@
 import shutil
+import torch
+import submitit
 from typing import Any, Dict
+import os
 from torch._tensor import Tensor
 from torch.nn.modules import Module
-from transformers import Trainer
+from transformers import Trainer, TrainingArguments
 from torch.distributed.fsdp.fully_sharded_data_parallel import (
     FullyShardedDataParallel as FSDP,
 )
 from utils import get_tokenizer
+from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
+from transformers.utils import is_torch_tpu_available
+from dataclasses import dataclass, field
+
+if is_torch_tpu_available(check_device=False):
+    import torch_xla.core.xla_model as xm
+
+
+@dataclass
+class CustomArguments(TrainingArguments):
+    slurm_eval: bool = field(
+        default=False, metadata={"help": "Whether to run eval via slurm job."}
+    )
+    command: str = field(default=None)
+    experiment_name: str = field(default=None)
 
 
 class CustomTrainer(Trainer):
@@ -40,23 +58,85 @@ class CustomTrainer(Trainer):
             return
         return super()._load_from_checkpoint(resume_from_checkpoint, model)
 
-    # def save_model(
-    #     self, output_dir: Optional[str] = None, _internal_call: bool = False
-    # ):
-    # underlying_config = self.model.module.config
-    # cpu_state = self.accelerator.get_state_dict(self.model, unwrap=True)
-    # converted_model = OPTForCausalLM.from_pretrained(
-    #     None, config=underlying_config, state_dict=cpu_state
-    # )
-    # converted_model.save_pretrained(
-    #     is_main_process=self.accelerator.is_main_process,
-    #     save_directory=output_dir,
-    #     save_function=self.accelerator.save,
-    #     max_shard_size="200MB",
-    # )
-    # self.model = BetterTransformer.reverse(self.model)
-    # super().save_model(output_dir, _internal_call)
-    # self.model = BetterTransformer.transform(self.model)
-    # self.model = BetterTransformer.reverse(self.model)
-    # self.accelerator.save_state(output_dir)
-    # self.model = BetterTransformer.transform(self.model)
+    def _maybe_log_save_evaluate(
+        self, tr_loss, model, trial, epoch, ignore_keys_for_eval
+    ):
+        if (
+            self.control.should_log
+            and self.state.global_step > self._globalstep_last_logged
+        ):
+            if is_torch_tpu_available():
+                xm.mark_step()
+
+            logs: Dict[str, float] = {}
+
+            # all_gather + mean() to get average loss over all processes
+            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+
+            # reset tr_loss to zero
+            tr_loss -= tr_loss
+
+            logs["loss"] = round(
+                tr_loss_scalar
+                / (self.state.global_step - self._globalstep_last_logged),
+                4,
+            )
+            logs["learning_rate"] = self._get_learning_rate()
+
+            self._total_loss_scalar += tr_loss_scalar
+            self._globalstep_last_logged = self.state.global_step
+            self.store_flos()
+
+            self.log(logs)
+
+        metrics = None
+
+        if self.control.should_save:
+            self._save_checkpoint(model, trial, metrics=metrics)
+            self.control = self.callback_handler.on_save(
+                self.args, self.state, self.control
+            )
+
+        if self.control.should_evaluate:
+            # BUILD SLURM EVALUATE COMMAND
+            checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+            run_dir = self._get_output_dir(trial=trial)
+            output_dir = os.path.join(run_dir, checkpoint_folder)
+            search_string = "--from_pretrained"
+            self.args.command[self.args.command.index(search_string) + 1] = output_dir
+            self.args.command.append("--evaluate_only")
+
+            # BUILD SLURM JOB SETTINGS
+            if self.args.slurm_eval:
+                print("-----------------------------------------------")
+                print("we have entered slurm eval")
+                print("here is the command: ", self.args.command)
+                eval_function = submitit.helpers.CommandFunction(
+                    self.args.command, verbose=True
+                )
+                slurm_nice_setting = 1000
+                executor = submitit.AutoExecutor(folder="your_experiment_folder")
+                cpus_per_task = self.args.dataloader_num_workers
+                mem_gb = 96
+                executor.update_parameters(
+                    name=self.args.experiment_name + "eval",
+                    timeout_min=120,
+                    cpus_per_task=cpus_per_task,
+                    gpus_per_node=1,
+                    mem_gb=mem_gb,
+                    slurm_srun_args=[f"--nice={str(slurm_nice_setting)}"],
+                )
+                exit()
+                job = executor.submit(eval_function)  # noqa
+
+            else:
+                metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+                self._report_to_hp_search(trial, self.state.global_step, metrics)
+            # Run delayed LR scheduler now that metrics are populated
+            if isinstance(
+                self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau
+            ):
+                metric_to_check = self.args.metric_for_best_model
+                if not metric_to_check.startswith("eval_"):
+                    metric_to_check = f"eval_{metric_to_check}"
+                self.lr_scheduler.step(metrics[metric_to_check])

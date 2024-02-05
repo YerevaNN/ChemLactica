@@ -1,5 +1,7 @@
 import os
 import accelerate
+
+# import sys
 from datasets import interleave_datasets
 import signal
 import traceback
@@ -13,7 +15,7 @@ import numpy
 import transformers
 from transformers import (
     # Trainer,
-    TrainingArguments,
+    # TrainingArguments,
     ProgressCallback,
     # get_polynomial_decay_schedule_with_warmup,
 )
@@ -40,7 +42,7 @@ from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from utils import signal_handler, get_tokenizer_special_tokens
 from model_utils import load_model
-from custom_trainer import CustomTrainer
+from custom_trainer import CustomTrainer, CustomArguments
 from dataset_utils import process_dataset, DIR_DATA_TYPES
 from jsonl_dataset import samples_generator
 
@@ -55,6 +57,8 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 
 def train(
+    command,
+    slurm_eval,
     from_pretrained,
     model_config,
     training_data_dirs,
@@ -69,7 +73,7 @@ def train(
     experiment_name,
     checkpoints_root_dir,
     dataloader_num_workers,
-    use_flash_attn,
+    flash_attn,
     gradient_accumulation_steps,
     gradient_checkpointing,
     evaluate_only,
@@ -125,7 +129,7 @@ def train(
     # auth_token = os.environ["HF_TOKEN"]
     model = load_model(
         from_pretrained,
-        use_flash_attn=use_flash_attn,
+        use_flash_attn=flash_attn,
         train_config=train_config,
         # auth_token=auth_token,
     )
@@ -206,7 +210,7 @@ def train(
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     if check_reproducability:
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
-            accelerator, model_config, use_flash_attn
+            accelerator, model_config, flash_attn
         )
     trainer_callback_dict["progress_callback"] = CustomProgressCallback(
         max_steps, total_theoretical_peak_flops
@@ -235,7 +239,10 @@ def train(
             # it will finish at max_steps when training ends so we anneal to 0 LR.
             scheduler_max_steps = max_steps
 
-        training_args = TrainingArguments(
+        training_args = CustomArguments(
+            command=command,
+            slurm_eval=slurm_eval,
+            experiment_name=experiment_name,
             do_train=not evaluate_only,
             output_dir=checkpoints_dir,
             per_device_train_batch_size=train_batch_size,
@@ -551,16 +558,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--flash_attn",
         action="store_true",
-        dest="use_flash_attn",
+        dest="flash_attn",
         help="whether or not to use flash attn)",
     )
     parser.add_argument(
         "--no_flash_attn",
         action="store_false",
-        dest="use_flash_attn",
+        dest="flash_attn",
         help="whether or not to use flash attn",
     )
-    parser.set_defaults(use_flash_attn=False)
+    parser.set_defaults(flash_attn=False)
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,
@@ -593,10 +600,51 @@ if __name__ == "__main__":
         "--evaluate_only",
         action="store_true",
         dest="evaluate_only",
-        default=False,
         help="Whether to only call evaluation, this is for slurm use",
+    )
+    parser.add_argument(
+        "--accelerate_eval_config_file",
+        type=str,
+        metavar="AE",
+        required=False,
+        dest="accelerate_eval_config_file",
+    )
+    parser.add_argument(
+        "--slurm_eval",
+        action="store_true",
+        required=False,
+        dest="slurm_eval",
     )
     parser.set_defaults(profile=False)
 
     args = parser.parse_args()
-    train(**args.__dict__)
+
+    if args.slurm_eval:
+        print("slurm eval")
+        command = [
+            "python3",
+            "-m",
+            "accelerate.commands.launch",
+            "--config_file",
+            f"{os.path.realpath(args.accelerate_eval_config_file)}",
+            "src/train.py",
+        ]
+    else:
+        command = None
+    for arg, value in vars(args).items():
+        if isinstance(value, list):
+            list_vals_str = str(" ".join(map(str, value)))
+            command.extend([f"--{arg}", list_vals_str])
+        elif value is not None:
+            if isinstance(value, bool) and value:
+                command.extend([f"--{arg}"])
+            elif isinstance(value, bool) and not value:
+                pass
+            else:
+                command.extend([f"--{arg}", str(value)])
+    if (
+        hasattr(args, "accelerate_eval_config_file")
+        and args.accelerate_eval_config_file
+    ):
+        delattr(args, "accelerate_eval_config_file")
+    train(command, **args.__dict__)
