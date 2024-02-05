@@ -51,6 +51,41 @@ def signal_handler(sig, frame):
     raise ForcedStop
 
 
+def get_called_command(args):
+    if args.slurm_eval:
+        print("slurm eval")
+        command = [
+            "python3",
+            "-m",
+            "accelerate.commands.launch",
+            "--config_file",
+            f"{os.path.realpath(args.accelerate_eval_config_file)}",
+            "src/train.py",
+        ]
+    else:
+        command = None
+    for arg, value in vars(args).items():
+        if isinstance(value, list):
+            list_vals_str = str(" ".join(map(str, value)))
+            command.extend([f"--{arg}", list_vals_str])
+        elif value is not None:
+            if isinstance(value, bool) and value:
+                command.extend([f"--{arg}"])
+            elif isinstance(value, bool) and not value:
+                pass
+            else:
+                command.extend([f"--{arg}", str(value)])
+    return command
+
+
+def remove_extraneous_args(args):
+    if (
+        hasattr(args, "accelerate_eval_config_file")
+        and args.accelerate_eval_config_file
+    ):
+        delattr(args, "accelerate_eval_config_file")
+
+
 if __name__ == "__main__":
     # import sys
     import glob

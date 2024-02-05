@@ -5,8 +5,10 @@ from datasets import interleave_datasets
 import signal
 import traceback
 import argparse
+from distributed_utils import get_experiment_hash
 from datetime import timedelta
 import random
+from parseargs import add_arguments
 import glob
 import multiprocessing
 from contextlib import nullcontext
@@ -39,7 +41,12 @@ from callbacks import (
 )
 from config.create_train_config import model_train_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils import signal_handler, get_tokenizer_special_tokens
+from utils import (
+    signal_handler,
+    get_tokenizer_special_tokens,
+    get_called_command,
+    remove_extraneous_args,
+)
 from model_utils import load_model
 from custom_trainer import CustomTrainer, CustomArguments
 from dataset_utils import process_dataset, DIR_DATA_TYPES
@@ -94,11 +101,9 @@ def train(
 
     train_config = model_train_configs[model_config]
     checkpoint_path_components = from_pretrained.split(os.path.sep)
-    experiment_hash = "none"
     if os.path.isdir(from_pretrained):
         organization = checkpoint_path_components[-4]
         model_name = checkpoint_path_components[-3]
-        experiment_hash = str(checkpoint_path_components[-2])
         resume_from_checkpoint = from_pretrained
     else:
         resume_from_checkpoint = False
@@ -122,7 +127,8 @@ def train(
         model.resize_token_embeddings(train_config["vocab_size"] + len(special_tokens))
 
     trainer_callback_dict = {}
-    communication_list = [experiment_hash]
+    experiment_hash = get_experiment_hash(from_pretrained)
+    experiment_hash_list = [experiment_hash]
     if track:
         if accelerator.is_main_process:
             aim_callback = CustomAimCallback(
@@ -134,13 +140,10 @@ def train(
                 run_hash=experiment_hash if experiment_hash != "none" else None,
             )
             trainer_callback_dict["aim_callback"] = aim_callback
+            experiment_hash_list = [aim_callback._run_hash]
 
-            experiment_hash = aim_callback._run_hash
-            communication_list = [experiment_hash]
-
-    broadcast_object_list(communication_list)
-    experiment_hash = communication_list[0]
-    print(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
+    broadcast_object_list(experiment_hash_list)
+    print(f"Process {accelerator.process_index} aim hash: {experiment_hash_list[0]}")
 
     if not valid_batch_size:
         valid_batch_size = train_batch_size
@@ -347,264 +350,11 @@ def train(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="none")
-
-    parser.add_argument(
-        "--from_pretrained",
-        type=str,
-        metavar="FP",
-        dest="from_pretrained",
-        required=True,
-        help="the path to the model dir",
-    )
-    parser.add_argument(
-        "--model_config",
-        type=str,
-        metavar="MC",
-        dest="model_config",
-        required=True,
-        help="the model configuration to use",
-    )
-    parser.add_argument(
-        "--training_data_dirs",
-        metavar="DT",
-        nargs="*",
-        dest="training_data_dirs",
-        required=True,
-        help="path to directory containing training data",
-    )
-    parser.add_argument(
-        "--dir_data_types",
-        metavar="DD",
-        nargs="*",
-        dest="dir_data_types",
-        required=True,
-        help="corresponding type of data for directory (in same order)",
-    )
-    parser.add_argument(
-        "--valid_data_dir",
-        type=str,
-        metavar="VD",
-        dest="valid_data_dir",
-        required=True,
-        help="path to directory containing validation data",
-    )
-    parser.add_argument(
-        "--max_steps",
-        type=int,
-        metavar="MS",
-        dest="max_steps",
-        required=True,
-        help="the number of steps to train (overrides the n_epochs)",
-    )
-    parser.add_argument(
-        "--scheduler_max_steps",
-        type=int,
-        metavar="SMS",
-        dest="scheduler_max_steps",
-        required=False,
-        default=None,
-        help="the number of steps the scheduler should run",
-    )
-    parser.add_argument(
-        "--eval_steps",
-        type=int,
-        metavar="ES",
-        dest="eval_steps",
-        required=True,
-        help="the number of training steps after which to evaluate the model",
-    )
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        metavar="SS",
-        dest="save_steps",
-        required=True,
-        help="the number of steps to save a model checkpoint",
-    )
-    parser.add_argument(
-        "--train_batch_size",
-        type=int,
-        metavar="TBS",
-        required=True,
-        help="train batch size (per GPU when using dist training)",
-    )
-    parser.add_argument(
-        "--valid_batch_size",
-        type=int,
-        metavar="TBS",
-        required=False,
-        help="valid batch size (per GPU when using dist validation)",
-        default=None,
-    )
-    parser.add_argument(
-        "--shuffle_buffer_size",
-        type=int,
-        metavar="SBS",
-        dest="shuffle_buffer_size",
-        required=False,
-        help="the buffer size of the buffered shuffle",
-        default=4,
-    )
-    parser.add_argument(
-        "--experiment_name",
-        type=str,
-        metavar="EN",
-        dest="experiment_name",
-        required=False,
-        help="the name of the experiment",
-        default="none",
-    )
-    parser.add_argument(
-        "--checkpoints_root_dir",
-        type=str,
-        metavar="CRD",
-        dest="checkpoints_root_dir",
-        required=True,
-        help="directory where to save checkpoints",
-    )
-    parser.add_argument(
-        "--dataloader_num_workers",
-        type=int,
-        metavar="NW",
-        dest="dataloader_num_workers",
-        required=False,
-        help="number of processes to use for dataloading",
-        default=0,
-    )
-    parser.add_argument(
-        "--track",
-        action="store_true",
-        dest="track",
-        help="whether or not track the training using aim",
-    )
-    parser.add_argument(
-        "--no_track",
-        action="store_false",
-        dest="track",
-        help="the directory to save the aim tracking information",
-    )
-    parser.set_defaults(track=True)
-    parser.add_argument(
-        "--track_dir",
-        type=str,
-        metavar="TD",
-        dest="track_dir",
-        required=False,
-        help="aim track directory",
-        default=None,
-    )
-    parser.add_argument(
-        "--profile",
-        action="store_true",
-        dest="profile",
-        help="whether or not profile the training",
-    )
-    parser.add_argument(
-        "--no_profile",
-        action="store_false",
-        dest="profile",
-        help="whether or not profile the training",
-    )
-    parser.set_defaults(profile=False)
-    parser.add_argument(
-        "--profile_dir",
-        type=str,
-        metavar="PD",
-        dest="profile_dir",
-        required=False,
-        help="profiling directory",
-        default=None,
-    )
-    parser.add_argument(
-        "--flash_attn",
-        action="store_true",
-        dest="flash_attn",
-        help="whether or not to use flash attn)",
-    )
-    parser.add_argument(
-        "--no_flash_attn",
-        action="store_false",
-        dest="flash_attn",
-        help="whether or not to use flash attn",
-    )
-    parser.set_defaults(flash_attn=False)
-    parser.add_argument(
-        "--gradient_accumulation_steps",
-        type=int,
-        metavar="GA",
-        dest="gradient_accumulation_steps",
-        required=False,
-        help="the number of steps to over which to accumulate gradients",
-        default=1,
-    )
-    parser.add_argument(
-        "--gradient_checkpointing",
-        action="store_true",
-        dest="gradient_checkpointing",
-        default=False,
-        help="whether or not to use gradient_checkpointing",
-    )
-    parser.add_argument(
-        "--check_reproducability",
-        action="store_true",
-        dest="check_reproducability",
-        help="whether or not check reproducability (should only be use for testing)",
-    )
-    parser.add_argument(
-        "--no_check_reproducability",
-        action="store_false",
-        dest="check_reproducability",
-        help="whether or not check reproducability (should only be use for testing)",
-    )
-    parser.add_argument(
-        "--evaluate_only",
-        action="store_true",
-        dest="evaluate_only",
-        help="Whether to only call evaluation, this is for slurm use",
-    )
-    parser.add_argument(
-        "--accelerate_eval_config_file",
-        type=str,
-        metavar="AE",
-        required=False,
-        dest="accelerate_eval_config_file",
-    )
-    parser.add_argument(
-        "--slurm_eval",
-        action="store_true",
-        required=False,
-        dest="slurm_eval",
-    )
-    parser.set_defaults(profile=False)
-
+    parser = add_arguments(parser)
     args = parser.parse_args()
 
-    if args.slurm_eval:
-        print("slurm eval")
-        command = [
-            "python3",
-            "-m",
-            "accelerate.commands.launch",
-            "--config_file",
-            f"{os.path.realpath(args.accelerate_eval_config_file)}",
-            "src/train.py",
-        ]
-    else:
-        command = None
-    for arg, value in vars(args).items():
-        if isinstance(value, list):
-            list_vals_str = str(" ".join(map(str, value)))
-            command.extend([f"--{arg}", list_vals_str])
-        elif value is not None:
-            if isinstance(value, bool) and value:
-                command.extend([f"--{arg}"])
-            elif isinstance(value, bool) and not value:
-                pass
-            else:
-                command.extend([f"--{arg}", str(value)])
-    if (
-        hasattr(args, "accelerate_eval_config_file")
-        and args.accelerate_eval_config_file
-    ):
-        delattr(args, "accelerate_eval_config_file")
+    command = get_called_command(args)
+
+    remove_extraneous_args(args)
+
     train(command, **args.__dict__)
