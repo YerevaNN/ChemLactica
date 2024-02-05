@@ -1,4 +1,5 @@
 import torch
+import accelerate
 from torch.utils._pytree import tree_map
 from typing import List, Any
 from numbers import Number
@@ -20,6 +21,25 @@ GPU_PRECISION_PEAK_FLOPS = {
         "fp16": 19500000000000,
     },
 }
+
+
+def get_theoretical_peak_flops(accelerator):
+    total_theoretical_peak_flops = 0
+    gpus = []
+    gpus.append(torch.cuda.get_device_properties(accelerator.device.index).name)
+    accelerator.wait_for_everyone()
+    gathered_gpus = accelerate.utils.gather_object(gpus)
+    accelerator.wait_for_everyone()
+    if accelerator.mixed_precision == "no":
+        precision = "fp32"
+    else:
+        precision = str(accelerator.mixed_precision)
+
+    for gpu_name in gathered_gpus:
+        total_theoretical_peak_flops += GPU_PRECISION_PEAK_FLOPS[str(gpu_name)][
+            precision
+        ]
+    return total_theoretical_peak_flops
 
 
 def get_shape(i):

@@ -1,5 +1,4 @@
 import os
-import accelerate
 
 # import sys
 from datasets import interleave_datasets
@@ -24,7 +23,7 @@ from accelerate.utils import broadcast_object_list
 import torch
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
-from flop_counter import GPU_PRECISION_PEAK_FLOPS
+from flop_counter import get_theoretical_peak_flops
 
 # from datasets.dataset_dict import IterableDatasetDict
 
@@ -105,27 +104,6 @@ def train(
         organization = checkpoint_path_components[-2]
         model_name = checkpoint_path_components[-1]
 
-    gpus = []
-    gpus.append(torch.cuda.get_device_properties(accelerator.device.index).name)
-    accelerator.wait_for_everyone()
-    gathered_gpus = accelerate.utils.gather_object(gpus)
-
-    accelerator.wait_for_everyone()
-    if accelerator.is_main_process:
-        print(gathered_gpus)
-    total_theoretical_peak_flops = 0
-
-    if accelerator.mixed_precision == "no":
-        precision = "fp32"
-    else:
-        precision = str(accelerator.mixed_precision)
-
-    for gpu_name in gathered_gpus:
-        total_theoretical_peak_flops += GPU_PRECISION_PEAK_FLOPS[str(gpu_name)][
-            precision
-        ]
-    print(total_theoretical_peak_flops)
-
     # auth_token = os.environ["HF_TOKEN"]
     model = load_model(
         from_pretrained,
@@ -138,6 +116,8 @@ def train(
         model.use_cache = (
             False  # use cache true doesn't work with gradient checkpointing
         )
+
+    total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)
 
     special_tokens = get_tokenizer_special_tokens(train_config["tokenizer_path"])
     print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
