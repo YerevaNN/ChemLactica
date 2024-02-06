@@ -58,6 +58,32 @@ class CustomTrainer(Trainer):
             return
         return super()._load_from_checkpoint(resume_from_checkpoint, model)
 
+    def _build_slurm_eval_command(self, train_command, trial):
+        checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+        run_dir = self._get_output_dir(trial=trial)
+        output_dir = os.path.join(run_dir, checkpoint_folder)
+        search_string = "--from_pretrained"
+        train_command[train_command(search_string) + 1] = output_dir
+        train_command.append("--evaluate_only")  # Drastically changes script behaviour
+        eval_command = train_command
+        return eval_command
+
+    def _submitit_slurm_eval_launch(self, eval_function):
+        slurm_nice_setting = 1000
+        executor = submitit.AutoExecutor(folder="your_experiment_folder")
+        cpus_per_task = self.args.dataloader_num_workers
+        mem_gb = 96
+        executor.update_parameters(
+            name=self.args.experiment_name + "eval",
+            timeout_min=120,
+            cpus_per_task=cpus_per_task,
+            gpus_per_node=1,
+            mem_gb=mem_gb,
+            slurm_srun_args=[f"--nice={str(slurm_nice_setting)}"],
+        )
+        exit()
+        job = executor.submit(eval_function)  # noqa
+
     def _maybe_log_save_evaluate(
         self, tr_loss, model, trial, epoch, ignore_keys_for_eval
     ):
@@ -101,36 +127,15 @@ class CustomTrainer(Trainer):
             )
 
         if self.control.should_evaluate:
-            # BUILD SLURM EVALUATE COMMAND
-            checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
-            run_dir = self._get_output_dir(trial=trial)
-            output_dir = os.path.join(run_dir, checkpoint_folder)
-            search_string = "--from_pretrained"
-            self.args.command[self.args.command.index(search_string) + 1] = output_dir
-            self.args.command.append("--evaluate_only")
-
-            # BUILD SLURM JOB SETTINGS
             if self.args.slurm_eval:
+                # BUILD SLURM EVALUATE COMMAND
+                eval_command = self._build_slurm_eval_command(self.args.command, trial)
                 print("-----------------------------------------------")
-                print("we have entered slurm eval")
-                print("here is the command: ", self.args.command)
+                print("starting slurm eval with command:", eval_command)
                 eval_function = submitit.helpers.CommandFunction(
-                    self.args.command, verbose=True
+                    eval_command, verbose=True
                 )
-                slurm_nice_setting = 1000
-                executor = submitit.AutoExecutor(folder="your_experiment_folder")
-                cpus_per_task = self.args.dataloader_num_workers
-                mem_gb = 96
-                executor.update_parameters(
-                    name=self.args.experiment_name + "eval",
-                    timeout_min=120,
-                    cpus_per_task=cpus_per_task,
-                    gpus_per_node=1,
-                    mem_gb=mem_gb,
-                    slurm_srun_args=[f"--nice={str(slurm_nice_setting)}"],
-                )
-                exit()
-                job = executor.submit(eval_function)  # noqa
+                self._submitit_slurm_eval_launch(eval_function)
 
             else:
                 metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
