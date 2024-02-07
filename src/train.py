@@ -316,7 +316,7 @@ def train(
             compute_metrics=compute_metrics,
             train_dataset=train_dataset if not evaluate_only else None,
             eval_dataset=processed_eval_dataset["validation"]
-            if evaluate_only
+            if not evaluate_only or slurm_eval
             else None,
             # optimizers=[optimizer, lr_scheduler],
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
