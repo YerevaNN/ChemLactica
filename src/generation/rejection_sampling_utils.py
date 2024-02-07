@@ -207,7 +207,7 @@ def generate_dataset(
         #             return None
         #         input_text += f", QED {target_mol.qed}, morgan_sim_to_lead {target_mol.morgan_sim_to_lead}, maccs_sim_to_lead {target_mol.maccs_sim_to_lead}"
         #         return input_text
-        for target_mol in candidate_target_molecules:
+        for target_mol in np.unique(candidate_target_molecules)[::-1]:
             if target_mol in similar_molecules_in_prompt:
                 continue
             sample = "</s>"
@@ -216,7 +216,7 @@ def generate_dataset(
             sample += f"[QED]{target_mol.qed:.2f}[/QED][START_SMILES]{target_mol.smiles}[END_SMILES]</s>"
             if len(tokenizer(sample)["input_ids"]) > 500:
                 continue
-            yield sample, target_mol
+            return sample, target_mol
 
     list_of_entries = {
         "samples":[],
@@ -227,15 +227,17 @@ def generate_dataset(
     progress_bar = tqdm.tqdm(total=num_samples)
     while num_samples > 0:
         samples = next_input_sample(lead_molecule)
-        for sample, target_mol in samples:
-            num_samples -= 1
-            list_of_entries["samples"].append(sample)
-            list_of_entries["smiles"].append(target_mol.smiles)
-            list_of_entries["qed"].append(target_mol.qed)
-            list_of_entries["morgan_sim_to_lead"].append(target_mol.morgan_sim_to_lead)
-            progress_bar.update(1)
-            if num_samples <= 0:
-                break
+        for s in samples:
+            if s:
+                sample, target_mol = s
+                num_samples -= 1
+                list_of_entries["samples"].append(sample)
+                list_of_entries["smiles"].append(target_mol.smiles)
+                list_of_entries["qed"].append(target_mol.qed)
+                list_of_entries["morgan_sim_to_lead"].append(target_mol.morgan_sim_to_lead)
+                progress_bar.update(1)
+                if num_samples <= 0:
+                    break
     
     pd.DataFrame(list_of_entries).to_csv(ds_file_name)
     return ds_file_name
