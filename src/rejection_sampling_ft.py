@@ -1,13 +1,19 @@
 from typing import List, Dict
 import os
+import gc
 import signal
+import traceback
 import argparse
+from functools import cache
 from datetime import timedelta
 import random
 import glob
+import subprocess
 import tqdm
 import numpy as np
 import transformers
+from transformers import logging
+from stringzilla import Str, File
 from transformers import (
     TrainingArguments,
     ProgressCallback,
@@ -15,7 +21,6 @@ from transformers import (
 )
 import torch
 from datasets import load_dataset
-from generation import generate
 from dataclasses import dataclass
 from utils import get_tokenizer
 from rdkit import DataStructs, Chem
@@ -26,24 +31,24 @@ from rdkit.Chem import MACCSkeys
 from callbacks import (
     CustomAimCallback,
     WPSCounterCallback,
-    ProfCallback,
     CustomProgressCallback,
     ReproducabilityCallback,
 )
 from config.create_train_config import model_fine_tune_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils import signal_handler, get_tokenizer_special_tokens
+from utils import signal_handler, get_tokenizer_special_tokens, create_command
 from model_utils import load_model
-from custom_trainer import CustomIterativeSFTTrainer
-from dataset_utils import process_dataset
+from custom_trainer import CustomIterativeSFTTrainer, CustomTrainer
+from dataset_utils import process_dataset, tokenize_function
+from generate_qed_rej_sampling_data import generate_dataset
 
 from rdkit import RDLogger
-import warnings
 RDLogger.DisableLog('rdApp.*')
 
 torch.manual_seed(42)
 random.seed(42)
 np.random.seed(42)
+logger = logging.get_logger("transformers")
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
@@ -87,18 +92,6 @@ def find(string: str, start: str, end: str="\n"):
 
 
 @dataclass
-class OptimPromptEntry:
-    prompt: str=""
-    qed_of_prompt: float=None
-
-    def __str__(self):
-        return f"{__class__.__name__}: '{self.prompt}'"
-    
-    def __repr__(self):
-        return str(self)
-
-
-@dataclass
 class MoleculeEntry:
     smiles: str=""
     qed: float=-1
@@ -126,7 +119,8 @@ def fine_tine(
     from_pretrained,
     model_config,
     valid_data_dir,
-    max_steps,
+    rounds,
+    steps_per_round,
     eval_steps,
     save_steps,
     train_batch_size,
@@ -143,10 +137,11 @@ def fine_tine(
     profile=False,
     profile_dir=None,
 ):
-    # transformers.logging.set_verbosity_info()
-    # transformers.utils.logging.enable_explicit_format()
-
-    device = "cuda:0"
+    transformers.logging.set_verbosity_info()
+    transformers.utils.logging.enable_explicit_format()
+    
+    print(f"flash attn used: {use_flash_attn}")
+    device = "cuda:1" if torch.cuda.is_available() else "cpu"
 
     train_config = model_fine_tune_configs[model_config]
     if os.path.isdir(from_pretrained):
@@ -159,7 +154,7 @@ def fine_tine(
         use_flash_attn=use_flash_attn,
         train_config=train_config,
         # auth_token=auth_token,
-    ).to(device)
+    )
     special_tokens = get_tokenizer_special_tokens()
     print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
     tokenizer = get_tokenizer()
@@ -267,6 +262,7 @@ def fine_tine(
     print("Warmup steps", train_config["warmup_steps"])
 
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
+    
     eval_dataset = load_dataset(
         "text", data_files={"validation": valid_data_files}, streaming=False
     )
@@ -279,23 +275,12 @@ def fine_tine(
         assay=False,
     )
 
-    def move_to_device(examples):
-        for key in list(examples.keys()):
-            examples[key] = torch.tensor(examples[key])
-        return examples
-    
-    processed_eval_dataset = processed_eval_dataset.map(
-        move_to_device,
-        batched=True
-    )
-
     trainer = CustomIterativeSFTTrainer(
         model=model,
         args=training_args,
         tokenizer=tokenizer,
         eval_dataset=processed_eval_dataset["validation"],
         optimizers=[optimizer, lr_scheduler],
-        max_length=train_config["block_size"],
         compute_metrics=compute_metrics,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
@@ -303,132 +288,51 @@ def fine_tine(
     for additional_callback in list(trainer_callback_dict.values()):
         trainer.add_callback(additional_callback)
 
-    pubchem_molecules_file = open("/mnt/sxtn/chem/pubchem_inchi/CID-SMILES-SHUF")
-    def next_molecule():
-        return pubchem_molecules_file.readline().split("\t")[-1].rstrip("\n")
-
-    generator_model = load_model(from_pretrained, use_flash_attn=True, dtype=torch.bfloat16).to(device)
-    sample_gen_args = {
-        "max_new_tokens": 50,
-        "temperature": 1.0,
-        "repetition_penalty": 1.0,
-        "do_sample": True,
-        "eos_token_id": 2
-    }
-    rej_sample_args = {
-        "max_new_tokens": 50,
-        "temperature": 1.3,
-        "repetition_penalty": 1.0,
-        "do_sample": True,
-        "num_return_sequences": 80,
-        "eos_token_id": 2
-    }
-    def next_input_sample(lead: str):
-        num_of_similar = random.randint(0, 5)
-        # num_of_similar = 5
-        input_text = "</s>"
-        try:
-            lead_molecule = MoleculeEntry(
-                smiles=lead, qed=compute_qed(lead),
-                morgan_sim_to_lead=random.uniform(0.9, 0.99),
-                inchi=get_inchi(lead)
-            )
-        except Exception:
-            return None
-        similar_molecules_in_prompt = []
-        if num_of_similar:
-            sample_gen_args["num_return_sequences"] = num_of_similar * 2
-            for outputs in generate(
-                    prompts=[
-                        f"</s>[SIMILAR]{lead_molecule.smiles} {random.uniform(0.9, 0.99):.2f}[/SIMILAR][QED]{random.uniform(0.9, 0.99):.2f}[/QED][START_SMILES]"
-                        for i in range(num_of_similar)
-                    ],
-                    model=generator_model,
-                    **sample_gen_args
-                ).values():
-                for out in outputs:
-                    smiles = find(out, "[START_SMILES]", "[END_SMILES]")
-                    try:
-                        mol = Chem.MolFromSmiles(smiles)
-                        gen_molecule = MoleculeEntry(
-                            smiles=smiles,
-                            qed=compute_qed(smiles),
-                            morgan_sim_to_lead=tanimoto_dist_func(smiles, lead),
-                            inchi=get_inchi(smiles)
-                        )
-                        if gen_molecule != lead_molecule:
-                            similar_molecules_in_prompt.append(gen_molecule)
-                    except Exception as e:
-                        pass
-        similar_molecules_in_prompt = list(np.unique(similar_molecules_in_prompt))
-        similar_molecules_in_prompt = similar_molecules_in_prompt[-num_of_similar:]
-        similar_molecules_in_prompt.append(lead_molecule)
-        random.shuffle(similar_molecules_in_prompt)
-        for mol in similar_molecules_in_prompt:
-            input_text += f"[SIMILAR]{mol.smiles} {mol.morgan_sim_to_lead:.2f}[/SIMILAR]"
-        input_text += f"[QED]{random.uniform(0.9, 0.99):.2f}[/QED][START_SMILES]"
-        candidate_target_molecules = []
-        for outputs in generate(
-                input_text,
-                model=generator_model,
-                **rej_sample_args
-            ).values():
-            for out in outputs:
-                smiles = find(out, "[START_SMILES]", "[END_SMILES]")
-                try:
-                    mol = Chem.MolFromSmiles(smiles)
-                    candidate_target_molecules.append(
-                        MoleculeEntry(
-                            smiles=smiles,
-                            qed=compute_qed(smiles),
-                            morgan_sim_to_lead=tanimoto_dist_func(smiles, lead),
-                            inchi=get_inchi(smiles)
-                        )
-                    )
-                except Exception as e:
-                    pass
-        for target_mol in np.unique(candidate_target_molecules)[::-1]:
-            if target_mol not in similar_molecules_in_prompt:
-                input_text += f"{target_mol.smiles}[END_SMILES]</s>"
-                if len(tokenizer(input_text)["input_ids"]) > 500:
-                    return None
-                return input_text
-
-    trainer.evaluate()
+    # trainer.evaluate()
     trainer.control = trainer.callback_handler.on_train_begin(training_args, trainer.state, trainer.control)
     trainer.control = trainer.callback_handler.on_epoch_begin(training_args, trainer.state, trainer.control)
-    for i in range(1, args.max_steps + 1):
-        trainer.control = trainer.callback_handler.on_step_begin(training_args, trainer.state, trainer.control)
-        train_batch = []
-        progress_bar = tqdm.tqdm(total=train_batch_size)
-        while len(train_batch) < train_batch_size:
-            sample = next_input_sample(lead=next_molecule())
-            if sample:
-                train_batch.append(sample)
-                progress_bar.update(1)
-            if len(train_batch) == train_batch_size:
-                break
-        trainer.step(texts=train_batch)
-        trainer.control = trainer.callback_handler.on_step_end(training_args, trainer.state, trainer.control)
-        # print(f"Step {i}")
-        if i % save_steps == 0:
-            trainer._save_checkpoint(model=None, trial=None)
-            trainer.control = trainer.callback_handler.on_save(training_args, trainer.state, trainer.control)
+    for i in tqdm.tqdm(range(1, args.rounds + 1)):
+        # generate and save rejection sampled samples
+        if trainer.state.global_step == 0:
+            generator_checkpoint_path = os.path.join(args.output_dir, f"checkpoint-{trainer.state.global_step}")
+        else:
+            generator_checkpoint_path = from_pretrained
+        print(f"Generator model: {generator_checkpoint_path}")
+        train_ds_name = generate_dataset(
+            checkpoint_path=generator_checkpoint_path,
+            generation_name="rejection_sampled",
+            device=device,
+            use_flash_attn=use_flash_attn,
+            num_samples=steps_per_round,
+            lead_molecule="CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1"
+        )
+        # read the rejection sampled samples
+        with open(train_ds_name, "r") as _f:
+            rej_sampled_samples = _f.readlines()
+        random.shuffle(rej_sampled_samples)
+
+        for i in tqdm.tqdm(range(len(rej_sampled_samples))):
+            trainer.control = trainer.callback_handler.on_step_begin(training_args, trainer.state, trainer.control)
+            batch_of_texts = rej_sampled_samples[i * train_batch_size:min((i+1) * train_batch_size, len(rej_sampled_samples))]
+            trainer.step(texts=batch_of_texts)
+            trainer.control = trainer.callback_handler.on_step_end(training_args, trainer.state, trainer.control)
+        trainer._save_checkpoint(model=None, trial=None)
+        trainer.control = trainer.callback_handler.on_save(training_args, trainer.state, trainer.control)
+        gc.collect()
+        torch.cuda.empty_cache()
     trainer.control = trainer.callback_handler.on_epoch_end(training_args, trainer.state, trainer.control)
     trainer.control = trainer.callback_handler.on_train_end(training_args, trainer.state, trainer.control)
 
-    # with prof_context_manager as prof:
-    #     try:
-    #         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
-    #     except Exception as e:
+    # try:
+    #     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+    # except Exception as e:
     #         traceback_info = traceback.format_exc()
     #         logger.error(e, traceback_info)
-    #     except KeyboardInterrupt:
-    #         with accelerator.main_process_first():
-    #             logger.error("KeyboardInterrupt")
-    #     if not (max_steps % eval_steps == 0):
-    #         trainer.evaluate()
-    pubchem_molecules_file.close()
+    # except KeyboardInterrupt:
+    #     if torch.distributed.get_rank() == 0:
+    #         logger.error("KeyboardInterrupt")
+    # if not (max_steps % eval_steps == 0):
+    #     trainer.evaluate()
 
 
 if __name__ == "__main__":
@@ -459,12 +363,17 @@ if __name__ == "__main__":
         help="path to directory containing validation data",
     )
     parser.add_argument(
-        "--max_steps",
+        "--rounds",
         type=int,
-        metavar="MS",
-        dest="max_steps",
+        dest="rounds",
         required=True,
-        help="the number of steps to train (overrides the n_epochs)",
+        help="the number of rounds",
+    )
+    parser.add_argument(
+        "--steps_per_round",
+        type=int,
+        dest="steps_per_round",
+        required=True,
     )
     parser.add_argument(
         "--eval_steps",

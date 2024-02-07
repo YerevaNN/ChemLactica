@@ -1,10 +1,11 @@
-from transformers import OPTForCausalLM, OPTConfig
+from functools import cache
 from utils import get_tokenizer_special_tokens
 import bitsandbytes as bnb
 from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
 import torch
 from custom_modeling_opt import CustomOPTForCausalLM
 from transformers import BitsAndBytesConfig
+from transformers import OPTForCausalLM, OPTConfig
 
 
 quant_config = BitsAndBytesConfig(

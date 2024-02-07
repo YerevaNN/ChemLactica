@@ -1043,8 +1043,7 @@ class CustomOPTForCausalLM(CustomOPTPreTrainedModel):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config, use_flash_attn):
-        if use_flash_attn:
-            config._flash_attn_2_enabled = True
+        config._flash_attn_2_enabled = use_flash_attn
         super().__init__(config)
         self.model = CustomOPTModel(config)
 
