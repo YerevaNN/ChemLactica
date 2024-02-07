@@ -296,7 +296,7 @@ def train(
         else:
             train_dataset = train_dataset[0]
 
-        if evaluate_only:
+        if evaluate_only or not slurm_eval:
             eval_dataset = load_dataset(
                 "text", data_files={"validation": valid_data_files}, streaming=False
             )
