@@ -17,6 +17,7 @@ from rdkit.Chem import MACCSkeys
 
 from config.create_train_config import model_fine_tune_configs
 from model_utils import load_model
+from generation.generation import generate
 
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
@@ -213,12 +214,12 @@ def generate_dataset(
 
     with open(ds_file_name, "a+") as _f:
         progress_bar = tqdm.tqdm(total=num_samples)
-        while num_samples >= 0:
+        while num_samples > 0:
             samples = next_input_sample(lead_molecule)
             for sample in samples:
                 _f.write(sample + "\n")
                 num_samples -= 1
-                if num_samples < 0:
+                if num_samples <= 0:
                     break
                 progress_bar.update(1)
     return ds_file_name

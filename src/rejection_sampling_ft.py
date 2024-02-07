@@ -4,11 +4,8 @@ import gc
 import signal
 import traceback
 import argparse
-from functools import cache
-from datetime import timedelta
 import random
 import glob
-import subprocess
 import tqdm
 import numpy as np
 import transformers
@@ -21,7 +18,6 @@ from transformers import (
 )
 import torch
 from datasets import load_dataset
-from dataclasses import dataclass
 from utils import get_tokenizer
 from rdkit import DataStructs, Chem
 from rdkit.Chem import AllChem
@@ -36,83 +32,25 @@ from callbacks import (
 )
 from config.create_train_config import model_fine_tune_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils import signal_handler, get_tokenizer_special_tokens, create_command
+from utils import signal_handler, get_tokenizer_special_tokens
 from model_utils import load_model
 from custom_trainer import CustomIterativeSFTTrainer, CustomTrainer
 from dataset_utils import process_dataset, tokenize_function
-from generate_qed_rej_sampling_data import generate_dataset
+from generation.generate_qed_rej_sampling_data import generate_dataset
 
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
 
-torch.manual_seed(42)
-random.seed(42)
-np.random.seed(42)
 logger = logging.get_logger("transformers")
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 
-def get_inchi(smiles: str):
-    return Chem.MolToInchi(Chem.MolFromSmiles(smiles))
-
-
-def same_molecule(smiles1: str, smiles2: str) -> bool:
-    try:
-        return get_inchi(smiles1) == get_inchi(smiles2)
-    except:
-        return True
-
-
-def get_morgan_fingerprint(smiles: str):
-    return AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(smiles), 2, nBits=2048)
-
-
-def get_maccs_fingerprint(smiles: str):
-    return MACCSkeys.GenMACCSKeys(Chem.MolFromSmiles(smiles))
-
-
-def tanimoto_dist_func(smiles1: str, smiles2: str, fingerprint: str="morgan"):
-    return DataStructs.TanimotoSimilarity(
-        get_morgan_fingerprint(smiles1) if fingerprint == 'morgan' else get_maccs_fingerprint(smiles1),
-        get_morgan_fingerprint(smiles2) if fingerprint == 'morgan' else get_maccs_fingerprint(smiles2),
-    )
-
-
-def compute_qed(smiles: str):
-    return qed(Chem.MolFromSmiles(smiles))
-
-
-def find(string: str, start: str, end: str="\n"):
-    s = string.find(start)
-    e = string.find(end)
-    if e != -1:
-        return string[s + len(start):e]
-
-
-@dataclass
-class MoleculeEntry:
-    smiles: str=""
-    qed: float=-1
-    morgan_sim_to_lead: float=-1
-    maccs_sim_to_lead: float=-1
-    inchi: str=None
-
-    def score(self):
-        return self.morgan_sim_to_lead + self.qed
-
-    def __eq__(self, other):
-        return self.inchi == other.inchi
-
-    def __lt__(self, other):
-        return self.score() < other.score()
-    
-    def __str__(self):
-        return f"smiles: {self.smiles}, qed: {self.qed:.4f}, morgan sim to lead: {self.morgan_sim_to_lead:.4f}, maccs sim to lead: {self.maccs_sim_to_lead:.4f}"
-    
-    def __repr__(self):
-        return str(self)
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 def fine_tine(
@@ -130,6 +68,8 @@ def fine_tine(
     use_flash_attn,
     gradient_accumulation_steps,
     gradient_checkpointing,
+    device,
+    seed,
     track=False,
     track_dir=None,
     check_reproducability=False,
@@ -137,18 +77,10 @@ def fine_tine(
     profile=False,
     profile_dir=None,
 ):
-    transformers.logging.set_verbosity_info()
+    # transformers.logging.set_verbosity_info()
     transformers.utils.logging.enable_explicit_format()
-    
-    print(f"flash attn used: {use_flash_attn}")
-    device = "cuda:1" if torch.cuda.is_available() else "cpu"
 
     train_config = model_fine_tune_configs[model_config]
-    if os.path.isdir(from_pretrained):
-        resume_from_checkpoint = from_pretrained
-    else:
-        resume_from_checkpoint = False
-
     model = load_model(
         from_pretrained,
         use_flash_attn=use_flash_attn,
@@ -221,7 +153,7 @@ def fine_tine(
     lr_scheduler = get_polynomial_decay_schedule_with_warmup(
         optimizer,
         num_warmup_steps=train_config["warmup_steps"],
-        num_training_steps=max_steps,
+        num_training_steps=steps_per_round * rounds,
         lr_end=0.1 * train_config["max_learning_rate"],
         power=1.0,
     )
@@ -242,7 +174,7 @@ def fine_tine(
         warmup_steps=train_config["warmup_steps"],
         max_grad_norm=train_config["global_gradient_norm"],
         evaluation_strategy="steps",
-        max_steps=max_steps,
+        max_steps=steps_per_round * rounds,
         eval_steps=eval_steps,
         save_steps=save_steps,
         dataloader_drop_last=True,
@@ -291,31 +223,34 @@ def fine_tine(
     # trainer.evaluate()
     trainer.control = trainer.callback_handler.on_train_begin(training_args, trainer.state, trainer.control)
     trainer.control = trainer.callback_handler.on_epoch_begin(training_args, trainer.state, trainer.control)
-    for i in tqdm.tqdm(range(1, args.rounds + 1)):
+    for i in tqdm.tqdm(range(1, rounds + 1)):
         # generate and save rejection sampled samples
         if trainer.state.global_step == 0:
-            generator_checkpoint_path = os.path.join(args.output_dir, f"checkpoint-{trainer.state.global_step}")
-        else:
             generator_checkpoint_path = from_pretrained
+        else:
+            generator_checkpoint_path = os.path.join(training_args.output_dir, f"checkpoint-{trainer.state.global_step}")
         print(f"Generator model: {generator_checkpoint_path}")
         train_ds_name = generate_dataset(
             checkpoint_path=generator_checkpoint_path,
             generation_name="rejection_sampled",
-            device=device,
             use_flash_attn=use_flash_attn,
             num_samples=steps_per_round,
-            lead_molecule="CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1"
+            lead_molecule="CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1",
+            device=device,
+            seed=seed
         )
         # read the rejection sampled samples
         with open(train_ds_name, "r") as _f:
             rej_sampled_samples = _f.readlines()
         random.shuffle(rej_sampled_samples)
 
-        for i in tqdm.tqdm(range(len(rej_sampled_samples))):
-            trainer.control = trainer.callback_handler.on_step_begin(training_args, trainer.state, trainer.control)
+        for i in tqdm.tqdm(range(len(rej_sampled_samples) // train_batch_size)):
             batch_of_texts = rej_sampled_samples[i * train_batch_size:min((i+1) * train_batch_size, len(rej_sampled_samples))]
-            trainer.step(texts=batch_of_texts)
-            trainer.control = trainer.callback_handler.on_step_end(training_args, trainer.state, trainer.control)
+            print("batch of texts size", len(batch_of_texts))
+            if batch_of_texts:
+                trainer.control = trainer.callback_handler.on_step_begin(training_args, trainer.state, trainer.control)
+                trainer.step(texts=batch_of_texts)
+                trainer.control = trainer.callback_handler.on_step_end(training_args, trainer.state, trainer.control)
         trainer._save_checkpoint(model=None, trial=None)
         trainer.control = trainer.callback_handler.on_save(training_args, trainer.state, trainer.control)
         gc.collect()
@@ -496,6 +431,17 @@ if __name__ == "__main__":
         help="whether or not check reproducability (should only be use for testing)",
     )
     parser.set_defaults(check_reproducability=False)
+    parser.add_argument(
+        "--device",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "--seed",
+        type=str,
+        required=False,
+        default=42
+    )
 
     args = parser.parse_args()
     fine_tine(**args.__dict__)
