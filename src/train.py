@@ -123,7 +123,9 @@ def train(
 
     if not resume_from_checkpoint:
         # if we are continuing training, embeddings already resized
-        model.resize_token_embeddings(train_config["vocab_size"] + len(special_tokens))
+        model.resize_token_embeddings(
+            train_config["vocab_size"] + len(special_tokens), pad_to_multiple_of=8
+        )
 
     trainer_callback_dict = {}
     experiment_hash = get_experiment_hash(from_pretrained)
