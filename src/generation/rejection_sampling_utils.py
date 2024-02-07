@@ -4,8 +4,10 @@ from functools import cache
 import datetime
 import random
 import glob
+import os
 import tqdm
 import numpy as np
+import pandas as pd
 from stringzilla import Str, File
 import torch
 from dataclasses import dataclass
@@ -85,7 +87,8 @@ def set_seed(seed: int):
 
 def generate_dataset(
     checkpoint_path,
-    generation_name,
+    run_hash,
+    round,
     num_samples,
     use_flash_attn,
     seed,
@@ -95,7 +98,10 @@ def generate_dataset(
     set_seed(seed)
     formatted_date_time = datetime.datetime.now().strftime("%Y-%m-%d,%H:%M")
     model_name = checkpoint_path.split(r'/')[-2:]
-    ds_file_name = f'/nfs/dgx/raid/chem/data/rej_sampling_data/{generation_name}_hash:{model_name[0][:6]}_step:{model_name[1].split("-")[-1]}_date:{formatted_date_time}.csv'
+    base_path = f"/nfs/dgx/raid/chem/data/rej_sampling_data/{run_hash}"
+    if not os.path.exists(base_path):
+        os.mkdir(base_path)
+    ds_file_name = f'{base_path}/round:{round}_hash:{model_name[0][:6]}_step:{model_name[1].split("-")[-1]}_date:{formatted_date_time}.csv'
 
     tokenizer = get_tokenizer()
     
@@ -124,7 +130,7 @@ def generate_dataset(
         "temperature": 1.3,
         "repetition_penalty": 1.0,
         "do_sample": True,
-        "num_return_sequences": 40,
+        "num_return_sequences": 5,
         "eos_token_id": 2
     }
     generator_model = load_model(checkpoint_path, use_flash_attn=use_flash_attn, dtype=torch.bfloat16).to(device)
@@ -210,18 +216,28 @@ def generate_dataset(
             sample += f"[QED]{target_mol.qed:.2f}[/QED][START_SMILES]{target_mol.smiles}[END_SMILES]</s>"
             if len(tokenizer(sample)["input_ids"]) > 500:
                 continue
-            yield sample
+            yield sample, target_mol
 
-    with open(ds_file_name, "a+") as _f:
-        progress_bar = tqdm.tqdm(total=num_samples)
-        while num_samples > 0:
-            samples = next_input_sample(lead_molecule)
-            for sample in samples:
-                _f.write(sample + "\n")
-                num_samples -= 1
-                if num_samples <= 0:
-                    break
-                progress_bar.update(1)
+    list_of_entries = {
+        "samples":[],
+        "smiles":[],
+        "qed":[],
+        "morgan_sim_to_lead":[]
+    }
+    progress_bar = tqdm.tqdm(total=num_samples)
+    while num_samples > 0:
+        samples = next_input_sample(lead_molecule)
+        for sample, target_mol in samples:
+            num_samples -= 1
+            list_of_entries["samples"].append(sample)
+            list_of_entries["smiles"].append(target_mol.smiles)
+            list_of_entries["qed"].append(target_mol.qed)
+            list_of_entries["morgan_sim_to_lead"].append(target_mol.morgan_sim_to_lead)
+            progress_bar.update(1)
+            if num_samples <= 0:
+                break
+    
+    pd.DataFrame(list_of_entries).to_csv(ds_file_name)
     return ds_file_name
 
 

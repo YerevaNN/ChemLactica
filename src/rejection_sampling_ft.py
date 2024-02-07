@@ -8,6 +8,7 @@ import random
 import glob
 import tqdm
 import numpy as np
+import pandas as pd
 import transformers
 from transformers import logging
 from stringzilla import Str, File
@@ -36,7 +37,11 @@ from utils import signal_handler, get_tokenizer_special_tokens
 from model_utils import load_model
 from custom_trainer import CustomIterativeSFTTrainer, CustomTrainer
 from dataset_utils import process_dataset, tokenize_function
-from generation.generate_qed_rej_sampling_data import generate_dataset
+from generation.rejection_sampling_utils import generate_dataset
+
+import sys
+sys.path.append("/auto/home/tigranfahradyan/RetMol")
+from chemlactica.run_qed import optimize_lead_molecule
 
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
@@ -224,29 +229,58 @@ def fine_tine(
     trainer.control = trainer.callback_handler.on_train_begin(training_args, trainer.state, trainer.control)
     trainer.control = trainer.callback_handler.on_epoch_begin(training_args, trainer.state, trainer.control)
     for i in tqdm.tqdm(range(1, rounds + 1)):
+        print(f"---------Rej Sampling ROUND {i}---------")
         # generate and save rejection sampled samples
         if trainer.state.global_step == 0:
             generator_checkpoint_path = from_pretrained
         else:
             generator_checkpoint_path = os.path.join(training_args.output_dir, f"checkpoint-{trainer.state.global_step}")
         print(f"Generator model: {generator_checkpoint_path}")
+        lead_molecule = "CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1"
+        # generator_model = load_model(
+        #     generator_checkpoint_path,
+        #     use_flash_attn=use_flash_attn,
+        #     train_config=train_config,
+        #     dtype=torch.bfloat16
+        # ).to(device)
+        # optimized_molecule = optimize_lead_molecule(
+        #     lead_molecule, model=generator_model, tokenizer=tokenizer,
+        #     num_of_iter=5, qed_range=[0.9, 0.98],
+        #     temperature=1.0, num_return_sequences=60,
+        #     max_similars_in_prompt=5
+        # )
+        # if optimized_molecule:
+        #     print(f"Optimized before round {i}")
+        # else:
+        #     print(f"Not optimized before round {i}")
+        # if trainer_callback_dict.get("aim_callback"):
+        #     trainer_callback_dict["aim_callback"]._run.track(True if optimized_molecule else False, name="optimized in round")
+
         train_ds_name = generate_dataset(
             checkpoint_path=generator_checkpoint_path,
-            generation_name="rejection_sampled",
+            run_hash=experiment_hash,
+            round=i,
             use_flash_attn=use_flash_attn,
             num_samples=steps_per_round,
-            lead_molecule="CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1",
+            lead_molecule=lead_molecule,
             device=device,
             seed=seed
         )
+        gc.collect()
+        torch.cuda.empty_cache()
         # read the rejection sampled samples
-        with open(train_ds_name, "r") as _f:
-            rej_sampled_samples = _f.readlines()
-        random.shuffle(rej_sampled_samples)
+        df_samples = pd.read_csv(train_ds_name)
+        del df_samples["Unnamed: 0"]
+        optimized_molecule_mask = np.bitwise_and(df_samples['qed'].values >= 0.9, df_samples['morgan_sim_to_lead'].values >= 0.4)
+        found_optimized_molecule = len(np.where(optimized_molecule_mask == True)[0]) > 0
+        print(f"Found optimized molecule: {found_optimized_molecule}")
+        if trainer_callback_dict.get("aim_callback"):
+            trainer_callback_dict["aim_callback"]._run.track(found_optimized_molecule, name='optimized in round')
 
+        rej_sampled_samples = list(df_samples["samples"].values)
+        random.shuffle(rej_sampled_samples)
         for i in tqdm.tqdm(range(len(rej_sampled_samples) // train_batch_size)):
             batch_of_texts = rej_sampled_samples[i * train_batch_size:min((i+1) * train_batch_size, len(rej_sampled_samples))]
-            print("batch of texts size", len(batch_of_texts))
             if batch_of_texts:
                 trainer.control = trainer.callback_handler.on_step_begin(training_args, trainer.state, trainer.control)
                 trainer.step(texts=batch_of_texts)
@@ -255,6 +289,7 @@ def fine_tine(
         trainer.control = trainer.callback_handler.on_save(training_args, trainer.state, trainer.control)
         gc.collect()
         torch.cuda.empty_cache()
+    
     trainer.control = trainer.callback_handler.on_epoch_end(training_args, trainer.state, trainer.control)
     trainer.control = trainer.callback_handler.on_train_end(training_args, trainer.state, trainer.control)
 
