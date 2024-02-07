@@ -59,22 +59,22 @@ def get_called_command(args):
             "-m",
             "accelerate.commands.launch",
             "--config_file",
-            f"{os.path.realpath(args.accelerate_eval_config_file)}",
+            "src/config/eval_config.yaml",
             "src/train.py",
         ]
+        for arg, value in vars(args).items():
+            if isinstance(value, list):
+                list_vals_str = str(" ".join(map(str, value)))
+                command.extend([f"--{arg}", list_vals_str])
+            elif value is not None:
+                if isinstance(value, bool) and value:
+                    command.extend([f"--{arg}"])
+                elif isinstance(value, bool) and not value:
+                    pass
+                else:
+                    command.extend([f"--{arg}", str(value)])
     else:
         command = None
-    for arg, value in vars(args).items():
-        if isinstance(value, list):
-            list_vals_str = str(" ".join(map(str, value)))
-            command.extend([f"--{arg}", list_vals_str])
-        elif value is not None:
-            if isinstance(value, bool) and value:
-                command.extend([f"--{arg}"])
-            elif isinstance(value, bool) and not value:
-                pass
-            else:
-                command.extend([f"--{arg}", str(value)])
     return command
 
 

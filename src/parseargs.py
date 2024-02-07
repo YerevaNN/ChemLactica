@@ -1,4 +1,8 @@
-def add_arguments(parser):
+import argparse
+
+
+def init_parser():
+    parser = argparse.ArgumentParser(description="none")
     parser.add_argument(
         "--from_pretrained",
         type=str,
@@ -214,16 +218,10 @@ def add_arguments(parser):
         help="Whether to only call evaluation, this is for slurm use",
     )
     parser.add_argument(
-        "--accelerate_eval_config_file",
-        type=str,
-        metavar="AE",
-        required=False,
-        dest="accelerate_eval_config_file",
-    )
-    parser.add_argument(
         "--slurm_eval",
         action="store_true",
         required=False,
         dest="slurm_eval",
     )
     parser.set_defaults(profile=False)
+    return parser

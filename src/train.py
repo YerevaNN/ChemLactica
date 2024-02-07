@@ -4,11 +4,10 @@ import os
 from datasets import interleave_datasets
 import signal
 import traceback
-import argparse
 from distributed_utils import get_experiment_hash
 from datetime import timedelta
 import random
-from parseargs import add_arguments
+from parseargs import init_parser
 import glob
 import multiprocessing
 from contextlib import nullcontext
@@ -349,8 +348,8 @@ def train(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="none")
-    parser = add_arguments(parser)
+    parser = init_parser()
+
     args = parser.parse_args()
 
     command = get_called_command(args)

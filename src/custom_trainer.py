@@ -133,7 +133,7 @@ class CustomTrainer(Trainer):
                 print("-----------------------------------------------")
                 print("starting slurm eval with command:", eval_command)
                 eval_function = submitit.helpers.CommandFunction(
-                    eval_command, verbose=True
+                    eval_command, verbose=True, cwd=os.getcwd()
                 )
                 self._submitit_slurm_eval_launch(eval_function)
 
