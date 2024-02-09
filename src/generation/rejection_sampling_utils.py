@@ -4,6 +4,8 @@ from functools import cache
 import datetime
 import random
 import glob
+import math
+import itertools as it
 import os
 import tqdm
 import numpy as np
@@ -127,10 +129,10 @@ def generate_dataset(
     }
     rej_sample_args = {
         "max_new_tokens": 50,
-        "temperature": 1.3,
+        "temperature": 1.0,
         "repetition_penalty": 1.0,
         "do_sample": True,
-        "num_return_sequences": 5,
+        "num_return_sequences": 80,
         "eos_token_id": 2
     }
     generator_model = load_model(checkpoint_path, use_flash_attn=use_flash_attn, dtype=torch.bfloat16).to(device)
@@ -146,7 +148,7 @@ def generate_dataset(
             )
         except Exception:
             return None
-        similar_molecules_in_prompt = []
+        cand_similar_molecules_in_prompt = []
         if num_of_similar:
             sample_gen_args["num_return_sequences"] = num_of_similar
             for outputs in generate(
@@ -169,12 +171,32 @@ def generate_dataset(
                             inchi=get_inchi(smiles)
                         )
                         if gen_molecule_entry != lead_molecule_entry:
-                            similar_molecules_in_prompt.append(gen_molecule_entry)
+                            cand_similar_molecules_in_prompt.append(gen_molecule_entry)
                     except Exception as e:
                         # print(e)
                         pass
-        similar_molecules_in_prompt = list(np.unique(similar_molecules_in_prompt))
-        similar_molecules_in_prompt = similar_molecules_in_prompt[-num_of_similar:]
+        cand_similar_molecules_in_prompt = np.unique(cand_similar_molecules_in_prompt)
+        # three_times_num_of_similar = num_of_similar * 3
+        # cand_similar_molecules_in_prompt = cand_similar_molecules_in_prompt[-three_times_num_of_similar:]
+
+        # pairwise_distance_matrix = np.ones(three_times_num_of_similar, three_times_num_of_similar)
+        # for i in range(three_times_num_of_similar):
+        #     for j in range(i):
+        #         pairwise_distance_matrix[i][j] = tanimoto_dist_func(cand_similar_molecules_in_prompt[i], cand_similar_molecules_in_prompt[[j]])
+        #         pairwise_distance_matrix[j][i] = pairwise_distance_matrix[i][j]
+
+        # best_sum_pairwise_distance = math.inf
+        # best_combination = None
+        # for comb in it.combinations(list(range(three_times_num_of_similar)), num_of_similar):
+        #     cur_sum_pairwise_distance = 0
+        #     for i in comb:
+        #         for j in comb:
+        #             cur_sum_pairwise_distance += pairwise_distance_matrix[i][j]
+        #     if cur_sum_pairwise_distance < best_sum_pairwise_distance:
+        #         best_combination = comb
+
+        # similar_molecules_in_prompt = [cand_similar_molecules_in_prompt[i] for i in best_combination]
+        similar_molecules_in_prompt = cand_similar_molecules_in_prompt[-num_of_similar:]
         similar_molecules_in_prompt.append(lead_molecule_entry)
         random.shuffle(similar_molecules_in_prompt)
         for mol in similar_molecules_in_prompt:
@@ -216,7 +238,7 @@ def generate_dataset(
             sample += f"[QED]{target_mol.qed:.2f}[/QED][START_SMILES]{target_mol.smiles}[END_SMILES]</s>"
             if len(tokenizer(sample)["input_ids"]) > 500:
                 continue
-            return sample, target_mol
+            yield sample, target_mol
 
     list_of_entries = {
         "samples":[],
@@ -227,9 +249,9 @@ def generate_dataset(
     progress_bar = tqdm.tqdm(total=num_samples)
     while num_samples > 0:
         samples = next_input_sample(lead_molecule)
-        for s in samples:
-            if s:
-                sample, target_mol = s
+        if samples:
+            for sample, target_mol in samples:
+                # sample, target_mol = samples
                 num_samples -= 1
                 list_of_entries["samples"].append(sample)
                 list_of_entries["smiles"].append(target_mol.smiles)
