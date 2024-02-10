@@ -1,11 +1,11 @@
-name: Run unittests
+name: Run integration tests
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
 jobs:
   test:
     name: Test
@@ -26,6 +26,24 @@ jobs:
         environment-file: environment.yml
         activate-environment: testenv
 
-    - name: Run unittests
-      shell: bash -l {0}
-      run: python3 confirm_test.py --confirm
+    - name: Get the second-to-last commit hash
+      id: commit_hash
+      run: |
+        COMMIT_HASH=$(git log --format="%H" -n 2 | tail -n 1)
+        echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
+
+    - name: read test_status.yaml
+      id: read_test_status
+      run: |
+        TEST_STATUS=$(cat test_status.yaml | grep "${COMMIT_HASH}" | cut -d ' ' -f 2|| echo "NOT FOUND")
+        echo "TEST_STATUS=${TEST_STATUS}" >> $GITHUB_ENV
+
+    - name: check test status
+      run: |
+        if [ "${TEST_STATUS}" == "NOT_FOUND" ]; then
+          echo "error: No entry found for the second-to-last commit in test_status.yaml."
+          exit 1
+        elif [ "${TEST_STATUS}" != "PASS" ]; then
+          echo "error: The test_status.yaml file indicates a failure for the second-to-last commit."
+          exit 1
+        fi
