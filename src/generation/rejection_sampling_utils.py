@@ -261,14 +261,14 @@ def generate_dataset(
         if samples:
             for sample, target_mol in samples:
                 # sample, target_mol = samples
-                num_samples -= 1
                 list_of_entries["samples"].append(sample)
                 list_of_entries["smiles"].append(target_mol.smiles)
                 list_of_entries["qed"].append(target_mol.qed)
                 list_of_entries["morgan_sim_to_lead"].append(target_mol.morgan_sim_to_lead)
                 progress_bar.update(1)
-                if num_samples <= 0:
-                    break
+        num_samples -= 1
+        if num_samples <= 0:
+            break
     
     pd.DataFrame(list_of_entries).to_csv(ds_file_name)
     return ds_file_name
