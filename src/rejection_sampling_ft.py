@@ -260,9 +260,10 @@ def fine_tine(
             checkpoint_path=generator_checkpoint_path,
             run_hash=experiment_hash,
             round=i,
-            use_flash_attn=use_flash_attn,
             num_samples=steps_per_round,
+            max_similars_in_prompt=5,
             lead_molecule=lead_molecule,
+            use_flash_attn=use_flash_attn,
             device=device,
             seed=seed
         )

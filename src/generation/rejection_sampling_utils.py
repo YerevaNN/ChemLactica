@@ -87,11 +87,15 @@ def set_seed(seed: int):
     np.random.seed(seed)
 
 
+cand_similar_molecules_in_prompt = []
+
+
 def generate_dataset(
     checkpoint_path,
     run_hash,
     round,
     num_samples,
+    max_similars_in_prompt,
     use_flash_attn,
     seed,
     lead_molecule,
@@ -132,50 +136,51 @@ def generate_dataset(
         "temperature": 1.0,
         "repetition_penalty": 1.0,
         "do_sample": True,
-        "num_return_sequences": 80,
+        "num_return_sequences": 5,
         "eos_token_id": 2
     }
     generator_model = load_model(checkpoint_path, use_flash_attn=use_flash_attn, dtype=torch.bfloat16).to(device)
     def next_input_sample(lead_molecule: str):
-        num_of_similar = random.randint(0, 5)
+        # num_of_similar = random.randint(0, 5)
         # num_of_similar = 5
         input_text = "</s>"
         try:
             lead_molecule_entry = MoleculeEntry(
                 smiles=lead_molecule, qed=compute_qed(lead_molecule),
-                morgan_sim_to_lead=random.uniform(0.4, 0.99),
+                morgan_sim_to_lead=random.uniform(0.9, 0.99),
                 inchi=get_inchi(lead_molecule)
             )
         except Exception:
             return None
-        cand_similar_molecules_in_prompt = []
-        if num_of_similar:
-            sample_gen_args["num_return_sequences"] = num_of_similar
-            for outputs in generate(
-                    prompts=[
-                        f"</s>[SIMILAR]{lead_molecule_entry.smiles} {random.uniform(0.9, 0.99):.2f}[/SIMILAR][QED]{random.uniform(0.9, 0.99):.2f}[/QED][START_SMILES]"
-                        for i in range(num_of_similar)
-                    ],
-                    model=generator_model,
-                    **sample_gen_args
-                ).values():
-                for out in outputs:
-                    smiles = find(out, "[START_SMILES]", "[END_SMILES]")
-                    try:
-                        mol = Chem.MolFromSmiles(smiles)
-                        gen_molecule_entry = MoleculeEntry(
-                            smiles=smiles,
-                            qed=compute_qed(smiles),
-                            morgan_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles),
-                            maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, "maccs"),
-                            inchi=get_inchi(smiles)
-                        )
-                        if gen_molecule_entry != lead_molecule_entry:
-                            cand_similar_molecules_in_prompt.append(gen_molecule_entry)
-                    except Exception as e:
-                        # print(e)
-                        pass
-        cand_similar_molecules_in_prompt = np.unique(cand_similar_molecules_in_prompt)
+        # cand_similar_molecules_in_prompt = []
+        # if num_of_similar:
+            # sample_gen_args["num_return_sequences"] = num_of_similar
+            # for outputs in generate(
+            #         prompts=[
+            #             f"</s>[SIMILAR]{lead_molecule_entry.smiles} {random.uniform(0.9, 0.99):.2f}[/SIMILAR][QED]{random.uniform(0.9, 0.99):.2f}[/QED][START_SMILES]"
+            #             for i in range(num_of_similar)
+            #         ],
+            #         model=generator_model,
+            #         **sample_gen_args
+            #     ).values():
+            #     for out in outputs:
+            #         smiles = find(out, "[START_SMILES]", "[END_SMILES]")
+            #         try:
+            #             mol = Chem.MolFromSmiles(smiles)
+            #             gen_molecule_entry = MoleculeEntry(
+            #                 smiles=smiles,
+            #                 qed=compute_qed(smiles),
+            #                 morgan_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles),
+            #                 maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, "maccs"),
+            #                 inchi=get_inchi(smiles)
+            #             )
+            #             if gen_molecule_entry != lead_molecule_entry:
+            #                 cand_similar_molecules_in_prompt.append(gen_molecule_entry)
+            #         except Exception as e:
+            #             # print(e)
+            #             pass
+
+        # cand_similar_molecules_in_prompt = np.unique(cand_similar_molecules_in_prompt)
         # three_times_num_of_similar = num_of_similar * 3
         # cand_similar_molecules_in_prompt = cand_similar_molecules_in_prompt[-three_times_num_of_similar:]
 
@@ -196,7 +201,10 @@ def generate_dataset(
         #         best_combination = comb
 
         # similar_molecules_in_prompt = [cand_similar_molecules_in_prompt[i] for i in best_combination]
-        similar_molecules_in_prompt = cand_similar_molecules_in_prompt[-num_of_similar:]
+
+        global cand_similar_molecules_in_prompt
+        cand_similar_molecules_in_prompt = list(np.unique(cand_similar_molecules_in_prompt)[-max_similars_in_prompt:])
+        similar_molecules_in_prompt = cand_similar_molecules_in_prompt.copy()
         similar_molecules_in_prompt.append(lead_molecule_entry)
         random.shuffle(similar_molecules_in_prompt)
         for mol in similar_molecules_in_prompt:
@@ -211,15 +219,15 @@ def generate_dataset(
             for out in outputs:
                 smiles = find(out, "[START_SMILES]", "[END_SMILES]")
                 try:
-                    candidate_target_molecules.append(
-                        MoleculeEntry(
-                            smiles=smiles,
-                            qed=compute_qed(smiles),
-                            morgan_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles),
-                            maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, "maccs"),
-                            inchi=get_inchi(smiles)
-                        )
+                    gen_mol = MoleculeEntry(
+                        smiles=smiles,
+                        qed=compute_qed(smiles),
+                        morgan_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles),
+                        maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, "maccs"),
+                        inchi=get_inchi(smiles)
                     )
+                    candidate_target_molecules.append(gen_mol)
+                    cand_similar_molecules_in_prompt.append(gen_mol)
                 except Exception as e:
                     pass
         # for target_mol in np.unique(candidate_target_molecules)[::-1]:
@@ -238,7 +246,8 @@ def generate_dataset(
             sample += f"[QED]{target_mol.qed:.2f}[/QED][START_SMILES]{target_mol.smiles}[END_SMILES]</s>"
             if len(tokenizer(sample)["input_ids"]) > 500:
                 continue
-            yield sample, target_mol
+            # yield sample, target_mol
+            return [(sample, target_mol)]
 
     list_of_entries = {
         "samples":[],
