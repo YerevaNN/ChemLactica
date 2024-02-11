@@ -132,12 +132,12 @@ def generate_dataset(
         "eos_token_id": 2
     }
     rej_sample_args = {
-        "max_new_tokens": 50,
+        "max_new_tokens": 300,
         "temperature": 1.0,
         "repetition_penalty": 1.0,
         "do_sample": True,
         "num_return_sequences": 5,
-        "eos_token_id": 2
+        "eos_token_id": 20,
     }
     generator_model = load_model(checkpoint_path, use_flash_attn=use_flash_attn, dtype=torch.bfloat16).to(device)
     def next_input_sample(lead_molecule: str):
@@ -209,7 +209,7 @@ def generate_dataset(
         random.shuffle(similar_molecules_in_prompt)
         for mol in similar_molecules_in_prompt:
             input_text += f"[SIMILAR]{mol.smiles} {mol.morgan_sim_to_lead:.2f}[/SIMILAR]"
-        input_text += f"[QED]{random.uniform(0.9, 0.99):.2f}[/QED][START_SMILES]"
+        input_text += f"[QED]{random.uniform(0.9, 0.99):.2f}[/QED]"
         candidate_target_molecules = []
         for outputs in generate(
                 input_text,
