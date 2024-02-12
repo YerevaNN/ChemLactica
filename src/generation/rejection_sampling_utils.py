@@ -265,8 +265,8 @@ def generate_dataset(
                 list_of_entries["smiles"].append(target_mol.smiles)
                 list_of_entries["qed"].append(target_mol.qed)
                 list_of_entries["morgan_sim_to_lead"].append(target_mol.morgan_sim_to_lead)
-                progress_bar.update(1)
         num_samples -= 1
+        progress_bar.update(1)
         if num_samples <= 0:
             break
     
