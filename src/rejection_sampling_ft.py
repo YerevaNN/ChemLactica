@@ -67,6 +67,7 @@ def fine_tine(
     eval_steps,
     save_steps,
     train_batch_size,
+    max_learning_rate,
     experiment_name,
     checkpoints_root_dir,
     dataloader_num_workers,
@@ -86,6 +87,7 @@ def fine_tine(
     transformers.utils.logging.enable_explicit_format()
 
     train_config = model_fine_tune_configs[model_config]
+    train_config["max_learning_rate"] = max_learning_rate
     model = load_model(
         from_pretrained,
         use_flash_attn=use_flash_attn,
@@ -376,6 +378,11 @@ if __name__ == "__main__":
         required=False,
         help="valid batch size (per GPU when using dist validation)",
         default=None,
+    )
+    parser.add_argument(
+        "--max_learning_rate",
+        type=float,
+        required=True,
     )
     parser.add_argument(
         "--experiment_name",
