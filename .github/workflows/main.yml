@@ -43,5 +43,14 @@ jobs:
         index=$(($length - 2))
         latest_commit=$(jq --argjson index $index '.[$index]' response.json)
         echo "Get commit SHA of the latest commit:"
-        latest_commit_sha=$(echo "$latest_commit" | jq -r '.sha')
+        COMMIT_HASH=$(echo "$latest_commit" | jq -r '.sha')
         echo "$latest_commit_sha"
+    - name: read integration test status
+      run: |
+        TEST_STATUS=$(cat test_status.yaml | grep "${COMMIT_HASH}" | cut -d ' ' -f 2|| echo "NOT FOUND")
+    - name: check test status
+      run: |
+        if [ "${TEST_STATUS}" != "PASS" ]; then
+          echo "error: The test_status.yaml file indicates a failure for the second-to-last commit."
+          exit 1
+        fi
