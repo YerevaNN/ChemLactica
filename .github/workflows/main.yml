@@ -23,7 +23,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        environment-file: environment.yml
+        environment-file: test_environment.yml
         activate-environment: testenv
 
     - name: Get the second-to-last commit hash
