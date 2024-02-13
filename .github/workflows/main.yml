@@ -50,9 +50,9 @@ jobs:
         echo "getting test status"
         TEST_STATUS=$(cat test_status.yaml | grep "${COMMIT_HASH}" | cut -d ' ' -f 2|| echo "NOT FOUND")
         echo "$TEST_STATUS"
-    # - name: check test status
-    #   run: |
-    #     if [ "${TEST_STATUS}" != "PASS" ]; then
-    #       echo "error: The test_status.yaml file indicates a failure for the second-to-last commit."
-    #       exit 1
-    #     fi
+    - name: check test status
+      run: |
+        if [ ! $TEST_STATUS=="PASS" ]; then
+          echo "error: The test_status.yaml file indicates a failure for the second-to-last commit or incorrect commit tested"
+          exit 1
+        fi
