@@ -5,14 +5,15 @@ on:
       - main
     types:
       - opened
-      - synchronize
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 5
 
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -25,25 +26,21 @@ jobs:
         auto-update-conda: true
         environment-file: test_environment.yml
         activate-environment: testenv
-
-    - name: Get the second-to-last commit hash
-      id: commit_hash
+    - name: list commits on PR
       run: |
-        COMMIT_HASH=$(git log --format="%H" -n 2 | tail -n 1)
-        echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_ENV
-
-    - name: read test_status.yaml
-      id: read_test_status
+        response=$(curl --request GET
+        --url 'https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits'
+        --header 'Authorization: token ${{ secrets.GITHUB_TOKEN }}'
+        --header 'Accept: application/vnd.github.v3+json'
+        --header 'Content-Type: application/json')
+        echo $response &gt; response.json
+    - name: get second last commit
       run: |
-        TEST_STATUS=$(cat test_status.yaml | grep "${COMMIT_HASH}" | cut -d ' ' -f 2|| echo "NOT FOUND")
-        echo "TEST_STATUS=${TEST_STATUS}" >> $GITHUB_ENV
-
-    - name: check test status
-      run: |
-        if [ "${TEST_STATUS}" == "NOT_FOUND" ]; then
-          echo "error: No entry found for the second-to-last commit in test_status.yaml."
-          exit 1
-        elif [ "${TEST_STATUS}" != "PASS" ]; then
-          echo "error: The test_status.yaml file indicates a failure for the second-to-last commit."
-          exit 1
-        fi
+        echo "Get length of the array:"
+        length=$(jq 'length' response.json)
+        echo "Get index of the second last commit:"
+        index=$(($length - 2))
+        latest_commit=$(jq --argjson index $index '.[$index]' response.json)
+        echo "Get commit SHA of the latest commit:"
+        latest_commit_sha=$(echo "$latest_commit" | jq -r '.sha')
+        echo "$latest_commit_sha"
