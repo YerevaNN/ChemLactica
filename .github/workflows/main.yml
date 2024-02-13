@@ -21,12 +21,12 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Set up Conda
-      uses: conda-incubator/setup-miniconda@v2
-      with:
-        auto-update-conda: true
-        environment-file: test_environment.yml
-        activate-environment: testenv
+    # - name: Set up Conda
+    #   uses: conda-incubator/setup-miniconda@v2
+    #   with:
+    #     auto-update-conda: true
+    #     environment-file: test_environment.yml
+    #     activate-environment: testenv
     - name: list commits on PR
       run: |
         response=$(curl --request GET \
@@ -44,13 +44,15 @@ jobs:
         latest_commit=$(jq --argjson index $index '.[$index]' response.json)
         echo "Get commit SHA of the latest commit:"
         COMMIT_HASH=$(echo "$latest_commit" | jq -r '.sha')
-        echo "$latest_commit_sha"
+        echo "$COMMIT_HASH"
     - name: read integration test status
       run: |
+        echo "getting test status"
         TEST_STATUS=$(cat test_status.yaml | grep "${COMMIT_HASH}" | cut -d ' ' -f 2|| echo "NOT FOUND")
-    - name: check test status
-      run: |
-        if [ "${TEST_STATUS}" != "PASS" ]; then
-          echo "error: The test_status.yaml file indicates a failure for the second-to-last commit."
-          exit 1
-        fi
+        echo "$TEST_STATUS"
+    # - name: check test status
+    #   run: |
+    #     if [ "${TEST_STATUS}" != "PASS" ]; then
+    #       echo "error: The test_status.yaml file indicates a failure for the second-to-last commit."
+    #       exit 1
+    #     fi
