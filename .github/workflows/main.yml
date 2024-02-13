@@ -29,12 +29,12 @@ jobs:
         activate-environment: testenv
     - name: list commits on PR
       run: |
-        response=$(curl --request GET
-        --url 'https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits'
-        --header 'Authorization: token ${{ secrets.GITHUB_TOKEN }}'
-        --header 'Accept: application/vnd.github.v3+json'
+        response=$(curl --request GET \
+        --url 'https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits' \
+        --header 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' \
+        --header 'Accept: application/vnd.github.v3+json' \
         --header 'Content-Type: application/json')
-        echo $response &gt; response.json
+        echo "$response" > response.json
     - name: get second last commit
       run: |
         echo "Get length of the array:"
