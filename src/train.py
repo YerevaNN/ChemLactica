@@ -151,6 +151,7 @@ def train(
 
     logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
+    # TODO: separate profiling
     if profile:
         prof = torch.profiler.profile(
             activities=[
@@ -249,7 +250,7 @@ def train(
             gradient_checkpointing=gradient_checkpointing,
             gradient_checkpointing_kwargs={"use_reentrant": False},
             gradient_accumulation_steps=gradient_accumulation_steps,
-            save_total_limit=4,
+            # save_total_limit=4, in order for offline eval to work, we keep all of them for now
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type="linear",
             optim="adamw_torch",
