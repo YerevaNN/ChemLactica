@@ -178,3 +178,4 @@ checkpoints/
 .aim/
 
 src/live_prompt.ipynb
+src/sft.ipynb

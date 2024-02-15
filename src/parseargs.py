@@ -4,6 +4,15 @@ import argparse
 def init_parser():
     parser = argparse.ArgumentParser(description="none")
     parser.add_argument(
+        "--train_type",
+        type=str,
+        metavar="TT",
+        dest="train_type",
+        choices=["pretrain", "sft", "isft", "dpo"],
+        required=True,
+        help="determining the type of training",
+    )
+    parser.add_argument(
         "--from_pretrained",
         type=str,
         metavar="FP",

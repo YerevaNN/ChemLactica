@@ -21,6 +21,10 @@ from transformers import (
 )
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
+from trl import SFTTrainer
+from trl.trainer import ConstantLengthDataset
+from utils import get_tokenizer
+
 import torch
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
@@ -64,6 +68,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 def train(
     command,
     slurm_eval,
+    train_type,
     from_pretrained,
     model_config,
     training_data_dirs,
@@ -256,77 +261,114 @@ def train(
             # load_best_model=True
         )
 
-        # print("TRAINING directories", training_data_dirs, dir_data_types)
-        assert len(training_data_dirs) == len(dir_data_types)
-        train_dataset_dict = {}
-        print("---Training dataset names---")
-        for i, (training_data_dir, dir_data_type) in enumerate(
-            zip(training_data_dirs, dir_data_types)
-        ):
-            if dir_data_type.lower() not in DIR_DATA_TYPES:
-                raise ValueError(
-                    f"""Unknown data type {dir_data_type},
-                    the following data types are supported: {DIR_DATA_TYPES}"""
+        if train_type == "pretrain":
+            # print("TRAINING directories", training_data_dirs, dir_data_types)
+            assert len(training_data_dirs) == len(dir_data_types)
+            train_dataset_dict = {}
+            print("---Training dataset names---")
+            for i, (training_data_dir, dir_data_type) in enumerate(
+                zip(training_data_dirs, dir_data_types)
+            ):
+                if dir_data_type.lower() not in DIR_DATA_TYPES:
+                    raise ValueError(
+                        f"""Unknown data type {dir_data_type},
+                        the following data types are supported: {DIR_DATA_TYPES}"""
+                    )
+                training_data_files = glob.glob(training_data_dir + "/*.jsonl")
+                ds_name = f"{dir_data_type}_{i}"
+                is_assay_split = "assay" in dir_data_type
+                dataset = IterableDataset.from_generator(
+                    samples_generator,
+                    gen_kwargs={
+                        "files": training_data_files,
+                        "shared_jsonl_files": shared_jsonl_files,
+                    },
                 )
-            training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-            ds_name = f"{dir_data_type}_{i}"
-            is_assay_split = "assay" in dir_data_type
-            dataset = IterableDataset.from_generator(
-                samples_generator,
-                gen_kwargs={
-                    "files": training_data_files,
-                    "shared_jsonl_files": shared_jsonl_files,
+                dataset = process_dataset(
+                    dataset=dataset,
+                    train_config=train_config,
+                    process_batch_sizes=(50, 50),
+                    is_eval=False,
+                    assay=is_assay_split,
+                )
+                if is_assay_split:
+                    dataset.shuffle(buffer_size=shuffle_buffer_size)
+                print(f"Dataset {i}: {ds_name}")
+                train_dataset_dict[ds_name] = dataset
+
+            valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
+
+            train_dataset = list(train_dataset_dict.values())
+            if len(train_dataset) > 1:
+                train_dataset = interleave_datasets(train_dataset)
+            else:
+                train_dataset = train_dataset[0]
+
+            if evaluate_only or not slurm_eval:
+                eval_dataset = load_dataset(
+                    "text", data_files={"validation": valid_data_files}, streaming=False
+                )
+                processed_eval_dataset = process_dataset(
+                    dataset=eval_dataset,
+                    train_config=train_config,
+                    process_batch_sizes=(50, 50),
+                    is_eval=True,
+                    assay=False,
+                )
+            else:
+                processed_eval_dataset = None
+
+            trainer = CustomTrainer(
+                model=model,
+                args=training_args,
+                compute_metrics=compute_metrics,
+                train_dataset=train_dataset if not evaluate_only else None,
+                eval_dataset=processed_eval_dataset["validation"]
+                if not evaluate_only or slurm_eval
+                else None,
+                # optimizers=[optimizer, lr_scheduler],
+                preprocess_logits_for_metrics=preprocess_logits_for_metrics,
+            )
+            trainer.remove_callback(ProgressCallback)
+            for additional_callback in list(trainer_callback_dict.values()):
+                trainer.add_callback(additional_callback)
+
+        elif train_type == "sft":
+            training_data_files = glob.glob(training_data_dirs[0] + "/*.csv")
+            valid_data_files = glob.glob(valid_data_dir + "/*.csv")
+            dataset = load_dataset(
+                "csv",
+                data_files={
+                    "train": training_data_files,
+                    "validation": valid_data_files,
                 },
             )
-            dataset = process_dataset(
-                dataset=dataset,
-                train_config=train_config,
-                process_batch_sizes=(50, 50),
-                is_eval=False,
-                assay=is_assay_split,
+            tokenizer = get_tokenizer(
+                "/auto/home/menuab/code/ChemLactica/src/tokenizer/ChemLacticaTokenizer66"
             )
-            if is_assay_split:
-                dataset.shuffle(buffer_size=shuffle_buffer_size)
-            print(f"Dataset {i}: {ds_name}")
-            train_dataset_dict[ds_name] = dataset
-
-        valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-
-        train_dataset = list(train_dataset_dict.values())
-        if len(train_dataset) > 1:
-            train_dataset = interleave_datasets(train_dataset)
-        else:
-            train_dataset = train_dataset[0]
-
-        if evaluate_only or not slurm_eval:
-            eval_dataset = load_dataset(
-                "text", data_files={"validation": valid_data_files}, streaming=False
+            format_func = (
+                lambda example: f"[START_SMILES]{example['smiles']}[END_SMILES][ACTIVITY]"
+                f"{example['activity']:.2f}[/ACTIVITY]"
             )
-            processed_eval_dataset = process_dataset(
-                dataset=eval_dataset,
-                train_config=train_config,
-                process_batch_sizes=(50, 50),
-                is_eval=True,
-                assay=False,
+            train_dataset = ConstantLengthDataset(
+                tokenizer=tokenizer,
+                dataset=dataset["train"],
+                formatting_func=format_func,
             )
-        else:
-            processed_eval_dataset = None
-
-        trainer = CustomTrainer(
-            model=model,
-            args=training_args,
-            compute_metrics=compute_metrics,
-            train_dataset=train_dataset if not evaluate_only else None,
-            eval_dataset=processed_eval_dataset["validation"]
-            if not evaluate_only or slurm_eval
-            else None,
-            # optimizers=[optimizer, lr_scheduler],
-            preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-        )
-        trainer.remove_callback(ProgressCallback)
-        for additional_callback in list(trainer_callback_dict.values()):
-            trainer.add_callback(additional_callback)
-
+            eval_dataset = ConstantLengthDataset(
+                tokenizer=tokenizer,
+                dataset=dataset["validation"],
+                formatting_func=format_func,
+            )
+            trainer = SFTTrainer(
+                model=model,
+                train_dataset=train_dataset,
+                eval_dataset=eval_dataset,
+                args=training_args,
+                packing=True,
+                tokenizer=tokenizer,
+                max_seq_length=1024,
+            )
         prof_context_manager = (
             trainer_callback_dict.get("profiller_callback").prof
             if trainer_callback_dict.get("profiller_callback") is not None
