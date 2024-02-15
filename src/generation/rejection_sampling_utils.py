@@ -87,7 +87,7 @@ def set_seed(seed: int):
     np.random.seed(seed)
 
 
-cand_similar_molecules_in_prompt = []
+# cand_similar_molecules_in_prompt = []
 
 
 def generate_dataset(
@@ -136,12 +136,12 @@ def generate_dataset(
         "temperature": 1.0,
         "repetition_penalty": 1.0,
         "do_sample": True,
-        "num_return_sequences": 5,
+        "num_return_sequences": 20,
         "eos_token_id": 20,
     }
     generator_model = load_model(checkpoint_path, use_flash_attn=use_flash_attn, dtype=torch.bfloat16).to(device)
     def next_input_sample(lead_molecule: str):
-        # num_of_similar = random.randint(0, 5)
+        num_of_similar = random.randint(0, max_similars_in_prompt)
         # num_of_similar = 5
         input_text = "</s>"
         try:
@@ -152,33 +152,33 @@ def generate_dataset(
             )
         except Exception:
             return None
-        # cand_similar_molecules_in_prompt = []
-        # if num_of_similar:
-            # sample_gen_args["num_return_sequences"] = num_of_similar
-            # for outputs in generate(
-            #         prompts=[
-            #             f"</s>[SIMILAR]{lead_molecule_entry.smiles} {random.uniform(0.9, 0.99):.2f}[/SIMILAR][QED]{random.uniform(0.9, 0.99):.2f}[/QED][START_SMILES]"
-            #             for i in range(num_of_similar)
-            #         ],
-            #         model=generator_model,
-            #         **sample_gen_args
-            #     ).values():
-            #     for out in outputs:
-            #         smiles = find(out, "[START_SMILES]", "[END_SMILES]")
-            #         try:
-            #             mol = Chem.MolFromSmiles(smiles)
-            #             gen_molecule_entry = MoleculeEntry(
-            #                 smiles=smiles,
-            #                 qed=compute_qed(smiles),
-            #                 morgan_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles),
-            #                 maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, "maccs"),
-            #                 inchi=get_inchi(smiles)
-            #             )
-            #             if gen_molecule_entry != lead_molecule_entry:
-            #                 cand_similar_molecules_in_prompt.append(gen_molecule_entry)
-            #         except Exception as e:
-            #             # print(e)
-            #             pass
+        cand_similar_molecules_in_prompt = []
+        if num_of_similar:
+            sample_gen_args["num_return_sequences"] = num_of_similar
+            for outputs in generate(
+                    prompts=[
+                        f"</s>[SIMILAR]{lead_molecule_entry.smiles} {random.uniform(0.9, 0.99):.2f}[/SIMILAR][QED]{random.uniform(0.9, 0.99):.2f}[/QED][START_SMILES]"
+                        for i in range(num_of_similar)
+                    ],
+                    model=generator_model,
+                    **sample_gen_args
+                ).values():
+                for out in outputs:
+                    smiles = find(out, "[START_SMILES]", "[END_SMILES]")
+                    try:
+                        mol = Chem.MolFromSmiles(smiles)
+                        gen_molecule_entry = MoleculeEntry(
+                            smiles=smiles,
+                            qed=compute_qed(smiles),
+                            morgan_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles),
+                            maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, "maccs"),
+                            inchi=get_inchi(smiles)
+                        )
+                        if gen_molecule_entry != lead_molecule_entry:
+                            cand_similar_molecules_in_prompt.append(gen_molecule_entry)
+                    except Exception as e:
+                        # print(e)
+                        pass
 
         # cand_similar_molecules_in_prompt = np.unique(cand_similar_molecules_in_prompt)
         # three_times_num_of_similar = num_of_similar * 3
@@ -202,7 +202,7 @@ def generate_dataset(
 
         # similar_molecules_in_prompt = [cand_similar_molecules_in_prompt[i] for i in best_combination]
 
-        global cand_similar_molecules_in_prompt
+        # global cand_similar_molecules_in_prompt
         cand_similar_molecules_in_prompt = list(np.unique(cand_similar_molecules_in_prompt)[-max_similars_in_prompt:])
         similar_molecules_in_prompt = cand_similar_molecules_in_prompt.copy()
         similar_molecules_in_prompt.append(lead_molecule_entry)

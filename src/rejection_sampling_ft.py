@@ -238,7 +238,8 @@ def fine_tine(
         else:
             generator_checkpoint_path = os.path.join(training_args.output_dir, f"checkpoint-{trainer.state.global_step}")
         print(f"Generator model: {generator_checkpoint_path}")
-        lead_molecule = "CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1"
+        # lead_molecule = "CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1"
+        lead_molecule = "c1ccc(-c2cc(N3C[C@H]4[C@@H]5CC[C@@H](O5)[C@H]4C3)c3ccccc3[nH+]2)cc1"
         # generator_model = load_model(
         #     generator_checkpoint_path,
         #     use_flash_attn=use_flash_attn,
