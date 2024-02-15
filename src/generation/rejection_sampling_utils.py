@@ -87,9 +87,6 @@ def set_seed(seed: int):
     np.random.seed(seed)
 
 
-# cand_similar_molecules_in_prompt = []
-
-
 def generate_dataset(
     checkpoint_path,
     run_hash,
@@ -111,15 +108,6 @@ def generate_dataset(
 
     tokenizer = get_tokenizer()
     
-    # @cache
-    # def get_pubchem_molecule_list():
-    #     return Str(File("/nfs/dgx/raid/chem/pubchem_inchi/CID-SMILES-SHUF")).splitlines()
-    
-    # def next_molecule():
-    #     pubchem_molecules_list = get_pubchem_molecule_list()
-    #     pubchem_mol_count = len(pubchem_molecules_list)
-    #     ind = random.randint(0, pubchem_mol_count - 1)
-    #     return str(pubchem_molecules_list[ind]).split("\t")[-1].rstrip("\n")
     lead_molecule = Chem.MolToSmiles(Chem.MolFromSmiles(lead_molecule), canonical=True)
     lead_molecule = Chem.MolToSmiles(Chem.MolFromSmiles(lead_molecule), kekuleSmiles=True)
     print("some molecule", lead_molecule)
@@ -202,7 +190,6 @@ def generate_dataset(
 
         # similar_molecules_in_prompt = [cand_similar_molecules_in_prompt[i] for i in best_combination]
 
-        # global cand_similar_molecules_in_prompt
         cand_similar_molecules_in_prompt = list(np.unique(cand_similar_molecules_in_prompt)[-max_similars_in_prompt:])
         similar_molecules_in_prompt = cand_similar_molecules_in_prompt.copy()
         similar_molecules_in_prompt.append(lead_molecule_entry)
@@ -230,13 +217,7 @@ def generate_dataset(
                     cand_similar_molecules_in_prompt.append(gen_mol)
                 except Exception as e:
                     pass
-        # for target_mol in np.unique(candidate_target_molecules)[::-1]:
-        #     if target_mol not in similar_molecules_in_prompt:
-        #         input_text += f"{target_mol.smiles}[END_SMILES]</s>"
-        #         if len(tokenizer(input_text)["input_ids"]) > 500:
-        #             return None
-        #         input_text += f", QED {target_mol.qed}, morgan_sim_to_lead {target_mol.morgan_sim_to_lead}, maccs_sim_to_lead {target_mol.maccs_sim_to_lead}"
-        #         return input_text
+
         for target_mol in np.unique(candidate_target_molecules)[::-1]:
             if target_mol in similar_molecules_in_prompt:
                 continue

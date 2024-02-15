@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 import transformers
 from transformers import logging
-from stringzilla import Str, File
 from transformers import (
     TrainingArguments,
     ProgressCallback,
@@ -20,10 +19,6 @@ from transformers import (
 import torch
 from datasets import load_dataset
 from utils import get_tokenizer
-from rdkit import DataStructs, Chem
-from rdkit.Chem import AllChem
-from rdkit.Chem.QED import qed
-from rdkit.Chem import MACCSkeys
 
 from callbacks import (
     CustomAimCallback,
@@ -35,13 +30,8 @@ from config.create_train_config import model_fine_tune_configs
 from eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from utils import signal_handler, get_tokenizer_special_tokens
 from model_utils import load_model
-from custom_trainer import CustomIterativeSFTTrainer, CustomTrainer
-from dataset_utils import process_dataset, tokenize_function
+from custom_trainer import CustomIterativeSFTTrainer
 from generation.rejection_sampling_utils import generate_dataset
-
-import sys
-sys.path.append("/auto/home/tigranfahradyan/RetMol")
-from chemlactica.run_qed import optimize_lead_molecule
 
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
@@ -240,24 +230,6 @@ def fine_tine(
         print(f"Generator model: {generator_checkpoint_path}")
         # lead_molecule = "CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1"
         lead_molecule = "c1ccc(-c2cc(N3C[C@H]4[C@@H]5CC[C@@H](O5)[C@H]4C3)c3ccccc3[nH+]2)cc1"
-        # generator_model = load_model(
-        #     generator_checkpoint_path,
-        #     use_flash_attn=use_flash_attn,
-        #     train_config=train_config,
-        #     dtype=torch.bfloat16
-        # ).to(device)
-        # optimized_molecule = optimize_lead_molecule(
-        #     lead_molecule, model=generator_model, tokenizer=tokenizer,
-        #     num_of_iter=5, qed_range=[0.9, 0.98],
-        #     temperature=1.0, num_return_sequences=60,
-        #     max_similars_in_prompt=5
-        # )
-        # if optimized_molecule:
-        #     print(f"Optimized before round {i}")
-        # else:
-        #     print(f"Not optimized before round {i}")
-        # if trainer_callback_dict.get("aim_callback"):
-        #     trainer_callback_dict["aim_callback"]._run.track(True if optimized_molecule else False, name="optimized in round")
 
         train_ds_name = generate_dataset(
             checkpoint_path=generator_checkpoint_path,
@@ -296,17 +268,6 @@ def fine_tine(
     
     trainer.control = trainer.callback_handler.on_epoch_end(training_args, trainer.state, trainer.control)
     trainer.control = trainer.callback_handler.on_train_end(training_args, trainer.state, trainer.control)
-
-    # try:
-    #     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
-    # except Exception as e:
-    #         traceback_info = traceback.format_exc()
-    #         logger.error(e, traceback_info)
-    # except KeyboardInterrupt:
-    #     if torch.distributed.get_rank() == 0:
-    #         logger.error("KeyboardInterrupt")
-    # if not (max_steps % eval_steps == 0):
-    #     trainer.evaluate()
 
 
 if __name__ == "__main__":
