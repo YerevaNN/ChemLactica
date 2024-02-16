@@ -75,6 +75,7 @@ def fine_tine(
 ):
     # transformers.logging.set_verbosity_info()
     transformers.utils.logging.enable_explicit_format()
+    set_seed(seed)
 
     train_config = model_fine_tune_configs[model_config]
     train_config["max_learning_rate"] = max_learning_rate

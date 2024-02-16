@@ -7,14 +7,6 @@ from functools import cache
 default_tokenizer_path = "src/tokenizer/ChemLacticaTokenizer66"
 
 
-def create_command(script, script_args):
-    command = "python3 "
-    command += (
-        f"{script} {''.join([f'--{arg} {val} ' for arg, val in script_args.items()])}"
-    )
-    return command
-
-
 @cache
 def get_start2end_tags_map(tokenizer_path: str=default_tokenizer_path):
     with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
