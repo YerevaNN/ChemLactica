@@ -7,6 +7,16 @@ import argparse
 import random
 import glob
 import tqdm
+
+from config.create_train_config import model_fine_tune_configs
+from eval_metrics import compute_metrics, preprocess_logits_for_metrics
+from utils import signal_handler, get_tokenizer_special_tokens, get_tokenizer
+from dataset_utils import process_dataset
+from model_utils import load_model
+from custom_trainer import CustomIterativeSFTTrainer
+from generation.rejection_sampling_utils import generate_dataset
+
+import torch
 import numpy as np
 import pandas as pd
 import transformers
@@ -16,9 +26,7 @@ from transformers import (
     ProgressCallback,
     get_polynomial_decay_schedule_with_warmup,
 )
-import torch
 from datasets import load_dataset
-from utils import get_tokenizer
 
 from callbacks import (
     CustomAimCallback,
@@ -26,12 +34,6 @@ from callbacks import (
     CustomProgressCallback,
     ReproducabilityCallback,
 )
-from config.create_train_config import model_fine_tune_configs
-from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils import signal_handler, get_tokenizer_special_tokens
-from model_utils import load_model
-from custom_trainer import CustomIterativeSFTTrainer
-from generation.rejection_sampling_utils import generate_dataset
 
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
@@ -223,7 +225,6 @@ def fine_tine(
     trainer.control = trainer.callback_handler.on_epoch_begin(training_args, trainer.state, trainer.control)
     for i in tqdm.tqdm(range(1, rounds + 1)):
         print(f"---------Rej Sampling ROUND {i}---------")
-        # generate and save rejection sampled samples
         if trainer.state.global_step == 0:
             generator_checkpoint_path = from_pretrained
         else:
@@ -232,6 +233,7 @@ def fine_tine(
         # lead_molecule = "CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1"
         lead_molecule = "c1ccc(-c2cc(N3C[C@H]4[C@@H]5CC[C@@H](O5)[C@H]4C3)c3ccccc3[nH+]2)cc1"
 
+        # generate and save rejection sampled samples
         train_ds_name = generate_dataset(
             checkpoint_path=generator_checkpoint_path,
             run_hash=experiment_hash,
