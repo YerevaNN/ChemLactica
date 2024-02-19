@@ -39,7 +39,7 @@ from chemlactica.utils.callbacks import (
     EarlyStoppingCallback,
 )
 from chemlactica.config.create_train_config import model_train_configs
-from .eval_metrics import compute_metrics, preprocess_logits_for_metrics
+from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from chemlactica.utils.utils import (
     signal_handler,
     get_tokenizer_special_tokens,
@@ -47,9 +47,9 @@ from chemlactica.utils.utils import (
     remove_extraneous_args,
 )
 from chemlactica.utils.model_utils import load_model
-from .custom_trainer import CustomTrainer, CustomArguments
+from chemlactica.custom_trainer import CustomTrainer, CustomArguments
 from chemlactica.utils.dataset_utils import process_dataset, DIR_DATA_TYPES
-from .jsonl_dataset import samples_generator
+from chemlactica.jsonl_dataset import samples_generator
 
 torch.manual_seed(42)
 random.seed(42)
