@@ -9,7 +9,7 @@ from transformers import Trainer, TrainingArguments
 from torch.distributed.fsdp.fully_sharded_data_parallel import (
     FullyShardedDataParallel as FSDP,
 )
-from utils import get_tokenizer
+from chemlactica.utils.utils import get_tokenizer
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 from transformers.utils import is_torch_tpu_available
 from dataclasses import dataclass, field

@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import math
 from collections import namedtuple
-from utils import get_start2end_tags_map, get_tokenizer
+from .utils.utils import get_start2end_tags_map, get_tokenizer
 from functools import cache
 
 
