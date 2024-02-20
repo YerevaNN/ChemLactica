@@ -13,6 +13,8 @@ from test_utils import create_train_command, TEST_DIR, TD_PATH
 
 class TestModelTraining(unittest.TestCase):
     def setUp(self):
+        self.config_file = "chemlactica/config/test_configs/fsdp_config.yaml"
+        self.script = "chemlactica/train.py"
         # clean up
         gc.collect()
         torch.cuda.empty_cache()
@@ -37,8 +39,8 @@ class TestModelTraining(unittest.TestCase):
 
         command = create_train_command(
             module="accelerate.commands.launch",
-            module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
-            script="src/train.py",
+            module_args={"config_file": self.config_file},
+            script=self.script,
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
@@ -71,8 +73,8 @@ class TestModelTraining(unittest.TestCase):
 
         command = create_train_command(
             module="accelerate.commands.launch",
-            module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
-            script="src/train.py",
+            module_args={"config_file": self.config_file},
+            script=self.script,
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
@@ -105,8 +107,8 @@ class TestModelTraining(unittest.TestCase):
 
         command = create_train_command(
             module="accelerate.commands.launch",
-            module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
-            script="src/train.py",
+            module_args={"config_file": self.config_file},
+            script=self.script,
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
@@ -138,8 +140,8 @@ class TestModelTraining(unittest.TestCase):
 
         first_command = create_train_command(
             module="accelerate.commands.launch",
-            module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
-            script="src/train.py",
+            module_args={"config_file": self.config_file},
+            script=self.script,
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
@@ -166,8 +168,8 @@ class TestModelTraining(unittest.TestCase):
 
         second_command = create_train_command(
             module="accelerate.commands.launch",
-            module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
-            script="src/train.py",
+            module_args={"config_file": self.config_file},
+            script=self.script,
             script_args={
                 "from_pretrained": os.path.join(
                     TEST_DIR, "checkpoints/facebook/galactica-125m/none/checkpoint-20"

@@ -5,10 +5,10 @@ import glob
 import gc
 import json
 
-from config.create_train_config import model_train_configs
-from dataset_utils import process_dataset
+from chemlactica.config.create_train_config import model_train_configs
+from .dataset_utils import process_dataset
 from datasets import load_dataset
-from model_utils import load_model
+from .model_utils import load_model
 from tqdm.auto import tqdm
 
 from aim.hugging_face import AimCallback

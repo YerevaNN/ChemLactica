@@ -4,7 +4,7 @@ from transformers import AutoTokenizer
 from functools import cache
 
 
-default_tokenizer_path = "src/tokenizer/ChemLacticaTokenizer66"
+default_tokenizer_path = "chemlactica/tokenizer/ChemLacticaTokenizer66"
 
 
 @cache
@@ -59,8 +59,8 @@ def get_called_command(args):
             "-m",
             "accelerate.commands.launch",
             "--config_file",
-            "src/config/eval_config.yaml",
-            "src/train.py",
+            "chemlactica/config/eval_config.yaml",
+            "chemlactica/train.py",
         ]
         for arg, value in vars(args).items():
             if isinstance(value, list):

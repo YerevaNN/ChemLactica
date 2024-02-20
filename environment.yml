@@ -187,6 +187,7 @@ dependencies:
       - cffi==1.16.0
       - cfgv==3.4.0
       - charset-normalizer==3.3.2
+      - chemlactica==0.0.1
       - click==8.1.7
       - cloudpickle==3.0.0
       - conda-pack==0.7.1+23.g60c249a
