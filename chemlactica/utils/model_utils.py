@@ -1,5 +1,5 @@
 from transformers import OPTForCausalLM, OPTConfig, MistralForCausalLM
-from utils import get_tokenizer_special_tokens
+from .utils import get_tokenizer_special_tokens
 
 import bitsandbytes as bnb
 

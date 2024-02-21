@@ -1,9 +1,9 @@
 import json
-from text_format_utils import generate_formatted_string, delete_empty_tags
+from .text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
-from utils import get_tokenizer
-from assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
+from .utils import get_tokenizer
+from .assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
 
 
 DIR_DATA_TYPES = {"computed", "assay"}

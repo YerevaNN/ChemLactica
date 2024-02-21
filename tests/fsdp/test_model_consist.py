@@ -33,8 +33,10 @@ class TestConsistencyOfModelOutput(unittest.TestCase):
     def test_consist_of_model_output(self):
         command = create_train_command(
             module="accelerate.commands.launch",
-            module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
-            script="src/train.py",
+            module_args={
+                "config_file": "chemlactica/config/test_configs/fsdp_config.yaml"
+            },
+            script="chemlactica/train.py",
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",

@@ -4,10 +4,10 @@ import os
 from datasets import interleave_datasets
 import signal
 import traceback
-from distributed_utils import get_experiment_hash
+from chemlactica.utils.distributed_utils import get_experiment_hash
 from datetime import timedelta
 import random
-from parseargs import init_parser
+from chemlactica.utils.parseargs import init_parser
 import glob
 import multiprocessing
 from contextlib import nullcontext
@@ -24,11 +24,11 @@ from accelerate.utils import broadcast_object_list
 import torch
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
-from flop_counter import get_theoretical_peak_flops
+from chemlactica.utils.flop_counter import get_theoretical_peak_flops
 
 # from datasets.dataset_dict import IterableDatasetDict
 
-from callbacks import (
+from chemlactica.utils.callbacks import (
     CustomAimCallback,
     WPSCounterCallback,
     ProfCallback,
@@ -38,18 +38,18 @@ from callbacks import (
     JsonlDatasetResumeCallback,
     EarlyStoppingCallback,
 )
-from config.create_train_config import model_train_configs
-from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils import (
+from chemlactica.config.create_train_config import model_train_configs
+from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
+from chemlactica.utils.utils import (
     signal_handler,
     get_tokenizer_special_tokens,
     get_called_command,
     remove_extraneous_args,
 )
-from model_utils import load_model
-from custom_trainer import CustomTrainer, CustomArguments
-from dataset_utils import process_dataset, DIR_DATA_TYPES
-from jsonl_dataset import samples_generator
+from chemlactica.utils.model_utils import load_model
+from chemlactica.custom_trainer import CustomTrainer, CustomArguments
+from chemlactica.utils.dataset_utils import process_dataset, DIR_DATA_TYPES
+from chemlactica.jsonl_dataset import samples_generator
 
 torch.manual_seed(42)
 random.seed(42)

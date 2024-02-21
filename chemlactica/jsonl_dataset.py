@@ -5,9 +5,8 @@ import os
 
 
 def samples_generator(
-        files: List[str], shared_jsonl_files,
-        chunk_size=25000, return_line_info=False
-    ):
+    files: List[str], shared_jsonl_files, chunk_size=25000, return_line_info=False
+):
     if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
         print("sharded_jsonl_files", shared_jsonl_files)
         print(f"TOK_PAR: {os.environ['TOKENIZERS_PARALLELISM']}")
@@ -40,7 +39,7 @@ def samples_generator(
                         if return_line_info:
                             ret["line_info"] = {
                                 "file": file,
-                                "line_number": state["line_number"] - len(batch) + i
+                                "line_number": state["line_number"] - len(batch) + i,
                             }
                         yield ret
                 shared_jsonl_files[file] = state
