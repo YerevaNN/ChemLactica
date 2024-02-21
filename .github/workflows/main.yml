@@ -21,11 +21,19 @@ jobs:
       with:
         python-version: '3.10'
 
+    - name: Remove flash-attn dependency
+      run: |
+        sed -i '/flash-attn/d' environment.yml
+
+    - name: Remove conda-pack dependency
+      run: |
+        sed -i '/conda-pack/d' environment.yml
+
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        environment-file: test_environment.yml
+        environment-file: environment.yml
         activate-environment: testenv
     - name: list commits on PR
       run: |
