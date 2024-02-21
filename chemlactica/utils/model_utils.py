@@ -1,5 +1,5 @@
 from transformers import OPTForCausalLM, OPTConfig, MistralForCausalLM
-from .utils import get_tokenizer_special_tokens
+from .utils import get_tokenizer_special_tokens, cast_to_fp32
 
 import bitsandbytes as bnb
 
@@ -74,6 +74,8 @@ def load_model(
         model = OPTForCausalLM.from_pretrained(
             from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
         )
+        model.model.decoder.forward = cast_to_fp32(model.model.decoder.forward)
+
     if "mistral" in from_pretrained.lower():
         model = MistralForCausalLM.from_pretrained(
             from_pretrained,

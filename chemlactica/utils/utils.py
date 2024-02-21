@@ -1,4 +1,5 @@
 import os
+import torch
 import json
 from transformers import AutoTokenizer
 from functools import cache
@@ -84,6 +85,13 @@ def remove_extraneous_args(args):
         and args.accelerate_eval_config_file
     ):
         delattr(args, "accelerate_eval_config_file")
+
+
+def cast_to_fp32(func):
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs).to(torch.float32)
+
+    return wrapper
 
 
 if __name__ == "__main__":
