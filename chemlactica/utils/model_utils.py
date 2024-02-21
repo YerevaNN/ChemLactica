@@ -1,11 +1,27 @@
 from transformers import OPTForCausalLM, OPTConfig, MistralForCausalLM
-from .utils import get_tokenizer_special_tokens, cast_to_fp32
+from .utils import get_tokenizer_special_tokens
 
 import bitsandbytes as bnb
 
 # from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
 import torch
 from transformers import BitsAndBytesConfig
+
+
+def float_casting_decorator(layer_class):
+    class FloatCastingLayer(layer_class):
+        def __init__(self, *args, **kwargs):
+            super(FloatCastingLayer, self).__init__(*args, **kwargs)
+
+        def forward(
+            self,
+            x,
+            *args,
+            **kwargs,
+        ):
+            return super().forward(x, *args, **kwargs).to(torch.float32)
+
+    return FloatCastingLayer
 
 
 quant_config = BitsAndBytesConfig(
@@ -74,7 +90,12 @@ def load_model(
         model = OPTForCausalLM.from_pretrained(
             from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
         )
-        model.model.decoder.forward = cast_to_fp32(model.model.decoder.forward)
+        print(type(model.lm_head))
+        model.lm_head = float_casting_decorator(model.lm_head.__class__)(
+            in_features=model.lm_head.in_features,
+            out_features=model.lm_head.out_features,
+        )
+        # model.lm_head.forward = cast_to_fp32(OPTForCausalLM.lm_head.forward)
 
     if "mistral" in from_pretrained.lower():
         model = MistralForCausalLM.from_pretrained(
