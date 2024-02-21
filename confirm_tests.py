@@ -13,6 +13,19 @@ class TestType(enum.Enum):
     INTEGRATION = "integration"
 
 
+def print_test_details(unit_test_result):
+    print(f"\nTotal Tests: {unit_test_result.testsRun}")
+    print(f"Failures: {len(unit_test_result.failures)}")
+    print(f"Errors: {len(unit_test_result.errors)}")
+    print(f"Skipped: {len(unit_test_result.skipped)}")
+    print(f"Successful: {unit_test_result.wasSuccessful()}")
+    if unit_test_result.failures or unit_test_result.errors:
+        print("\nDetails about failures and errors:")
+        for failure in unit_test_result.failures + unit_test_result.errors:
+            print(f"\nTest: {failure[0]}")
+            print(f"Details: {failure[1]}")
+
+
 def write_test_status(
     git_commit_hash: str, status: str = "FAIL", file_name: str = "test_status"
 ):
@@ -31,16 +44,11 @@ def run_unit_tests():
     loader = unittest.TestLoader()
     # Discover and load unit tests
     unit_test_suite = loader.discover("unit_tests", pattern="*test*")
-    for test in unit_test_suite:
-        print(test)
 
     # Run the unit tests
-    runner = unittest.TextTestRunner()
+    runner = unittest.TextTestRunner(failfast=False, verbosity=2)
     result = runner.run(unit_test_suite)
-    if result.wasSuccessful():
-        print("All tests passed!")
-    else:
-        print("Some tests failed.")
+    print_test_details(result)
 
 
 if __name__ == "__main__":
@@ -87,7 +95,7 @@ if __name__ == "__main__":
     confirm = args.confirm
     gpus = args.gpus
     if run is not None:
-        match run:
+        match (run):
             case TestType.UNIT:
                 run_unit_tests()
             case TestType.INTEGRATION:
