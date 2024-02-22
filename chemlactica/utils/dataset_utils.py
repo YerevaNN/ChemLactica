@@ -1,12 +1,21 @@
 import json
-from text_format_utils import generate_formatted_string, delete_empty_tags
+from .text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
-from utils import get_tokenizer
-from assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
+from .utils import get_tokenizer
+from .assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
 
 
 DIR_DATA_TYPES = {"computed", "assay"}
+
+
+def load_jsonl_line(jsonl_line):
+    _maybe_compound_dict = json.loads(jsonl_line)
+    if isinstance(_maybe_compound_dict, dict):
+        return _maybe_compound_dict
+    else:
+        return json.loads(_maybe_compound_dict)
+    return json.loads(jsonl_line)
 
 
 def generate_assay_docs(examples, train_config):
@@ -20,7 +29,7 @@ def generate_assay_docs(examples, train_config):
     incomplete_docs = []
     for compound_str in examples["text"]:
         try:
-            compound = json.loads(json.loads(compound_str))
+            compound = load_jsonl_line(compound_str)
             result, incomplete_doc = get_compound_assay_docs(
                 tokenizer, compound, MODEL_CONTEXT_LENGTH
             )
@@ -53,7 +62,7 @@ def tokenize_function(examples, train_config):
 def process_str(str):
     # it's wierd workaround but works for now
     try:
-        compound = json.loads(json.loads((str["text"])))
+        compound = load_jsonl_line(str["text"])
     except Exception as e:
         print(e)
         return ""

@@ -2,22 +2,28 @@ import transformers
 import torch
 import torch.nn.functional as F
 import math
-from collections import namedtuple
-from utils import get_start2end_tags_map, get_tokenizer
-from functools import cache
+
+# from collections import namedtuple
+from .utils.utils import get_start2end_tags_map, get_tokenizer
+
+# from functools import cache
 
 
 def get_prop2index_map(start2end_tags: dict):
     prop2index_map = {start: i for i, start in enumerate(start2end_tags.keys())}
+
     def inner_func(prop: str):
         return prop2index_map[prop]
+
     return inner_func
 
 
 def get_index2prop_map(start2end_tags: dict):
     index2prop_map = [start for start in start2end_tags.keys()]
+
     def inner_func(index: int):
         return index2prop_map[index]
+
     return inner_func
 
 
@@ -36,7 +42,7 @@ def perplexity(logits: torch.Tensor, labels: torch.Tensor, base=2):
 
 @torch.no_grad()
 def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
-    batch_size = labels.size(0)
+    # batch_size = labels.size(0)
 
     logits = logits[..., :-1, :].contiguous().view(-1, logits.size(2))
     labels = labels[..., 1:].contiguous().view(-1)
@@ -53,13 +59,15 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
     metrics_tensor[0][-1] = perplexity(logits, labels)
     metrics_tensor[1][-1] = 1
 
-    start_tags_mask = torch.zeros(labels.size(0), dtype=torch.bool, device=labels.device)
+    start_tags_mask = torch.zeros(
+        labels.size(0), dtype=torch.bool, device=labels.device
+    )
     end_tags_mask = torch.zeros(labels.size(0), dtype=torch.bool, device=labels.device)
     for start, end in start2end_tags.items():
-        start_mask = (labels == tokenizer.encode(start)[0])
+        start_mask = labels == tokenizer.encode(start)[0]
         start_tags_mask = torch.bitwise_or(start_tags_mask, start_mask)
 
-        end_mask = (labels == tokenizer.encode(end)[0])
+        end_mask = labels == tokenizer.encode(end)[0]
         end_tags_mask = torch.bitwise_or(end_tags_mask, end_mask)
 
     start_tags_indices = torch.where(start_tags_mask)[0]
@@ -69,8 +77,13 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
     # two pointers
     first_ptr = 0
     second_ptr = 0
-    while first_ptr < start_tags_indices.size(0) and second_ptr < end_tags_indices.size(0):
-        while second_ptr < end_tags_indices.size(0) and start_tags_indices[first_ptr] >= end_tags_indices[second_ptr]:
+    while first_ptr < start_tags_indices.size(0) and second_ptr < end_tags_indices.size(
+        0
+    ):
+        while (
+            second_ptr < end_tags_indices.size(0)
+            and start_tags_indices[first_ptr] >= end_tags_indices[second_ptr]
+        ):
             second_ptr += 1
         if second_ptr < end_tags_indices.size(0):
             # [PROP_NAME]...value...[/PROP_NAME]
@@ -79,8 +92,11 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor):
             start_index = start_tags_indices[first_ptr]
             end_index = end_tags_indices[second_ptr]
             index = prop2index(tokenizer.decode(labels[start_index]))
-            # print(tokenizer.decode(labels[start_index]), ":", index, "perp", perplexity(logits[start_index+1:end_index], labels[start_index+1:end_index]))
-            metrics_tensor[0][index] += perplexity(logits[start_index+1:end_index], labels[start_index+1:end_index])
+            # print(tokenizer.decode(labels[start_index]), ":", index, "perp", perplexity(logits[start_index+1:end_index], labels[start_index+1:end_index])) # noqa
+            metrics_tensor[0][index] += perplexity(
+                logits[start_index + 1 : end_index],  # noqa
+                labels[start_index + 1 : end_index],  # noqa
+            )
             metrics_tensor[1][index] += 1
         first_ptr += 1
 
