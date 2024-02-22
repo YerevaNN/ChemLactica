@@ -21,7 +21,7 @@ from transformers import (
 )
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
-from trl import SFTTrainer
+from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 from trl.trainer import ConstantLengthDataset
 from utils import get_tokenizer
 
@@ -203,10 +203,11 @@ def train(
         shared_jsonl_files = None
         if accelerator.is_main_process:
             shared_jsonl_files = manager.dict()
-            trainer_callback_dict[
-                "json_dataset_resume_callback"
-            ] = JsonlDatasetResumeCallback(shared_jsonl_files)
-            print(f"shared jsonl files {shared_jsonl_files}")
+            if train_type == "pretrain":
+                trainer_callback_dict[
+                    "json_dataset_resume_callback"
+                ] = JsonlDatasetResumeCallback(shared_jsonl_files)
+                print(f"shared jsonl files {shared_jsonl_files}")
         checkpoints_dir = os.path.join(
             checkpoints_root_dir,
             organization,
@@ -234,14 +235,18 @@ def train(
             bf16_full_eval=True,
             fp16=False,
             logging_dir=track_dir,
-            learning_rate=train_config["max_learning_rate"],
+            # learning_rate=train_config["max_learning_rate"],
+            learning_rate=2e-5,
             weight_decay=train_config["weight_decay"],
             adam_beta1=train_config["adam_beta1"],
             adam_beta2=train_config["adam_beta2"],
-            warmup_steps=train_config["warmup_steps"],
+            # warmup_steps=train_config["warmup_steps"],
+            warmup_steps=0,
+            num_train_epochs=5,
             max_grad_norm=train_config["global_gradient_norm"],
             evaluation_strategy="steps",
-            max_steps=scheduler_max_steps,
+            # max_steps=scheduler_max_steps,
+            max_steps=-1,
             eval_steps=eval_steps,
             save_steps=save_steps,
             dataloader_drop_last=True,
@@ -256,7 +261,8 @@ def train(
             gradient_accumulation_steps=gradient_accumulation_steps,
             save_total_limit=4,
             resume_from_checkpoint=resume_from_checkpoint,
-            lr_scheduler_type="linear",
+            # lr_scheduler_type="linear",
+            lr_scheduler_type="cosine",
             optim="adamw_torch",
             # load_best_model=True
         )
@@ -329,9 +335,6 @@ def train(
                 # optimizers=[optimizer, lr_scheduler],
                 preprocess_logits_for_metrics=preprocess_logits_for_metrics,
             )
-            trainer.remove_callback(ProgressCallback)
-            for additional_callback in list(trainer_callback_dict.values()):
-                trainer.add_callback(additional_callback)
 
         elif train_type == "sft":
             training_data_files = glob.glob(training_data_dirs[0] + "/*.csv")
@@ -350,25 +353,51 @@ def train(
                 lambda example: f"[START_SMILES]{example['smiles']}[END_SMILES][ACTIVITY]"
                 f"{example['activity']:.2f}[/ACTIVITY]"
             )
+
+            def formatting_prompts_func(example):
+                output_texts = []
+                for i in range(len(example["smiles"])):
+                    text = (
+                        f"[START_SMILES]{example['smiles'][i]}[END_SMILES]"
+                        f"[ACTIVITY]{round(example['activity'][i], 2)}[/ACTIVITY]"
+                    )
+                    output_texts.append(text)
+                return output_texts
+
             train_dataset = ConstantLengthDataset(
                 tokenizer=tokenizer,
                 dataset=dataset["train"],
                 formatting_func=format_func,
+                seq_length=1024,
             )
             eval_dataset = ConstantLengthDataset(
                 tokenizer=tokenizer,
                 dataset=dataset["validation"],
                 formatting_func=format_func,
+                seq_length=1024,
             )
+
+            response_template = "[ACTIVITY]"
+            collator = DataCollatorForCompletionOnlyLM(
+                response_template, tokenizer=tokenizer
+            )
+
             trainer = SFTTrainer(
                 model=model,
-                train_dataset=train_dataset,
-                eval_dataset=eval_dataset,
+                train_dataset=dataset["train"],
+                eval_dataset=dataset["validation"],
+                formatting_func=formatting_prompts_func,
                 args=training_args,
-                packing=True,
+                packing=False,
                 tokenizer=tokenizer,
                 max_seq_length=1024,
+                data_collator=collator,
             )
+
+        trainer.remove_callback(ProgressCallback)
+        for additional_callback in list(trainer_callback_dict.values()):
+            trainer.add_callback(additional_callback)
+
         prof_context_manager = (
             trainer_callback_dict.get("profiller_callback").prof
             if trainer_callback_dict.get("profiller_callback") is not None
