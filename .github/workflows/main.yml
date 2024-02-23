@@ -29,12 +29,24 @@ jobs:
       run: |
         sed -i '/conda-pack/d' environment.yml
 
+    - name: Remove chemlactica dependency
+      run: |
+        sed -i '/chemlactica/d' environment.yml
+
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
         environment-file: environment.yml
         activate-environment: testenv
+    - name: install local chemlactica package
+      run: |
+        pip install .
+
+    - name: Run unit tests
+      run: |
+        python3 confirm_tests.py --run unit
+
     - name: list commits on PR
       run: |
         response=$(curl --request GET \
