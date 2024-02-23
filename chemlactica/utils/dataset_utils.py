@@ -10,12 +10,14 @@ DIR_DATA_TYPES = {"computed", "assay"}
 
 
 def load_jsonl_line(jsonl_line):
-    _maybe_compound_dict = json.loads(jsonl_line)
-    if isinstance(_maybe_compound_dict, dict):
-        return _maybe_compound_dict
-    else:
-        return json.loads(_maybe_compound_dict)
-    return json.loads(jsonl_line)
+    try:
+        _maybe_compound_dict = json.loads(jsonl_line)
+        if isinstance(_maybe_compound_dict, dict):
+            return _maybe_compound_dict
+        else:
+            return json.loads(_maybe_compound_dict)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Error decoding JSON: {e}")
 
 
 def generate_assay_docs(examples, train_config):
