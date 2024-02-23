@@ -23,12 +23,11 @@ from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 from trl.trainer import ConstantLengthDataset
-from utils import get_tokenizer
-
 import torch
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
 from chemlactica.utils.flop_counter import get_theoretical_peak_flops
+from utils.utils import get_tokenizer
 
 # from datasets.dataset_dict import IterableDatasetDict
 
@@ -40,7 +39,7 @@ from chemlactica.utils.callbacks import (
     CustomProgressCallback,
     ReproducabilityCallback,
     JsonlDatasetResumeCallback,
-    EarlyStoppingCallback,
+    # EarlyStoppingCallback,
 )
 from chemlactica.config.create_train_config import model_train_configs
 from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
@@ -74,7 +73,6 @@ def train(
     training_data_dirs,
     dir_data_types,
     valid_data_dir,
-    max_steps,
     scheduler_max_steps,
     eval_steps,
     save_steps,
@@ -87,6 +85,8 @@ def train(
     gradient_accumulation_steps,
     gradient_checkpointing,
     evaluate_only,
+    max_steps,
+    num_train_epochs=1,
     track=False,
     track_dir=None,
     check_reproducability=False,
@@ -108,7 +108,7 @@ def train(
     if os.path.isdir(from_pretrained):
         organization = checkpoint_path_components[-4]
         model_name = checkpoint_path_components[-3]
-        resume_from_checkpoint = from_pretrained
+        resume_from_checkpoint = from_pretrained if train_type == "pretrain" else False
     else:
         resume_from_checkpoint = False
         organization = checkpoint_path_components[-2]
@@ -133,7 +133,7 @@ def train(
         )
 
     trainer_callback_dict = {}
-    experiment_hash = get_experiment_hash(from_pretrained)
+    experiment_hash = get_experiment_hash(from_pretrained, train_type)
     experiment_hash_list = [experiment_hash]
     if track:
         if accelerator.is_main_process:
@@ -149,12 +149,11 @@ def train(
             experiment_hash_list = [aim_callback._run_hash]
 
     broadcast_object_list(experiment_hash_list)
-    print(f"Process {accelerator.process_index} aim hash: {experiment_hash_list[0]}")
+    experiment_hash = experiment_hash_list[0]
+    logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
     if not valid_batch_size:
         valid_batch_size = train_batch_size
-
-    logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
     # TODO: separate profiling
     if profile:
@@ -183,11 +182,11 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
-    trainer_callback_dict["early stop callback"] = EarlyStoppingCallback(
-        early_stopping_steps=(max_steps)
-    )
+    # trainer_callback_dict["early stop callback"] = EarlyStoppingCallback(
+    #     early_stopping_steps=(max_steps)
+    # )
 
-    trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
+    trainer_callback_dict["epoch_callback"] = EpochCallback(num_train_epochs)
     if check_reproducability:
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
             accelerator, model_config, flash_attn
@@ -204,17 +203,17 @@ def train(
         shared_jsonl_files = None
         if accelerator.is_main_process:
             shared_jsonl_files = manager.dict()
-            if train_type == "pretrain":
-                trainer_callback_dict[
-                    "json_dataset_resume_callback"
-                ] = JsonlDatasetResumeCallback(shared_jsonl_files)
-                print(f"shared jsonl files {shared_jsonl_files}")
+            # trainer_callback_dict[
+            #     "json_dataset_resume_callback"
+            # ] = JsonlDatasetResumeCallback(shared_jsonl_files)
+            print(f"shared jsonl files {shared_jsonl_files}")
         checkpoints_dir = os.path.join(
             checkpoints_root_dir,
             organization,
             f"{model_name}",
             experiment_hash,
         )
+        logger.info(f"Checkpoint dir: {checkpoints_dir}")
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
         if not scheduler_max_steps:
@@ -236,18 +235,17 @@ def train(
             bf16_full_eval=True,
             fp16=False,
             logging_dir=track_dir,
-            # learning_rate=train_config["max_learning_rate"],
-            learning_rate=2e-5,
+            learning_rate=train_config["max_learning_rate"],
             weight_decay=train_config["weight_decay"],
             adam_beta1=train_config["adam_beta1"],
             adam_beta2=train_config["adam_beta2"],
-            # warmup_steps=train_config["warmup_steps"],
-            warmup_steps=0,
-            num_train_epochs=5,
+            warmup_steps=train_config["warmup_steps"]
+            if train_type == "pretrain"
+            else 0,
             max_grad_norm=train_config["global_gradient_norm"],
             evaluation_strategy="steps",
-            # max_steps=scheduler_max_steps,
-            max_steps=-1,
+            max_steps=scheduler_max_steps,
+            num_train_epochs=num_train_epochs,
             eval_steps=eval_steps,
             save_steps=save_steps,
             dataloader_drop_last=True,
@@ -262,8 +260,7 @@ def train(
             gradient_accumulation_steps=gradient_accumulation_steps,
             # save_total_limit=4, in order for offline eval to work, we keep all of them for now
             resume_from_checkpoint=resume_from_checkpoint,
-            # lr_scheduler_type="linear",
-            lr_scheduler_type="cosine",
+            lr_scheduler_type="linear",
             optim="adamw_torch",
             # load_best_model=True
         )
@@ -336,10 +333,10 @@ def train(
                 # optimizers=[optimizer, lr_scheduler],
                 preprocess_logits_for_metrics=preprocess_logits_for_metrics,
             )
-
         elif train_type == "sft":
             training_data_files = glob.glob(training_data_dirs[0] + "/*.csv")
             valid_data_files = glob.glob(valid_data_dir + "/*.csv")
+            print(training_data_files, valid_data_files)
             dataset = load_dataset(
                 "csv",
                 data_files={
@@ -348,11 +345,11 @@ def train(
                 },
             )
             tokenizer = get_tokenizer(
-                "/auto/home/menuab/code/ChemLactica/src/tokenizer/ChemLacticaTokenizer66"
+                "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
             )
             format_func = (
-                lambda example: f"[START_SMILES]{example['smiles']}[END_SMILES][ACTIVITY]"
-                f"{example['activity']:.2f}[/ACTIVITY]"
+                lambda example: f"[START_SMILES]{example['smiles']}[END_SMILES][PROPERTY]"
+                f"{example['activity']:.2f}[/PROPERTY]"
             )
 
             def formatting_prompts_func(example):
@@ -360,7 +357,7 @@ def train(
                 for i in range(len(example["smiles"])):
                     text = (
                         f"[START_SMILES]{example['smiles'][i]}[END_SMILES]"
-                        f"[ACTIVITY]{round(example['activity'][i], 2)}[/ACTIVITY]"
+                        f"[PROPERTY]{round(example['activity'][i], 2)}[/PROPERTY]"
                     )
                     output_texts.append(text)
                 return output_texts
@@ -378,7 +375,7 @@ def train(
                 seq_length=1024,
             )
 
-            response_template = "[ACTIVITY]"
+            response_template = "[PROPERTY]"
             collator = DataCollatorForCompletionOnlyLM(
                 response_template, tokenizer=tokenizer
             )
@@ -394,6 +391,8 @@ def train(
                 max_seq_length=1024,
                 data_collator=collator,
             )
+            trainer.remove_callback(JsonlDatasetResumeCallback)
+            trainer.remove_callback(ReproducabilityCallback)
 
         trainer.remove_callback(ProgressCallback)
         for additional_callback in list(trainer_callback_dict.values()):
