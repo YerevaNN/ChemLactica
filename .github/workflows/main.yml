@@ -10,6 +10,9 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
 
     steps:
     - uses: actions/checkout@v4
@@ -36,20 +39,17 @@ jobs:
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
-        auto-update-conda: true
         environment-file: test_environment.yml
         activate-environment: testenv
+        auto-update-conda: true
+
     - name: Install local chemlactica package within Conda environment
       run: |
-        conda activate testenv  # Activate the Conda environment
         pip install .  # Install dependencies within the Conda environment
-        conda deactivate  # Deactivate the Conda environment after installation
 
     - name: Run unit tests
       run: |
-        conda activate testenv  # Activate the Conda environment
         python3 confirm_tests.py --run unit
-        conda deactivate  # Deactivate the Conda environment after installation
 
     - name: list commits on PR
       run: |
