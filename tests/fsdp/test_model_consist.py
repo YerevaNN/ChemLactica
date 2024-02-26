@@ -2,7 +2,8 @@ import subprocess
 import unittest
 import gc
 import os
-import sys
+
+# import sys
 import shutil
 
 import torch
@@ -11,7 +12,6 @@ from test_utils import create_train_command, TD_PATH, TEST_DIR
 
 
 class TestConsistencyOfModelOutput(unittest.TestCase):
-
     def setUp(self):
         # clean up
         gc.collect()
@@ -33,13 +33,15 @@ class TestConsistencyOfModelOutput(unittest.TestCase):
     def test_consist_of_model_output(self):
         command = create_train_command(
             module="accelerate.commands.launch",
-            module_args={"config_file": "src/config/test_configs/fsdp_config.yaml"},
-            script="src/train.py",
+            module_args={
+                "config_file": "chemlactica/config/test_configs/fsdp_config.yaml"
+            },
+            script="chemlactica/train.py",
             script_args={
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
-                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",
-                "dir_data_types": "comp assay",
+                "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
+                "dir_data_types": "computed assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
                 "train_batch_size": 4,
                 "max_steps": 20,
@@ -52,7 +54,7 @@ class TestConsistencyOfModelOutput(unittest.TestCase):
                 "no_track": "",
                 "check_reproducability": "",
                 "flash_attn": "",
-            }
+            },
         )
         print(f"Running command: {command}")
         out = subprocess.run(command, shell=True, capture_output=False)

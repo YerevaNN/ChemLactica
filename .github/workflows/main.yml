@@ -1,31 +1,82 @@
-name: Run unittests
+name: Run integration tests
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 5
 
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: '3.10'
 
+    # - name: Remove flash-attn dependency
+    #   run: |
+    #     sed -i '/flash-attn/d' environment.yml
+
+    # - name: Remove conda-pack dependency
+    #   run: |
+    #     sed -i '/conda-pack/d' environment.yml
+
+    # - name: Remove chemlactica dependency
+    #   run: |
+    #     sed -i '/chemlactica/d' environment.yml
+
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
-        auto-update-conda: true
-        environment-file: environment.yml
+        environment-file: test_environment.yml
         activate-environment: testenv
+        auto-update-conda: true
 
-    - name: Run unittests
-      shell: bash -l {0}
-      run: python3 confirm_test.py --confirm
+    - name: Install local chemlactica package within Conda environment
+      run: |
+        pip install .  # Install dependencies within the Conda environment
+
+    - name: Run unit tests
+      run: |
+        python3 confirm_tests.py --run unit
+
+    - name: list commits on PR
+      run: |
+        response=$(curl --request GET \
+        --url 'https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits' \
+        --header 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' \
+        --header 'Accept: application/vnd.github.v3+json' \
+        --header 'Content-Type: application/json')
+        echo "$response" > response.json
+    - name: get second last commit
+      run: |
+        echo "Get length of the array:"
+        length=$(jq 'length' response.json)
+        echo "Get index of the second last commit:"
+        index=$(($length - 2))
+        latest_commit=$(jq --argjson index $index '.[$index]' response.json)
+        echo "Get commit SHA of the latest commit:"
+        COMMIT_HASH=$(echo "$latest_commit" | jq -r '.sha')
+        echo "$COMMIT_HASH"
+    - name: read integration test status
+      run: |
+        echo "getting test status"
+        TEST_STATUS=$(cat test_status.yaml | grep "${COMMIT_HASH}" | cut -d ' ' -f 2|| echo "NOT FOUND")
+        echo "$TEST_STATUS"
+    - name: check test status
+      run: |
+        if [ ! $TEST_STATUS=="PASS" ]; then
+          echo "error: The test_status.yaml file indicates a failure for the second-to-last commit or incorrect commit tested"
+          exit 1
+        fi

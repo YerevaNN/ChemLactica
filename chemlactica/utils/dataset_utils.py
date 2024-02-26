@@ -1,23 +1,37 @@
 import json
-from text_format_utils import generate_formatted_string, delete_empty_tags
+from .text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
 
-from utils import get_tokenizer
-from assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
+from .utils import get_tokenizer
+from .assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
+
+
+DIR_DATA_TYPES = {"computed", "assay"}
+
+
+def load_jsonl_line(jsonl_line):
+    try:
+        _maybe_compound_dict = json.loads(jsonl_line)
+        if isinstance(_maybe_compound_dict, dict):
+            return _maybe_compound_dict
+        else:
+            return json.loads(_maybe_compound_dict)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Error decoding JSON: {e}")
 
 
 def generate_assay_docs(examples, train_config):
-    tokenizer = get_tokenizer()
+    tokenizer = get_tokenizer(train_config["tokenizer_path"])
     MODEL_CONTEXT_LENGTH = train_config["block_size"]
     final = {
         "input_ids": [],
-        "token_type_ids": [],
+        # "token_type_ids": [],
         "attention_mask": [],
     }
     incomplete_docs = []
     for compound_str in examples["text"]:
         try:
-            compound = json.loads(json.loads(compound_str))
+            compound = load_jsonl_line(compound_str)
             result, incomplete_doc = get_compound_assay_docs(
                 tokenizer, compound, MODEL_CONTEXT_LENGTH
             )
@@ -26,7 +40,7 @@ def generate_assay_docs(examples, train_config):
             if len(result["input_ids"]) == 0:
                 raise ValueError
             final["input_ids"].extend(result["input_ids"])
-            final["token_type_ids"].extend(result["token_type_ids"])
+            # final["token_type_ids"].extend(result["token_type_ids"])
             final["attention_mask"].extend(result["attention_mask"])
         except Exception:
             continue
@@ -34,23 +48,23 @@ def generate_assay_docs(examples, train_config):
         incomplete_docs, tokenizer, MODEL_CONTEXT_LENGTH
     )
     final["input_ids"].extend(patched_documents["input_ids"])
-    final["token_type_ids"].extend(patched_documents["token_type_ids"])
+    # final["token_type_ids"].extend(patched_documents["token_type_ids"])
     final["attention_mask"].extend(patched_documents["attention_mask"])
 
     final["labels"] = final["input_ids"].copy()
     return final
 
 
-def tokenize_function(examples):
-    tokenizer = get_tokenizer()
+def tokenize_function(examples, train_config):
+    tokenizer = get_tokenizer(train_config["tokenizer_path"])
     # print(f"Process id: {os.getpid()}, {tokenizer}")
-    return tokenizer(examples["text"])
+    return tokenizer(examples["text"], return_token_type_ids=False)
 
 
 def process_str(str):
     # it's wierd workaround but works for now
     try:
-        compound = json.loads(json.loads((str["text"])))
+        compound = load_jsonl_line(str["text"])
     except Exception as e:
         print(e)
         return ""
@@ -63,9 +77,12 @@ def group_texts(examples, train_config):
     # Concatenate all texts.
     concatenated_examples = {
         "input_ids": torch.as_tensor(
-            sum(examples["input_ids"], [get_tokenizer().eos_token_id])
+            sum(
+                examples["input_ids"],
+                [get_tokenizer(train_config["tokenizer_path"]).eos_token_id],
+            )
         ),
-        "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
+        # "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
         "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),
     }
 
@@ -117,6 +134,7 @@ def process_dataset(
             tokenized_datasets = dataset.map(
                 tokenize_function,
                 batched=False,
+                fn_kwargs={"train_config": train_config},
                 remove_columns=["text"],
                 batch_size=process_batch_sizes[0],
                 num_proc=4,
@@ -132,6 +150,7 @@ def process_dataset(
             tokenized_datasets = dataset.map(
                 tokenize_function,
                 batched=True,
+                fn_kwargs={"train_config": train_config},
                 batch_size=process_batch_sizes[0],
                 remove_columns=["text"],
             )

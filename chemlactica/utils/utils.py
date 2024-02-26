@@ -4,29 +4,29 @@ from transformers import AutoTokenizer
 from functools import cache
 
 
-default_tokenizer_path = "src/tokenizer/ChemLacticaTokenizer66"
+default_tokenizer_path = "chemlactica/tokenizer/ChemLacticaTokenizer66"
 
 
 @cache
-def get_start2end_tags_map(tokenizer_path: str=default_tokenizer_path):
+def get_start2end_tags_map(tokenizer_path: str = default_tokenizer_path):
     with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
         special_tokens_map = json.load(_f)
     additional_tokens = special_tokens_map["additional_special_tokens"]
     n = len(additional_tokens)
-    assert (n & 1) == 0 # should be even
+    assert (n & 1) == 0  # should be even, every opening tag needs a closing tag
     return {
         additional_tokens[i]: additional_tokens[n // 2 + i] for i in range(n // 2)
     } | {"[START_SMILES]": "[END_SMILES]"}
 
 
-def get_tokenizer_special_tokens(tokenizer_path: str=default_tokenizer_path):
+def get_tokenizer_special_tokens(tokenizer_path: str = default_tokenizer_path):
     with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
         special_tokens_json = json.load(_f)
     return special_tokens_json["additional_special_tokens"]
 
 
 @cache
-def get_tokenizer(tokenizer_path: str=default_tokenizer_path):
+def get_tokenizer(tokenizer_path: str = default_tokenizer_path):
     return create_tokenizer(tokenizer_path)
 
 
@@ -51,8 +51,43 @@ def signal_handler(sig, frame):
     raise ForcedStop
 
 
+def get_called_command(args):
+    if args.slurm_eval:
+        print("slurm eval")
+        command = [
+            "python3",
+            "-m",
+            "accelerate.commands.launch",
+            "--config_file",
+            "chemlactica/config/eval_config.yaml",
+            "chemlactica/train.py",
+        ]
+        for arg, value in vars(args).items():
+            if isinstance(value, list):
+                list_vals_str = str(" ".join(map(str, value)))
+                command.extend([f"--{arg}", list_vals_str])
+            elif value is not None:
+                if isinstance(value, bool) and value:
+                    command.extend([f"--{arg}"])
+                elif isinstance(value, bool) and not value:
+                    pass
+                else:
+                    command.extend([f"--{arg}", str(value)])
+    else:
+        command = None
+    return command
+
+
+def remove_extraneous_args(args):
+    if (
+        hasattr(args, "accelerate_eval_config_file")
+        and args.accelerate_eval_config_file
+    ):
+        delattr(args, "accelerate_eval_config_file")
+
+
 if __name__ == "__main__":
-    import sys
+    # import sys
     import glob
 
     # from utils import CustomTokenizer

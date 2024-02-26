@@ -10,7 +10,7 @@ from transformers import BatchEncoding, AutoTokenizer
 
 
 def modified_tokenizer_call(tokenizer, text):
-    be = tokenizer(text, return_tensors="pt")
+    be = tokenizer(text, return_tensors="pt", return_token_type_ids=False)
     for key, be_tensor in be.items():
         be[key] = be_tensor.squeeze()
         if be[key].dim() == 0:
@@ -98,7 +98,7 @@ def combine_batch_encodings(document_content_dict, doc_start, model_context_leng
     doc_be = BatchEncoding(
         {
             "input_ids": torch.empty(0, dtype=torch.int64),
-            "token_type_ids": torch.empty(0, dtype=torch.int64),
+            # "token_type_ids": torch.empty(0, dtype=torch.int64),
             "attention_mask": torch.empty(0, dtype=torch.int64),
         }
     )
@@ -137,17 +137,17 @@ def combine_batch_encodings(document_content_dict, doc_start, model_context_leng
                 - model_context_length
             )
             doc_be["input_ids"] = doc_be["input_ids"][:-final_diff]
-            doc_be["token_type_ids"] = doc_be["token_type_ids"][:-final_diff]
+            # doc_be["token_type_ids"] = doc_be["token_type_ids"][:-final_diff]
             doc_be["attention_mask"] = doc_be["attention_mask"][:-final_diff]
         doc_be = extend_be(doc_be, comp_prop["value"])
 
     input_ids = doc_be["input_ids"]
-    token_type_ids = doc_be["token_type_ids"]
+    # token_type_ids = doc_be["token_type_ids"]
     attention_mask = doc_be["attention_mask"]
 
     return (
         input_ids[:model_context_length],
-        token_type_ids[:model_context_length],
+        # token_type_ids[:model_context_length],
         attention_mask[:model_context_length],
     )
 
@@ -220,7 +220,7 @@ def get_compound_assay_docs(tokenizer, json_data, model_context_length):
     doc_start = modified_tokenizer_call(tokenizer, "</s>")
     documents = {
         "input_ids": [],
-        "token_type_ids": [],
+        # "token_type_ids": [],
         "attention_mask": [],
     }
     # wrong_count = 0
@@ -341,7 +341,7 @@ def get_compound_assay_docs(tokenizer, json_data, model_context_length):
         if not inc:
             (
                 doc_input_ids,
-                doc_token_type_ids,
+                # doc_token_type_ids,
                 doc_attention_mask,
             ) = combine_batch_encodings(
                 document_content_dict, doc_start, model_context_length
@@ -349,7 +349,7 @@ def get_compound_assay_docs(tokenizer, json_data, model_context_length):
 
             if len(doc_input_ids) == model_context_length:
                 documents["input_ids"].append(doc_input_ids)
-                documents["token_type_ids"].append(doc_token_type_ids)
+                # documents["token_type_ids"].append(doc_token_type_ids)
                 documents["attention_mask"].append(doc_attention_mask)
     return documents, incomplete_doc
 
@@ -358,7 +358,7 @@ def process_incomplete_docs(incomplete_docs, tokenizer, model_context_length):
     doc_start = modified_tokenizer_call(tokenizer, "</s>")
     documents = {
         "input_ids": [],
-        "token_type_ids": [],
+        # "token_type_ids": [],
         "attention_mask": [],
     }
     while incomplete_docs:
@@ -366,7 +366,7 @@ def process_incomplete_docs(incomplete_docs, tokenizer, model_context_length):
         doc_be = BatchEncoding(
             {
                 "input_ids": torch.empty(0, dtype=torch.int64),
-                "token_type_ids": torch.empty(0, dtype=torch.int64),
+                # "token_type_ids": torch.empty(0, dtype=torch.int64),
                 "attention_mask": torch.empty(0, dtype=torch.int64),
             }
         )
@@ -377,7 +377,7 @@ def process_incomplete_docs(incomplete_docs, tokenizer, model_context_length):
             except IndexError:
                 break
             if new_doc_len < model_context_length:
-                input_ids, token_type_ids, attention_mask = combine_batch_encodings(
+                input_ids, attention_mask = combine_batch_encodings(
                     incomplete_doc["doc_dic"], doc_start, model_context_length
                 )
                 doc_be = extend_be(
@@ -385,7 +385,7 @@ def process_incomplete_docs(incomplete_docs, tokenizer, model_context_length):
                     BatchEncoding(
                         {
                             "input_ids": input_ids,
-                            "token_type_ids": token_type_ids,
+                            # "token_type_ids": token_type_ids,
                             "attention_mask": attention_mask,
                         }
                     ),
@@ -397,7 +397,7 @@ def process_incomplete_docs(incomplete_docs, tokenizer, model_context_length):
                 ] = sp_evenly_remove_elements_from_lists(
                     incomplete_doc["doc_dic"]["descriptions"], difference
                 )
-                input_ids, token_type_ids, attention_mask = combine_batch_encodings(
+                input_ids, attention_mask = combine_batch_encodings(
                     incomplete_doc["doc_dic"], doc_start, model_context_length
                 )
                 len(input_ids)
@@ -406,7 +406,7 @@ def process_incomplete_docs(incomplete_docs, tokenizer, model_context_length):
                     BatchEncoding(
                         {
                             "input_ids": input_ids,
-                            "token_type_ids": token_type_ids,
+                            # "token_type_ids": token_type_ids,
                             "attention_mask": attention_mask,
                         }
                     ),
@@ -415,9 +415,9 @@ def process_incomplete_docs(incomplete_docs, tokenizer, model_context_length):
 
         if len(doc_be["input_ids"]) > model_context_length:
             documents["input_ids"].append(doc_be["input_ids"][:model_context_length])
-            documents["token_type_ids"].append(
-                doc_be["token_type_ids"][:model_context_length]
-            )
+            # documents["token_type_ids"].append(
+            #     doc_be["token_type_ids"][:model_context_length]
+            # )
             documents["attention_mask"].append(
                 doc_be["attention_mask"][:model_context_length]
             )

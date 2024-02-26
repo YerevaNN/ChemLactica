@@ -83,7 +83,7 @@ mistral7b:
   eos_token_id: 2
   tie_word_embeddings: False
   rope_theta: 10000.0
-  sliding_windows: 1024
+  sliding_window: 512
   global_gradient_norm: 1.0
   weight_decay: 0.1
   adam_beta1: 0.9

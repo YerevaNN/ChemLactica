@@ -5,10 +5,11 @@ import glob
 import gc
 import json
 
-from config.create_train_config import model_train_configs
-from dataset_utils import process_dataset
+from chemlactica.config.create_train_config import model_train_configs
+from .dataset_utils import process_dataset
 from datasets import load_dataset
-from model_utils import load_model
+from .model_utils import load_model
+from tqdm.auto import tqdm
 
 from aim.hugging_face import AimCallback
 import torch
@@ -33,18 +34,43 @@ def calc_hash_for_binary_file(path):
 
 
 class CustomProgressCallback(ProgressCallback):
+    def __init__(self, early_stopping_steps, total_theoretical_peak_flops):
+        self.training_bar = None
+        self.prediction_bar = None
+        self.early_stopping_steps = early_stopping_steps
+        self._start_flos = 0
+        self._total_theoretical_peak_flops = total_theoretical_peak_flops
+        self._start_time = time.time()
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        if state.is_world_process_zero:
+            self.training_bar = tqdm(
+                total=self.early_stopping_steps, dynamic_ncols=True
+            )
+        self.current_step = 0
+
     def on_log(self, args, state, control, logs=None, **kwargs):
+        elapsed_time = time.time() - self._start_time
+        new_flos = state.total_flos
+        elapsed_flos = (new_flos - self._start_flos) / elapsed_time
+        mfu = (elapsed_flos / self._total_theoretical_peak_flops) * 100
+        self._start_time = time.time()
+        self._start_flos = new_flos
         if state.is_local_process_zero and self.training_bar is not None:
             _ = logs.pop("total_flos", None)
+            logs.update({"mfu": mfu})
             self.training_bar.write(str(logs))
             logger.info(str(logs))
 
 
 class CustomAimCallback(AimCallback):
-    def __init__(self, checkpoints_dict_name, model, blocksize, *args, **kwargs):
+    def __init__(
+        self, checkpoints_dict_name, model, blocksize, run_hash, *args, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self._checkpoints_dict_name = checkpoints_dict_name
         self.model = model
+        self._run_hash = run_hash
         self.setup()
         self.embedding_norm_1 = 0
         self.embedding_norm_2 = 0
@@ -298,3 +324,12 @@ class JsonlDatasetResumeCallback(TrainerCallback):
             print(name, state)
         with open(os.path.join(checkpoint_dir, "jsonl_states.json"), "w") as file:
             json.dump(jsonl_states, file, indent=4)
+
+
+class EarlyStoppingCallback(TrainerCallback):
+    def __init__(self, early_stopping_steps):
+        self.early_stopping_steps = early_stopping_steps
+
+    def on_step_end(self, args, state, control, **kwargs):
+        if state.global_step >= self.early_stopping_steps:
+            control.should_training_stop = True

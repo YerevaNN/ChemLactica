@@ -1,0 +1,10 @@
+[project]
+name = "chemlactica"
+version = "0.0.1"
+description = "Language modelling for chemistry by YerevanN"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+
+[tool.setuptools]
+packages = ["chemlactica"]
