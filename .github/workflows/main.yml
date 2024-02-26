@@ -39,13 +39,17 @@ jobs:
         auto-update-conda: true
         environment-file: test_environment.yml
         activate-environment: testenv
-    - name: install local chemlactica package
+    - name: Install local chemlactica package within Conda environment
       run: |
-        pip install .
+        conda activate testenv  # Activate the Conda environment
+        pip install .  # Install dependencies within the Conda environment
+        conda deactivate  # Deactivate the Conda environment after installation
 
     - name: Run unit tests
       run: |
+        conda activate testenv  # Activate the Conda environment
         python3 confirm_tests.py --run unit
+        conda deactivate  # Deactivate the Conda environment after installation
 
     - name: list commits on PR
       run: |
