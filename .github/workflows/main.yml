@@ -21,23 +21,23 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Remove flash-attn dependency
-      run: |
-        sed -i '/flash-attn/d' environment.yml
+    # - name: Remove flash-attn dependency
+    #   run: |
+    #     sed -i '/flash-attn/d' environment.yml
 
-    - name: Remove conda-pack dependency
-      run: |
-        sed -i '/conda-pack/d' environment.yml
+    # - name: Remove conda-pack dependency
+    #   run: |
+    #     sed -i '/conda-pack/d' environment.yml
 
-    - name: Remove chemlactica dependency
-      run: |
-        sed -i '/chemlactica/d' environment.yml
+    # - name: Remove chemlactica dependency
+    #   run: |
+    #     sed -i '/chemlactica/d' environment.yml
 
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        environment-file: environment.yml
+        environment-file: test_environment.yml
         activate-environment: testenv
     - name: install local chemlactica package
       run: |
