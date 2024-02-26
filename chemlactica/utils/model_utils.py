@@ -8,6 +8,22 @@ import torch
 from transformers import BitsAndBytesConfig
 
 
+def float_casting_decorator(layer_class):
+    class FloatCastingLayer(layer_class):
+        def __init__(self, *args, **kwargs):
+            super(FloatCastingLayer, self).__init__(*args, **kwargs)
+
+        def forward(
+            self,
+            x,
+            *args,
+            **kwargs,
+        ):
+            return super().forward(x, *args, **kwargs).to(torch.float32)
+
+    return FloatCastingLayer
+
+
 quant_config = BitsAndBytesConfig(
     load_in_4bit=True,
     bnb_4bit_use_double_quant=False,
@@ -74,6 +90,13 @@ def load_model(
         model = OPTForCausalLM.from_pretrained(
             from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
         )
+        print(type(model.lm_head))
+        model.lm_head = float_casting_decorator(model.lm_head.__class__)(
+            in_features=model.lm_head.in_features,
+            out_features=model.lm_head.out_features,
+        )
+        # model.lm_head.forward = cast_to_fp32(OPTForCausalLM.lm_head.forward)
+
     if "mistral" in from_pretrained.lower():
         model = MistralForCausalLM.from_pretrained(
             from_pretrained,
