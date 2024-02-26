@@ -8,11 +8,11 @@ import random
 import glob
 import tqdm
 
-from config.create_train_config import model_fine_tune_configs
-from eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils import signal_handler, get_tokenizer_special_tokens, get_tokenizer
-from dataset_utils import process_dataset
-from model_utils import load_model
+from chemlactica.config.create_train_config import model_fine_tune_configs
+from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
+from chemlactica.utils.utils import signal_handler, get_tokenizer_special_tokens, get_tokenizer
+from chemlactica.utils.dataset_utils import process_dataset
+from chemlactica.utils.model_utils import load_model
 from custom_trainer import CustomIterativeSFTTrainer
 from generation.rejection_sampling_utils import generate_dataset
 
@@ -28,7 +28,7 @@ from transformers import (
 )
 from datasets import load_dataset
 
-from callbacks import (
+from utils.callbacks import (
     CustomAimCallback,
     WPSCounterCallback,
     CustomProgressCallback,
