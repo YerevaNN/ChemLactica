@@ -1,4 +1,4 @@
-name: test_cl11.8_t_4.37
+name: testenv
 channels:
   - pytorch
   - nvidia

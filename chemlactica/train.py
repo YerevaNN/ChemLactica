@@ -145,6 +145,7 @@ def train(
 
     broadcast_object_list(experiment_hash_list)
     print(f"Process {accelerator.process_index} aim hash: {experiment_hash_list[0]}")
+    experiment_hash = experiment_hash_list[0]
 
     if not valid_batch_size:
         valid_batch_size = train_batch_size

@@ -10,6 +10,9 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
 
     steps:
     - uses: actions/checkout@v4
@@ -21,12 +24,33 @@ jobs:
       with:
         python-version: '3.10'
 
+    # - name: Remove flash-attn dependency
+    #   run: |
+    #     sed -i '/flash-attn/d' environment.yml
+
+    # - name: Remove conda-pack dependency
+    #   run: |
+    #     sed -i '/conda-pack/d' environment.yml
+
+    # - name: Remove chemlactica dependency
+    #   run: |
+    #     sed -i '/chemlactica/d' environment.yml
+
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
-        auto-update-conda: true
         environment-file: test_environment.yml
         activate-environment: testenv
+        auto-update-conda: true
+
+    - name: Install local chemlactica package within Conda environment
+      run: |
+        pip install .  # Install dependencies within the Conda environment
+
+    - name: Run unit tests
+      run: |
+        python3 confirm_tests.py --run unit
+
     - name: list commits on PR
       run: |
         response=$(curl --request GET \
