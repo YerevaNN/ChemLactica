@@ -57,7 +57,7 @@ numpy.random.seed(42)
 logger = logging.get_logger("transformers")
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "caching_allocator"
-os.environ['TOKENIZERS_PARALLELISM'] = True
+os.environ['TOKENIZERS_PARALLELISM'] = "true"
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
