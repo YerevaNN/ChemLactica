@@ -1,4 +1,3 @@
-import shutil
 import torch
 import submitit
 from typing import Any, Dict
@@ -6,9 +5,6 @@ import os
 from torch._tensor import Tensor
 from torch.nn.modules import Module
 from transformers import Trainer, TrainingArguments
-from torch.distributed.fsdp.fully_sharded_data_parallel import (
-    FullyShardedDataParallel as FSDP,
-)
 from chemlactica.utils.utils import get_tokenizer
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 from transformers.utils import is_torch_tpu_available
@@ -40,23 +36,6 @@ class CustomTrainer(Trainer):
                 print(f"Sample {i + 1}:", tokeinzer.decode(inputs["input_ids"][i]))
             self.num_samples_to_print = None
         return super().training_step(model, inputs)
-
-    def _save_checkpoint(self, model, trial, metrics=None):
-        if shutil.disk_usage("/").free > 3 * 1024**3:
-            super()._save_checkpoint(model, trial, metrics=None)
-        else:
-            print("**disk is full didn't save**")
-
-    def _load_from_checkpoint(self, resume_from_checkpoint, model=None):
-        """
-        This code is added because we had a failure when resuming training.
-        Basically, we load the model with fsdp when the model is not fsdp wrapped.
-        In the future versions transformers this issue is handled, by adding an extra check,
-        but not in 4.31.0 version. So this is our manual check addition to solve the problem.
-        """
-        if type(self.model) != FSDP:
-            return
-        return super()._load_from_checkpoint(resume_from_checkpoint, model)
 
     def _build_slurm_eval_command(self, train_command, trial):
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
