@@ -22,7 +22,6 @@ from transformers import (
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
-from trl.trainer import ConstantLengthDataset
 import torch
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
@@ -39,7 +38,7 @@ from chemlactica.utils.callbacks import (
     CustomProgressCallback,
     ReproducabilityCallback,
     JsonlDatasetResumeCallback,
-    # EarlyStoppingCallback,
+    EarlyStoppingCallback,
 )
 from chemlactica.config.create_train_config import model_train_configs
 from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
@@ -182,12 +181,13 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
-    # trainer_callback_dict["early stop callback"] = EarlyStoppingCallback(
-    #     early_stopping_steps=(max_steps)
-    # )
+    if train_type == "pretrain":
+        trainer_callback_dict["early stop callback"] = EarlyStoppingCallback(
+            early_stopping_steps=(max_steps)
+        )
 
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_train_epochs)
-    if check_reproducability:
+    if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
             accelerator, model_config, flash_attn
         )
@@ -201,11 +201,11 @@ def train(
 
     with multiprocessing.Manager() if accelerator.is_main_process else nullcontext() as manager:
         shared_jsonl_files = None
-        if accelerator.is_main_process:
+        if accelerator.is_main_process and train_type == "pretrain":
             shared_jsonl_files = manager.dict()
-            # trainer_callback_dict[
-            #     "json_dataset_resume_callback"
-            # ] = JsonlDatasetResumeCallback(shared_jsonl_files)
+            trainer_callback_dict[
+                "json_dataset_resume_callback"
+            ] = JsonlDatasetResumeCallback(shared_jsonl_files)
             print(f"shared jsonl files {shared_jsonl_files}")
         checkpoints_dir = os.path.join(
             checkpoints_root_dir,
@@ -336,7 +336,6 @@ def train(
         elif train_type == "sft":
             training_data_files = glob.glob(training_data_dirs[0] + "/*.csv")
             valid_data_files = glob.glob(valid_data_dir + "/*.csv")
-            print(training_data_files, valid_data_files)
             dataset = load_dataset(
                 "csv",
                 data_files={
@@ -347,35 +346,18 @@ def train(
             tokenizer = get_tokenizer(
                 "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
             )
-            format_func = (
-                lambda example: f"[START_SMILES]{example['smiles']}[END_SMILES][PROPERTY]"
-                f"{example['activity']:.2f}[/PROPERTY]"
-            )
 
             def formatting_prompts_func(example):
                 output_texts = []
                 for i in range(len(example["smiles"])):
                     text = (
-                        f"[START_SMILES]{example['smiles'][i]}[END_SMILES]"
-                        f"[PROPERTY]{round(example['activity'][i], 2)}[/PROPERTY]"
+                        f"[START_SMILES][END_SMILES]"
+                        f"[PROPERTY]activity {round(example['activity'][i], 2)}[/PROPERTY]"
                     )
                     output_texts.append(text)
                 return output_texts
 
-            train_dataset = ConstantLengthDataset(
-                tokenizer=tokenizer,
-                dataset=dataset["train"],
-                formatting_func=format_func,
-                seq_length=1024,
-            )
-            eval_dataset = ConstantLengthDataset(
-                tokenizer=tokenizer,
-                dataset=dataset["validation"],
-                formatting_func=format_func,
-                seq_length=1024,
-            )
-
-            response_template = "[PROPERTY]"
+            response_template = "[PROPERTY]activity "
             collator = DataCollatorForCompletionOnlyLM(
                 response_template, tokenizer=tokenizer
             )
@@ -388,11 +370,10 @@ def train(
                 args=training_args,
                 packing=False,
                 tokenizer=tokenizer,
-                max_seq_length=1024,
+                max_seq_length=512,
                 data_collator=collator,
+                # neftune_noise_alpha=5,
             )
-            trainer.remove_callback(JsonlDatasetResumeCallback)
-            trainer.remove_callback(ReproducabilityCallback)
 
         trainer.remove_callback(ProgressCallback)
         for additional_callback in list(trainer_callback_dict.values()):

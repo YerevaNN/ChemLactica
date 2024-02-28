@@ -16,7 +16,7 @@ for key in model_train_configs.keys():
 
 
 model_train_configs["125m"]["max_learning_rate"] = 1.4e-3
-model_train_configs["125m"]["max_learning_rate"] = 2e-5
+model_train_configs["125m"]["max_learning_rate"] = 2e-5  # used for sft training
 model_train_configs["125m"][
     "tokenizer_path"
 ] = "chemlactica/tokenizer/ChemLacticaTokenizer66"
