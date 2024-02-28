@@ -346,6 +346,7 @@ def train(
             except Exception as e:
                 traceback_info = traceback.format_exc()
                 logger.error(e, traceback_info)
+                raise
             except KeyboardInterrupt:
                 with accelerator.main_process_first():
                     logger.error("KeyboardInterrupt")

@@ -90,11 +90,10 @@ def load_model(
         model = OPTForCausalLM.from_pretrained(
             from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
         )
-        print(type(model.lm_head))
-        model.lm_head = float_casting_decorator(model.lm_head.__class__)(
-            in_features=model.lm_head.in_features,
-            out_features=model.lm_head.out_features,
-        )
+        # model.lm_head = float_casting_decorator(model.lm_head.__class__)(
+        #     in_features=model.lm_head.in_features,
+        #     out_features=model.lm_head.out_features,
+        # )
         # model.lm_head.forward = cast_to_fp32(OPTForCausalLM.lm_head.forward)
 
     if "mistral" in from_pretrained.lower():

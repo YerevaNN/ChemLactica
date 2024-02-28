@@ -1,4 +1,4 @@
-import shutil
+import torch
 import submitit
 from typing import Any, Dict
 import os
@@ -9,6 +9,7 @@ from torch.distributed.fsdp.fully_sharded_data_parallel import (
     FullyShardedDataParallel as FSDP,
 )
 from transformers import Trainer, TrainingArguments
+from chemlactica.utils.utils import get_tokenizer
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 from transformers.utils import is_torch_tpu_available
 from trl import IterativeSFTTrainer
