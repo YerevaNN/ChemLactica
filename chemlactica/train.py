@@ -334,25 +334,30 @@ def train(
                 preprocess_logits_for_metrics=preprocess_logits_for_metrics,
             )
         elif train_type == "sft":
-            training_data_files = glob.glob(training_data_dirs[0] + "/*.csv")
-            valid_data_files = glob.glob(valid_data_dir + "/*.csv")
-            dataset = load_dataset(
-                "csv",
-                data_files={
-                    "train": training_data_files,
-                    "validation": valid_data_files,
-                },
-            )
+            if os.path.isdir(training_data_dirs[0]):
+                training_data_files = glob.glob(training_data_dirs[0] + "/*.csv")
+                valid_data_files = glob.glob(valid_data_dir + "/*.csv")
+                dataset = load_dataset(
+                    "csv",
+                    data_files={
+                        "train": training_data_files,
+                        "validation": valid_data_files,
+                    },
+                )
+            else:
+                dataset = load_dataset(training_data_dirs[0])
+
             tokenizer = get_tokenizer(
                 "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
             )
 
             def formatting_prompts_func(example):
+                # features = example.column_names
                 output_texts = []
                 for i in range(len(example["smiles"])):
                     text = (
-                        f"[START_SMILES][END_SMILES]"
-                        f"[PROPERTY]activity {round(example['activity'][i], 2)}[/PROPERTY]"
+                        f"[START_SMILES]{example['smiles'][i]}[END_SMILES]"
+                        f"[PROPERTY]activity {round(example['label'][i], 2)}[/PROPERTY]"
                     )
                     output_texts.append(text)
                 return output_texts
@@ -372,7 +377,7 @@ def train(
                 tokenizer=tokenizer,
                 max_seq_length=512,
                 data_collator=collator,
-                # neftune_noise_alpha=5,
+                neftune_noise_alpha=5,
             )
 
         trainer.remove_callback(ProgressCallback)
