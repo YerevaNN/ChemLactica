@@ -42,6 +42,7 @@ class TestModelTraining(unittest.TestCase):
             module_args={"config_file": self.config_file},
             script=self.script,
             script_args={
+                "train_type": "pretrain",
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'assay_train')}",
@@ -76,6 +77,7 @@ class TestModelTraining(unittest.TestCase):
             module_args={"config_file": self.config_file},
             script=self.script,
             script_args={
+                "train_type": "pretrain",
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
@@ -110,6 +112,7 @@ class TestModelTraining(unittest.TestCase):
             module_args={"config_file": self.config_file},
             script=self.script,
             script_args={
+                "train_type": "pretrain",
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
@@ -143,6 +146,7 @@ class TestModelTraining(unittest.TestCase):
             module_args={"config_file": self.config_file},
             script=self.script,
             script_args={
+                "train_type": "pretrain",
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
@@ -171,6 +175,7 @@ class TestModelTraining(unittest.TestCase):
             module_args={"config_file": self.config_file},
             script=self.script,
             script_args={
+                "train_type": "pretrain",
                 "from_pretrained": os.path.join(
                     TEST_DIR, "checkpoints/facebook/galactica-125m/none/checkpoint-20"
                 ),
