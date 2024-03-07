@@ -2,7 +2,8 @@ from custom_trainer import CustomTrainer
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 
 from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from utils.dataset_utils import get_tokenizer
+from utils.dataset_utils import sft_formatting_prompts_func
+from utils.utils import get_tokenizer
 
 
 def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_eval):
@@ -20,21 +21,7 @@ def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_
         )
 
     elif train_type == "sft":
-        tokenizer = get_tokenizer(
-            "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
-        )
-
-        def formatting_prompts_func(example):
-            # features = example.column_names
-            output_texts = []
-            for i in range(len(example["smiles"])):
-                text = (
-                    f"[START_SMILES]{example['smiles'][i]}[END_SMILES]"
-                    f"[PROPERTY]activity {round(example['activity'][i], 2)}[/PROPERTY]"
-                )
-                output_texts.append(text)
-            return output_texts
-
+        tokenizer = get_tokenizer()
         response_template = "[PROPERTY]activity "
         collator = DataCollatorForCompletionOnlyLM(
             response_template, tokenizer=tokenizer
@@ -43,7 +30,7 @@ def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_
             model=model,
             train_dataset=dataset["train"],
             eval_dataset=dataset["validation"],
-            formatting_func=formatting_prompts_func,
+            formatting_func=sft_formatting_prompts_func,
             args=training_args,
             packing=False,
             tokenizer=tokenizer,
