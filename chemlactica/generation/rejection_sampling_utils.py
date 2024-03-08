@@ -8,11 +8,13 @@ import itertools as it
 import os
 import tqdm
 from dataclasses import dataclass
+from enum import Enum
 
 from utils import get_tokenizer
 from config.create_train_config import model_fine_tune_configs
 from model_utils import load_model
 from generation.generation import generate
+from rejection_sampling_configs import sample_gen_args, rej_sample_args
 
 import numpy as np
 import pandas as pd
@@ -38,10 +40,15 @@ def get_maccs_fingerprint(smiles: str):
     return MACCSkeys.GenMACCSKeys(Chem.MolFromSmiles(smiles))
 
 
-def tanimoto_dist_func(smiles1: str, smiles2: str, fingerprint: str="morgan"):
+class FingerprintType(Enum):
+    MORGAN=1,
+    MACCS=2
+
+
+def tanimoto_dist_func(smiles1: str, smiles2: str, fingerprint: FingerprintType=FingerprintType.Morgan):
     return DataStructs.TanimotoSimilarity(
-        get_morgan_fingerprint(smiles1) if fingerprint == 'morgan' else get_maccs_fingerprint(smiles1),
-        get_morgan_fingerprint(smiles2) if fingerprint == 'morgan' else get_maccs_fingerprint(smiles2),
+        get_morgan_fingerprint(smiles1) if fingerprint == FingerprintType.Morgan else get_maccs_fingerprint(smiles1),
+        get_morgan_fingerprint(smiles2) if fingerprint == fingerprint == FingerprintType.Morgan else get_maccs_fingerprint(smiles2),
     )
 
 
@@ -111,21 +118,7 @@ def generate_dataset(
     lead_molecule = Chem.MolToSmiles(Chem.MolFromSmiles(lead_molecule), kekuleSmiles=True)
     print("some molecule", lead_molecule)
 
-    sample_gen_args = {
-        "max_new_tokens": 50,
-        "temperature": 1.0,
-        "repetition_penalty": 1.0,
-        "do_sample": True,
-        "eos_token_id": 2
-    }
-    rej_sample_args = {
-        "max_new_tokens": 300,
-        "temperature": 1.0,
-        "repetition_penalty": 1.0,
-        "do_sample": True,
-        "num_return_sequences": 20,
-        "eos_token_id": 20,
-    }
+    
     generator_model = load_model(checkpoint_path, use_flash_attn=use_flash_attn, dtype=torch.bfloat16).to(device)
     def next_input_sample(lead_molecule: str):
         num_of_similar = random.randint(0, max_similars_in_prompt)
@@ -158,7 +151,7 @@ def generate_dataset(
                             smiles=smiles,
                             qed=compute_qed(smiles),
                             morgan_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles),
-                            maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, "maccs"),
+                            maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, FingerprintType.MACCS),
                             inchi=get_inchi(smiles)
                         )
                         if gen_molecule_entry != lead_molecule_entry:
@@ -209,7 +202,7 @@ def generate_dataset(
                         smiles=smiles,
                         qed=compute_qed(smiles),
                         morgan_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles),
-                        maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, "maccs"),
+                        maccs_sim_to_lead=tanimoto_dist_func(smiles, lead_molecule_entry.smiles, FingerprintType.MACCS),
                         inchi=get_inchi(smiles)
                     )
                     candidate_target_molecules.append(gen_mol)

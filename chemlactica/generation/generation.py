@@ -6,14 +6,6 @@ from model_utils import load_model
 from utils import get_tokenizer
 
 
-def create_cli_command(script, script_args):
-    train_command = "python3 "
-    train_command += (
-        f"{script} {''.join([f'--{arg} {val} ' for arg, val in script_args.items()])}"
-    )
-    return train_command
-
-
 def generate(prompts: List[str], model, **gen_kwargs):
     if type(prompts) == str:
         prompts = [prompts]

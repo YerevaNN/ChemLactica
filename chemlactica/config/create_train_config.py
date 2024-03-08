@@ -43,13 +43,3 @@ model_train_configs["llama2"]["global_gradient_norm"] = 0.1
 model_train_configs["1.3b"]["warmup_steps"] = 500
 model_train_configs["1.3b"]["max_learning_rate"] = 0.0014
 model_train_configs["1.3b"]["global_gradient_norm"] = 1.0
-
-
-# read static train config
-with open(os.path.join(absolute_path, "models_fine-tune_config.yaml"), "r") as f_:
-    model_fine_tune_configs = yaml.full_load(f_)
-
-model_fine_tune_configs["125m"]["max_learning_rate"] = 1e-5
-model_fine_tune_configs["125m"]["adam_beta1"] = 0.9
-model_fine_tune_configs["125m"]["adam_beta2"] = 0.95
-model_fine_tune_configs["125m"]["warmup_steps"] = 0

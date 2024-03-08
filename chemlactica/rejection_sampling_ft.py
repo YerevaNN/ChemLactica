@@ -8,7 +8,7 @@ import random
 import glob
 import tqdm
 
-from chemlactica.config.create_train_config import model_fine_tune_configs
+from chemlactica.config.create_finetine_config import model_fine_tune_configs
 from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from chemlactica.utils.utils import signal_handler, get_tokenizer_special_tokens, get_tokenizer
 from chemlactica.utils.dataset_utils import process_dataset
