@@ -1,39 +1,22 @@
 import os
-
-# import sys
-# from datasets import interleave_datasets
+import random
 import signal
 import traceback
-from chemlactica.utils.distributed_utils import get_experiment_hash
-from datetime import timedelta
-import random
-from chemlactica.utils.parseargs import init_parser
-
-# import glob
 import multiprocessing
+from datetime import timedelta
 from contextlib import nullcontext
+
+import torch
 import numpy
 import transformers
 from transformers import (
-    # Trainer,
-    # TrainingArguments,
     ProgressCallback,
-    # get_polynomial_decay_schedule_with_warmup,
 )
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
 
-# from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
-import torch
-
-# from datasets import load_dataset
-# from datasets.iterable_dataset import IterableDataset
-from chemlactica.utils.flop_counter import get_theoretical_peak_flops
-
-# from utils.utils import get_tokenizer
-
-# from datasets.dataset_dict import IterableDatasetDict
-
+from chemlactica.config.create_train_config import model_train_configs
+from chemlactica.custom_trainer import CustomArguments
 from chemlactica.utils.callbacks import (
     CustomAimCallback,
     WPSCounterCallback,
@@ -44,20 +27,16 @@ from chemlactica.utils.callbacks import (
     JsonlDatasetResumeCallback,
     EarlyStoppingCallback,
 )
-from chemlactica.config.create_train_config import model_train_configs
-
-# from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from chemlactica.utils.utils import (
     signal_handler,
     get_tokenizer_special_tokens,
     get_called_command,
     remove_extraneous_args,
 )
+from chemlactica.utils.parseargs import init_parser
 from chemlactica.utils.model_utils import load_model
-from chemlactica.custom_trainer import CustomArguments
-
-# from chemlactica.utils.dataset_utils import process_dataset, DIR_DATA_TYPES
-# from chemlactica.jsonl_dataset import samples_generator
+from chemlactica.utils.distributed_utils import get_experiment_hash
+from chemlactica.utils.flop_counter import get_theoretical_peak_flops
 from chemlactica.get_dataset import get_dataset
 from chemlactica.get_trainer import get_trainer
 
@@ -289,120 +268,6 @@ def train(
         trainer = get_trainer(
             train_type, model, dataset, training_args, evaluate_only, slurm_eval
         )
-        # if train_type == "pretrain":
-        #     # print("TRAINING directories", training_data_dirs, dir_data_types)
-        #     assert len(training_data_dirs) == len(dir_data_types)
-        #     train_dataset_dict = {}
-        #     print("---Training dataset names---")
-        #     for i, (training_data_dir, dir_data_type) in enumerate(
-        #         zip(training_data_dirs, dir_data_types)
-        #     ):
-        #         if dir_data_type.lower() not in DIR_DATA_TYPES:
-        #             raise ValueError(
-        #                 f"""Unknown data type {dir_data_type},
-        #                 the following data types are supported: {DIR_DATA_TYPES}"""
-        #             )
-        #         training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-        #         ds_name = f"{dir_data_type}_{i}"
-        #         is_assay_split = "assay" in dir_data_type
-        #         dataset = IterableDataset.from_generator(
-        #             samples_generator,
-        #             gen_kwargs={
-        #                 "files": training_data_files,
-        #                 "shared_jsonl_files": shared_jsonl_files,
-        #             },
-        #         )
-        #         dataset = process_dataset(
-        #             dataset=dataset,
-        #             train_config=train_config,
-        #             process_batch_sizes=(50, 50),
-        #             is_eval=False,
-        #             assay=is_assay_split,
-        #         )
-        #         if is_assay_split:
-        #             dataset.shuffle(buffer_size=shuffle_buffer_size)
-        #         print(f"Dataset {i}: {ds_name}")
-        #         train_dataset_dict[ds_name] = dataset
-
-        #     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-
-        #     train_dataset = list(train_dataset_dict.values())
-        #     if len(train_dataset) > 1:
-        #         train_dataset = interleave_datasets(train_dataset)
-        #     else:
-        #         train_dataset = train_dataset[0]
-
-        #     if evaluate_only or not slurm_eval:
-        #         eval_dataset = load_dataset(
-        #             "text", data_files={"validation": valid_data_files}, streaming=False
-        #         )
-        #         processed_eval_dataset = process_dataset(
-        #             dataset=eval_dataset,
-        #             train_config=train_config,
-        #             process_batch_sizes=(50, 50),
-        #             is_eval=True,
-        #             assay=False,
-        #         )
-        #     else:
-        #         processed_eval_dataset = None
-
-        #     trainer = CustomTrainer(
-        #         model=model,
-        #         args=training_args,
-        #         compute_metrics=compute_metrics,
-        #         train_dataset=train_dataset if not evaluate_only else None,
-        #         eval_dataset=processed_eval_dataset["validation"]
-        #         if not evaluate_only or slurm_eval
-        #         else None,
-        #         # optimizers=[optimizer, lr_scheduler],
-        #         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-        #     )
-        # elif train_type == "sft":
-        #     if os.path.isdir(training_data_dirs[0]):
-        #         training_data_files = glob.glob(training_data_dirs[0] + "/*.csv")
-        #         valid_data_files = glob.glob(valid_data_dir + "/*.csv")
-        #         dataset = load_dataset(
-        #             "csv",
-        #             data_files={
-        #                 "train": training_data_files,
-        #                 "validation": valid_data_files,
-        #             },
-        #         )
-        #     else:
-        #         dataset = load_dataset(training_data_dirs[0])
-
-        #     tokenizer = get_tokenizer(
-        #         "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
-        #     )
-
-        #     def formatting_prompts_func(example):
-        #         # features = example.column_names
-        #         output_texts = []
-        #         for i in range(len(example["smiles"])):
-        #             text = (
-        #                 f"[START_SMILES]{example['smiles'][i]}[END_SMILES]"
-        #                 f"[PROPERTY]activity {round(example['label'][i], 2)}[/PROPERTY]"
-        #             )
-        #             output_texts.append(text)
-        #         return output_texts
-
-        #     response_template = "[PROPERTY]activity "
-        #     collator = DataCollatorForCompletionOnlyLM(
-        #         response_template, tokenizer=tokenizer
-        #     )
-
-        #     trainer = SFTTrainer(
-        #         model=model,
-        #         train_dataset=dataset["train"],
-        #         eval_dataset=dataset["validation"],
-        #         formatting_func=formatting_prompts_func,
-        #         args=training_args,
-        #         packing=False,
-        #         tokenizer=tokenizer,
-        #         max_seq_length=512,
-        #         data_collator=collator,
-        #         neftune_noise_alpha=5,
-        #     )
 
         trainer.remove_callback(ProgressCallback)
         for additional_callback in list(trainer_callback_dict.values()):
