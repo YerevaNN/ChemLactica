@@ -6,6 +6,22 @@ import bitsandbytes as bnb
 # from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
 import torch
 from transformers import BitsAndBytesConfig
+import torch.nn as nn
+
+
+class LinearFloat32(nn.Linear):
+    def forward(self, _input) -> torch.Tensor:
+        return super().forward(_input).to(torch.float32)
+
+
+def cast_lm_head_to_fp32_init(func):
+    def inner_func(self, config, *args, **kwargs):
+        func(self, config, *args, **kwargs)
+        self.lm_head = LinearFloat32(
+            config.word_embed_proj_dim, config.vocab_size, bias=False
+        )
+
+    return inner_func
 
 
 def float_casting_decorator(layer_class):
@@ -87,9 +103,11 @@ def load_model(
             )
         )
     if "galactica" in from_pretrained.lower():
+        OPTForCausalLM.__init__ = cast_lm_head_to_fp32_init(OPTForCausalLM.__init__)
         model = OPTForCausalLM.from_pretrained(
             from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
         )
+
         # model.lm_head = float_casting_decorator(model.lm_head.__class__)(
         #     in_features=model.lm_head.in_features,
         #     out_features=model.lm_head.out_features,
