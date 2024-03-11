@@ -55,7 +55,9 @@ torch.manual_seed(42)
 random.seed(42)
 numpy.random.seed(42)
 logger = logging.get_logger("transformers")
+
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "caching_allocator"
+os.environ['TOKENIZERS_PARALLELISM'] = "true"
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
@@ -186,7 +188,7 @@ def train(
     trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
     if check_reproducability:
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
-            accelerator, model_config, flash_attn
+            model_config, flash_attn
         )
 
     total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)
