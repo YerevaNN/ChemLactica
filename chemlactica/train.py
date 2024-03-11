@@ -193,8 +193,8 @@ def train(
         trainer_callback_dict["early stop callback"] = EarlyStoppingCallback(
             early_stopping_steps=(max_steps)
         )
+        trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
 
-    trainer_callback_dict["epoch_callback"] = EpochCallback(num_train_epochs)
     if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
             accelerator, model_config, flash_attn
