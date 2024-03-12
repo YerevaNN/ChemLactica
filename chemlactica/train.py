@@ -57,7 +57,7 @@ numpy.random.seed(42)
 logger = logging.get_logger("transformers")
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "caching_allocator"
-os.environ['TOKENIZERS_PARALLELISM'] = "true"
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
@@ -285,6 +285,7 @@ def train(
             dataset = process_dataset(
                 dataset=dataset,
                 train_config=train_config,
+                accelerator=accelerator,
                 process_batch_sizes=(50, 50),
                 is_eval=False,
                 assay=is_assay_split,

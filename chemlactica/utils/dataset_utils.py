@@ -1,6 +1,9 @@
+# import ujson
+
 import json
 from .text_format_utils import generate_formatted_string, delete_empty_tags
-import torch
+
+# import torch
 
 from .utils import get_tokenizer
 from .assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
@@ -55,7 +58,7 @@ def generate_assay_docs(examples, train_config):
     return final
 
 
-def tokenize_function(examples, train_config):
+def tokenize_function(examples, train_config, tokenizer):
     tokenizer = get_tokenizer(train_config["tokenizer_path"])
     # print(f"Process id: {os.getpid()}, {tokenizer}")
     return tokenizer(examples["text"], return_token_type_ids=False)
@@ -76,14 +79,12 @@ def process_str(str):
 def group_texts(examples, train_config):
     # Concatenate all texts.
     concatenated_examples = {
-        "input_ids": torch.as_tensor(
-            sum(
-                examples["input_ids"],
-                [get_tokenizer(train_config["tokenizer_path"]).eos_token_id],
-            )
+        "input_ids": sum(
+            examples["input_ids"],
+            [get_tokenizer(train_config["tokenizer_path"]).eos_token_id],
         ),
         # "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
-        "attention_mask": torch.as_tensor(sum(examples["attention_mask"], [1])),
+        "attention_mask": sum(examples["attention_mask"], [1]),
     }
 
     total_length = len(concatenated_examples[list(examples.keys())[0]])
@@ -108,8 +109,14 @@ def group_texts(examples, train_config):
 
 
 def process_dataset(
-    dataset, train_config, process_batch_sizes: tuple, is_eval=False, assay=True
+    dataset,
+    train_config,
+    accelerator,
+    process_batch_sizes: tuple,
+    is_eval=False,
+    assay=True,
 ):
+    tokenizer = get_tokenizer(train_config["tokenizer_path"])
     if assay:
         if is_eval:
             lm_datasets = dataset.map(
@@ -134,7 +141,7 @@ def process_dataset(
             tokenized_datasets = dataset.map(
                 tokenize_function,
                 batched=False,
-                fn_kwargs={"train_config": train_config},
+                fn_kwargs={"train_config": train_config, "tokenizer": tokenizer},
                 remove_columns=["text"],
                 batch_size=process_batch_sizes[0],
                 num_proc=4,
@@ -146,19 +153,22 @@ def process_dataset(
                 num_proc=4,
             )
         else:
-            dataset = dataset.map(process_str)
-            tokenized_datasets = dataset.map(
-                tokenize_function,
-                batched=True,
-                fn_kwargs={"train_config": train_config},
-                batch_size=process_batch_sizes[0],
-                remove_columns=["text"],
-            )
-            lm_datasets = tokenized_datasets.map(
-                group_texts,
-                batched=True,
-                batch_size=process_batch_sizes[1],
-                fn_kwargs={"train_config": train_config},
-            )
+            with accelerator.main_process_first():
+                dataset = dataset.map(process_str)
+            with accelerator.main_process_first():
+                tokenized_datasets = dataset.map(
+                    tokenize_function,
+                    batched=True,
+                    fn_kwargs={"train_config": train_config, "tokenizer": tokenizer},
+                    batch_size=process_batch_sizes[0],
+                    remove_columns=["text"],
+                )
+            with accelerator.main_process_first():
+                lm_datasets = tokenized_datasets.map(
+                    group_texts,
+                    batched=True,
+                    batch_size=process_batch_sizes[1],
+                    fn_kwargs={"train_config": train_config},
+                )
 
     return lm_datasets
