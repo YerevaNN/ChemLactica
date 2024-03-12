@@ -108,7 +108,7 @@ def format_key_value(key, value):
     special_tags = get_special_tags()
     formatted_string = ""
     if key == "related":
-        if len(value) > 5:
+        if len(value) > 10:
             value = random.sample(value, 5)
         for pair in value:
             formatted_string += f"{special_tags['similarity']['start']}{pair['SMILES']} {pair['similarity']}{special_tags['similarity']['end']}"  # noqa
