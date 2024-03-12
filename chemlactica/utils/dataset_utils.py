@@ -1,6 +1,8 @@
 # import ujson
+import contextlib
 
 import orjson
+import numpy as np
 import json
 from .text_format_utils import generate_formatted_string, delete_empty_tags
 
@@ -65,7 +67,7 @@ def tokenize_function(examples, train_config, tokenizer):
     return tokenizer(examples["text"], return_token_type_ids=False)
 
 
-def process_str(str):
+def process_str(str, random_number_generator):
     # it's wierd workaround but works for now
     try:
         compound = load_jsonl_line(str["text"])
@@ -73,7 +75,7 @@ def process_str(str):
         print(e)
         return ""
     compound = delete_empty_tags(compound)
-    str["text"] = generate_formatted_string(compound)
+    str["text"] = generate_formatted_string(compound, random_number_generator)
     return str
 
 
@@ -119,6 +121,12 @@ def process_dataset(
 ):
     tokenizer = get_tokenizer(train_config["tokenizer_path"])
     eos_token_id = tokenizer.eos_token_id
+    if accelerator is not None:
+        main_process_first = accelerator.main_process_first()
+    else:
+        main_process_first = contextlib.nullcontext()
+    rng = np.random.default_rng()
+
     if assay:
         if is_eval:
             lm_datasets = dataset.map(
@@ -155,9 +163,12 @@ def process_dataset(
                 num_proc=4,
             )
         else:
-            with accelerator.main_process_first():
-                dataset = dataset.map(process_str)
-            with accelerator.main_process_first():
+            with main_process_first:
+                dataset = dataset.map(
+                    process_str,
+                    fn_kwargs={"random_number_generator": rng},
+                )
+            with main_process_first:
                 tokenized_datasets = dataset.map(
                     tokenize_function,
                     batched=True,
@@ -165,7 +176,7 @@ def process_dataset(
                     batch_size=process_batch_sizes[0],
                     remove_columns=["text"],
                 )
-            with accelerator.main_process_first():
+            with main_process_first:
                 lm_datasets = tokenized_datasets.map(
                     group_texts,
                     batched=True,
