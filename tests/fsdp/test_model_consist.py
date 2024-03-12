@@ -38,6 +38,7 @@ class TestConsistencyOfModelOutput(unittest.TestCase):
             },
             script="chemlactica/train.py",
             script_args={
+                "train_type": "pretrain",
                 "from_pretrained": "facebook/galactica-125m",
                 "model_config": "125m",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
