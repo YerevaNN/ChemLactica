@@ -76,12 +76,12 @@ def process_str(str):
     return str
 
 
-def group_texts(examples, train_config):
+def group_texts(examples, train_config, eos_token_id):
     # Concatenate all texts.
     concatenated_examples = {
         "input_ids": sum(
             examples["input_ids"],
-            [get_tokenizer(train_config["tokenizer_path"]).eos_token_id],
+            [eos_token_id],
         ),
         # "token_type_ids": torch.as_tensor(sum(examples["token_type_ids"], [0])),
         "attention_mask": sum(examples["attention_mask"], [1]),
@@ -117,6 +117,7 @@ def process_dataset(
     assay=True,
 ):
     tokenizer = get_tokenizer(train_config["tokenizer_path"])
+    eos_token_id = tokenizer.eos_token_id
     if assay:
         if is_eval:
             lm_datasets = dataset.map(
@@ -149,7 +150,7 @@ def process_dataset(
             lm_datasets = tokenized_datasets.map(
                 group_texts,
                 batched=True,
-                fn_kwargs={"train_config": train_config},
+                fn_kwargs={"train_config": train_config, "eos_token_id": eos_token_id},
                 num_proc=4,
             )
         else:
@@ -168,7 +169,10 @@ def process_dataset(
                     group_texts,
                     batched=True,
                     batch_size=process_batch_sizes[1],
-                    fn_kwargs={"train_config": train_config},
+                    fn_kwargs={
+                        "train_config": train_config,
+                        "eos_token_id": eos_token_id,
+                    },
                 )
 
     return lm_datasets
