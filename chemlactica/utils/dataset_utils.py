@@ -1,5 +1,6 @@
 # import ujson
 
+import orjson
 import json
 from .text_format_utils import generate_formatted_string, delete_empty_tags
 
@@ -14,11 +15,11 @@ DIR_DATA_TYPES = {"computed", "assay"}
 
 def load_jsonl_line(jsonl_line):
     try:
-        _maybe_compound_dict = json.loads(jsonl_line)
+        _maybe_compound_dict = orjson.loads(jsonl_line)
         if isinstance(_maybe_compound_dict, dict):
             return _maybe_compound_dict
         else:
-            return json.loads(_maybe_compound_dict)
+            return orjson.loads(_maybe_compound_dict)
     except json.JSONDecodeError as e:
         raise ValueError(f"Error decoding JSON: {e}")
 
