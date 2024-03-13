@@ -9,7 +9,8 @@ def init_parser():
         metavar="TT",
         dest="train_type",
         choices=["pretrain", "sft", "isft", "dpo"],
-        required=True,
+        required=False,
+        default="pretrain",
         help="determining the type of training",
     )
     parser.add_argument(
