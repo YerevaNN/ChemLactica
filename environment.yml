@@ -216,6 +216,7 @@ dependencies:
       - multiprocess==0.70.15
       - ninja==1.11.1.1
       - nodeenv==1.8.0
+      - orjson==3.9.15
       - pandas==2.2.0
       - pillow==10.2.0
       - pre-commit==3.6.1
