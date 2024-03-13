@@ -1,15 +1,14 @@
-import torch
 import submitit
 from typing import Any, Dict
 import os
 import torch
 from torch._tensor import Tensor
 from torch.nn.modules import Module
-from torch.distributed.fsdp.fully_sharded_data_parallel import (
-    FullyShardedDataParallel as FSDP,
-)
+
+# from torch.distributed.fsdp.fully_sharded_data_parallel import (
+#     FullyShardedDataParallel as FSDP,
+# )
 from transformers import Trainer, TrainingArguments
-from chemlactica.utils.utils import get_tokenizer
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 from transformers.utils import is_torch_tpu_available
 from trl import IterativeSFTTrainer
@@ -28,6 +27,7 @@ class CustomArguments(TrainingArguments):
     )
     command: str = field(default=None)
     experiment_name: str = field(default=None)
+    train_config: dict = field(default=None)
 
 
 class CustomTrainer(Trainer):
@@ -137,7 +137,6 @@ class CustomTrainer(Trainer):
 
 
 class CustomIterativeSFTTrainer(IterativeSFTTrainer):
-
     def __init__(self, *args, **kwargs):
         # the number of samples to print when the training begins, for debugging purposes
         self.num_samples_to_print = 5

@@ -214,6 +214,7 @@ def train(
             command=command,
             slurm_eval=slurm_eval,
             experiment_name=experiment_name,
+            train_config=train_config,
             do_train=not evaluate_only,
             output_dir=checkpoints_dir,
             per_device_train_batch_size=train_batch_size,

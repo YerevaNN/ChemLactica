@@ -198,7 +198,7 @@ class ReproducabilityCallback(TrainerCallback):
 
         processed_dataset = process_dataset(
             dataset=dataset,
-            train_config={"block_size": 2048},
+            train_config=self.train_config,
             process_batch_sizes=(100, 100),
         )
 
