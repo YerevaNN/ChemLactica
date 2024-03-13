@@ -1,5 +1,4 @@
 # import ujson
-import contextlib
 
 import orjson
 import numpy as np
@@ -11,6 +10,9 @@ from .text_format_utils import generate_formatted_string, delete_empty_tags
 from .utils import get_tokenizer
 from .assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
 
+from accelerate import PartialState
+
+state = PartialState()
 
 DIR_DATA_TYPES = {"computed", "assay"}
 
@@ -114,17 +116,12 @@ def group_texts(examples, train_config, eos_token_id):
 def process_dataset(
     dataset,
     train_config,
-    accelerator,
     process_batch_sizes: tuple,
     is_eval=False,
     assay=True,
 ):
     tokenizer = get_tokenizer(train_config["tokenizer_path"])
     eos_token_id = tokenizer.eos_token_id
-    if accelerator is not None:
-        main_process_first = accelerator.main_process_first
-    else:
-        main_process_first = contextlib.nullcontext
     rng = np.random.default_rng()
 
     if assay:
@@ -167,12 +164,12 @@ def process_dataset(
                 num_proc=4,
             )
         else:
-            with main_process_first():
+            with state.main_process_first():
                 dataset = dataset.map(
                     process_str,
                     fn_kwargs={"random_number_generator": rng},
                 )
-            with main_process_first():
+            with state.main_process_first():
                 tokenized_datasets = dataset.map(
                     tokenize_function,
                     batched=True,
@@ -180,7 +177,7 @@ def process_dataset(
                     batch_size=process_batch_sizes[0],
                     remove_columns=["text"],
                 )
-            with main_process_first():
+            with state.main_process_first():
                 lm_datasets = tokenized_datasets.map(
                     group_texts,
                     batched=True,
