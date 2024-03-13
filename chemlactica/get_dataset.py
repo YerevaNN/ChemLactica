@@ -17,6 +17,7 @@ def get_dataset(
     evaluate_only,
     slurm_eval,
     shuffle_buffer_size,
+    accelerator,
 ):
     if train_type == "pretrain":
         assert len(training_data_dirs) == len(dir_data_types)
@@ -43,6 +44,7 @@ def get_dataset(
             dataset = process_dataset(
                 dataset=dataset,
                 train_config=train_config,
+                accelerator=accelerator,
                 process_batch_sizes=(50, 50),
                 is_eval=False,
                 assay=is_assay_split,
@@ -67,6 +69,7 @@ def get_dataset(
             processed_eval_dataset = process_dataset(
                 dataset=eval_dataset,
                 train_config=train_config,
+                accelerator=accelerator,
                 process_batch_sizes=(50, 50),
                 is_eval=True,
                 assay=False,

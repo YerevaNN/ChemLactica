@@ -264,6 +264,7 @@ def train(
             evaluate_only,
             slurm_eval,
             shuffle_buffer_size,
+            accelerator,
         )
         trainer = get_trainer(
             train_type, model, dataset, training_args, evaluate_only, slurm_eval
