@@ -122,9 +122,9 @@ def process_dataset(
     tokenizer = get_tokenizer(train_config["tokenizer_path"])
     eos_token_id = tokenizer.eos_token_id
     if accelerator is not None:
-        main_process_first = accelerator.main_process_first()
+        main_process_first = accelerator.main_process_first
     else:
-        main_process_first = contextlib.nullcontext()
+        main_process_first = contextlib.nullcontext
     rng = np.random.default_rng()
 
     if assay:
@@ -147,7 +147,11 @@ def process_dataset(
             )
     else:
         if is_eval:
-            dataset = dataset.map(process_str, num_proc=8)
+            dataset = dataset.map(
+                process_str,
+                num_proc=8,
+                fn_kwargs={"random_number_generator": rng},
+            )
             tokenized_datasets = dataset.map(
                 tokenize_function,
                 batched=False,
@@ -163,12 +167,12 @@ def process_dataset(
                 num_proc=4,
             )
         else:
-            with main_process_first:
+            with main_process_first():
                 dataset = dataset.map(
                     process_str,
                     fn_kwargs={"random_number_generator": rng},
                 )
-            with main_process_first:
+            with main_process_first():
                 tokenized_datasets = dataset.map(
                     tokenize_function,
                     batched=True,
@@ -176,7 +180,7 @@ def process_dataset(
                     batch_size=process_batch_sizes[0],
                     remove_columns=["text"],
                 )
-            with main_process_first:
+            with main_process_first():
                 lm_datasets = tokenized_datasets.map(
                     group_texts,
                     batched=True,
