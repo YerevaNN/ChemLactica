@@ -1,33 +1,22 @@
 import os
-
-# import sys
-from datasets import interleave_datasets
+import random
 import signal
 import traceback
-from chemlactica.utils.distributed_utils import get_experiment_hash
-from datetime import timedelta
-import random
-from chemlactica.utils.parseargs import init_parser
-import glob
 import multiprocessing
+from datetime import timedelta
 from contextlib import nullcontext
+
+import torch
 import numpy
 import transformers
 from transformers import (
-    # Trainer,
-    # TrainingArguments,
     ProgressCallback,
-    # get_polynomial_decay_schedule_with_warmup,
 )
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
-import torch
-from datasets import load_dataset
-from datasets.iterable_dataset import IterableDataset
-from chemlactica.utils.flop_counter import get_theoretical_peak_flops
 
-# from datasets.dataset_dict import IterableDatasetDict
-
+from chemlactica.config.create_train_config import model_train_configs
+from chemlactica.custom_trainer import CustomArguments
 from chemlactica.utils.callbacks import (
     CustomAimCallback,
     WPSCounterCallback,
@@ -38,18 +27,18 @@ from chemlactica.utils.callbacks import (
     JsonlDatasetResumeCallback,
     EarlyStoppingCallback,
 )
-from chemlactica.config.create_train_config import model_train_configs
-from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
 from chemlactica.utils.utils import (
     signal_handler,
     get_tokenizer_special_tokens,
     get_called_command,
     remove_extraneous_args,
 )
+from chemlactica.utils.parseargs import init_parser
 from chemlactica.utils.model_utils import load_model
-from chemlactica.custom_trainer import CustomTrainer, CustomArguments
-from chemlactica.utils.dataset_utils import process_dataset, DIR_DATA_TYPES
-from chemlactica.jsonl_dataset import samples_generator
+from chemlactica.utils.distributed_utils import get_experiment_hash
+from chemlactica.utils.flop_counter import get_theoretical_peak_flops
+from chemlactica.get_dataset import get_dataset
+from chemlactica.get_trainer import get_trainer
 
 torch.manual_seed(42)
 random.seed(42)
@@ -66,12 +55,12 @@ signal.signal(signal.SIGTERM, signal_handler)
 def train(
     command,
     slurm_eval,
+    train_type,
     from_pretrained,
     model_config,
     training_data_dirs,
     dir_data_types,
     valid_data_dir,
-    max_steps,
     scheduler_max_steps,
     eval_steps,
     save_steps,
@@ -84,6 +73,8 @@ def train(
     gradient_accumulation_steps,
     gradient_checkpointing,
     evaluate_only,
+    max_steps,
+    num_train_epochs=1,
     track=False,
     track_dir=None,
     check_reproducability=False,
@@ -105,7 +96,7 @@ def train(
     if os.path.isdir(from_pretrained):
         organization = checkpoint_path_components[-4]
         model_name = checkpoint_path_components[-3]
-        resume_from_checkpoint = from_pretrained
+        resume_from_checkpoint = from_pretrained if train_type == "pretrain" else False
     else:
         resume_from_checkpoint = False
         organization = checkpoint_path_components[-2]
@@ -130,7 +121,7 @@ def train(
         )
 
     trainer_callback_dict = {}
-    experiment_hash = get_experiment_hash(from_pretrained)
+    experiment_hash = get_experiment_hash(from_pretrained, train_type)
     experiment_hash_list = [experiment_hash]
     if track:
         if accelerator.is_main_process:
@@ -146,13 +137,11 @@ def train(
             experiment_hash_list = [aim_callback._run_hash]
 
     broadcast_object_list(experiment_hash_list)
-    print(f"Process {accelerator.process_index} aim hash: {experiment_hash_list[0]}")
     experiment_hash = experiment_hash_list[0]
+    logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
     if not valid_batch_size:
         valid_batch_size = train_batch_size
-
-    logger.info(f"Process {accelerator.process_index} aim hash: {experiment_hash}")
 
     # TODO: separate profiling
     if profile:
@@ -181,12 +170,13 @@ def train(
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
 
-    trainer_callback_dict["early stop callback"] = EarlyStoppingCallback(
-        early_stopping_steps=(max_steps)
-    )
+    if train_type == "pretrain":
+        trainer_callback_dict["early stop callback"] = EarlyStoppingCallback(
+            early_stopping_steps=(max_steps)
+        )
+        trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
 
-    trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
-    if check_reproducability:
+    if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
             model_config, flash_attn
         )
@@ -200,7 +190,7 @@ def train(
 
     with multiprocessing.Manager() if accelerator.is_main_process else nullcontext() as manager:
         shared_jsonl_files = None
-        if accelerator.is_main_process:
+        if accelerator.is_main_process and train_type == "pretrain":
             shared_jsonl_files = manager.dict()
             trainer_callback_dict[
                 "json_dataset_resume_callback"
@@ -212,6 +202,7 @@ def train(
             f"{model_name}",
             experiment_hash,
         )
+        logger.info(f"Checkpoint dir: {checkpoints_dir}")
         accelerator.print("resuming from checkpoint:", resume_from_checkpoint)
 
         if not scheduler_max_steps:
@@ -237,10 +228,13 @@ def train(
             weight_decay=train_config["weight_decay"],
             adam_beta1=train_config["adam_beta1"],
             adam_beta2=train_config["adam_beta2"],
-            warmup_steps=train_config["warmup_steps"],
+            warmup_steps=train_config["warmup_steps"]
+            if train_type == "pretrain"
+            else 0,
             max_grad_norm=train_config["global_gradient_norm"],
             evaluation_strategy="steps",
             max_steps=scheduler_max_steps,
+            num_train_epochs=num_train_epochs,
             eval_steps=eval_steps,
             save_steps=save_steps,
             dataloader_drop_last=True,
@@ -260,74 +254,21 @@ def train(
             # load_best_model=True
         )
 
-        # print("TRAINING directories", training_data_dirs, dir_data_types)
-        assert len(training_data_dirs) == len(dir_data_types)
-        train_dataset_dict = {}
-        print("---Training dataset names---")
-        for i, (training_data_dir, dir_data_type) in enumerate(
-            zip(training_data_dirs, dir_data_types)
-        ):
-            if dir_data_type.lower() not in DIR_DATA_TYPES:
-                raise ValueError(
-                    f"""Unknown data type {dir_data_type},
-                    the following data types are supported: {DIR_DATA_TYPES}"""
-                )
-            training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-            ds_name = f"{dir_data_type}_{i}"
-            is_assay_split = "assay" in dir_data_type
-            dataset = IterableDataset.from_generator(
-                samples_generator,
-                gen_kwargs={
-                    "files": training_data_files,
-                    "shared_jsonl_files": shared_jsonl_files,
-                },
-            )
-            dataset = process_dataset(
-                dataset=dataset,
-                train_config=train_config,
-                accelerator=accelerator,
-                process_batch_sizes=(50, 50),
-                is_eval=False,
-                assay=is_assay_split,
-            )
-            if is_assay_split:
-                dataset.shuffle(buffer_size=shuffle_buffer_size)
-            print(f"Dataset {i}: {ds_name}")
-            train_dataset_dict[ds_name] = dataset
-
-        valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-
-        train_dataset = list(train_dataset_dict.values())
-        if len(train_dataset) > 1:
-            train_dataset = interleave_datasets(train_dataset)
-        else:
-            train_dataset = train_dataset[0]
-
-        if evaluate_only or not slurm_eval:
-            eval_dataset = load_dataset(
-                "text", data_files={"validation": valid_data_files}, streaming=False
-            )
-            processed_eval_dataset = process_dataset(
-                dataset=eval_dataset,
-                train_config=train_config,
-                process_batch_sizes=(50, 50),
-                is_eval=True,
-                assay=False,
-            )
-        else:
-            processed_eval_dataset = None
-
-        trainer = CustomTrainer(
-            model=model,
-            args=training_args,
-            compute_metrics=compute_metrics,
-            train_dataset=train_dataset if not evaluate_only else None,
-            eval_dataset=processed_eval_dataset["validation"]
-            if not evaluate_only or slurm_eval
-            else None,
-            # optimizers=[optimizer, lr_scheduler],
-            preprocess_logits_for_metrics=preprocess_logits_for_metrics,
+        dataset = get_dataset(
+            train_type,
+            training_data_dirs,
+            valid_data_dir,
+            dir_data_types,
+            train_config,
+            shared_jsonl_files,
+            evaluate_only,
+            slurm_eval,
+            shuffle_buffer_size,
         )
+        trainer = get_trainer(
+            train_type, model, dataset, training_args, evaluate_only, slurm_eval
+        )
+
         trainer.remove_callback(ProgressCallback)
         for additional_callback in list(trainer_callback_dict.values()):
             trainer.add_callback(additional_callback)

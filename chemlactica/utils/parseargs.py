@@ -4,6 +4,15 @@ import argparse
 def init_parser():
     parser = argparse.ArgumentParser(description="none")
     parser.add_argument(
+        "--train_type",
+        type=str,
+        metavar="TT",
+        dest="train_type",
+        choices=["pretrain", "sft", "isft", "dpo"],
+        required=True,
+        help="determining the type of training",
+    )
+    parser.add_argument(
         "--from_pretrained",
         type=str,
         metavar="FP",
@@ -48,8 +57,17 @@ def init_parser():
         type=int,
         metavar="MS",
         dest="max_steps",
-        required=True,
+        required=False,
+        default=-1,
         help="the number of steps to train (overrides the n_epochs)",
+    )
+    parser.add_argument(
+        "--num_train_epochs",
+        type=int,
+        metavar="MS",
+        dest="num_train_epochs",
+        required=False,
+        help="the number of epochs to train",
     )
     parser.add_argument(
         "--scheduler_max_steps",
