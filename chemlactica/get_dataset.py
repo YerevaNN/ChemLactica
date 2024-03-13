@@ -17,6 +17,7 @@ def get_dataset(
     evaluate_only,
     slurm_eval,
     shuffle_buffer_size,
+    accelerator,
 ):
     if train_type == "pretrain":
         assert len(training_data_dirs) == len(dir_data_types)
