@@ -108,7 +108,7 @@ def format_key_value(key, value, rng):
     if key == "related":
         if len(value) > 10:
             # value = random.sample(value, 5)
-            value = rng.choice(value, size=5, replace=False, shuffle=False)
+            value = rng.choice(value, size=10, replace=False, shuffle=False)
         for pair in value:
             formatted_string += f"{SPECIAL_TAGS['similarity']['start']}{pair['SMILES']} {pair['similarity']}{SPECIAL_TAGS['similarity']['end']}"  # noqa
     elif key == "experimental":
