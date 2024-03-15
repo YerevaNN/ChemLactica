@@ -1,6 +1,7 @@
 import json
 from .text_format_utils import generate_formatted_string, delete_empty_tags
 import torch
+from chemlactica.utils.text_format_utils import get_special_tags
 
 from .utils import get_tokenizer
 from .assay_doc_utils import get_compound_assay_docs, process_incomplete_docs
@@ -164,12 +165,31 @@ def process_dataset(
     return lm_datasets
 
 
-def sft_formatting_prompts_func(example):
-    output_texts = []
-    for i in range(len(example["smiles"])):
-        text = (
-            f"[START_SMILES]{example['smiles'][i]}[END_SMILES]"
-            f"[PROPERTY]activity {round(example['activity'][i], 2)}[/PROPERTY]"
-        )
-        output_texts.append(text)
-    return output_texts
+def prepare_startend_tags_from_csv_column_name(column_name):
+    propert_name = column_name.split(".")[0]
+    if propert_name == "START_SMILES":
+        end_tag = "[END_SMILES]"
+    else:
+        end_tag = f"[/{propert_name}]"
+    
+    start_tag = f"[{propert_name}]"
+    return start_tag, end_tag
+
+
+def sft_formatting_samples(examples):
+    column_names = list(examples.keys())
+    column_names.remove("index")
+    samples_len = len(examples[column_names[0]])
+    
+    formatted_samples = ["</s>" for _ in range(samples_len)]
+    for column_name in column_names:
+        
+        # make sure that all the values are complete and have the same length
+        assert samples_len == len(examples[column_name])
+        
+        start_tag, end_tag = prepare_startend_tags_from_csv_column_name(column_name)
+        for i in range(samples_len):
+            if examples[column_name][i]:
+                formatted_samples[i] += f"{start_tag}{examples[column_name][i]}{end_tag}"
+
+    return formatted_samples

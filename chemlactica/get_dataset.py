@@ -76,6 +76,6 @@ def get_dataset(
         dataset = {"train": train_dataset, "validation": processed_eval_dataset}
 
     elif train_type == "sft":
-        dataset = load_dataset(training_data_dirs[0])
+        dataset = load_dataset("csv", data_files={"train": training_data_dirs[0], "validation": training_data_dirs[0]})
 
     return dataset
