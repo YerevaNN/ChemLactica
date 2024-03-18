@@ -46,7 +46,6 @@ numpy.random.seed(42)
 logger = logging.get_logger("transformers")
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "caching_allocator"
-os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
@@ -188,9 +187,9 @@ def train(
 
     accelerator.wait_for_everyone()
 
-    with multiprocessing.Manager() if accelerator.is_main_process else nullcontext() as manager:
+    with multiprocessing.Manager() as manager:
         shared_jsonl_files = None
-        if accelerator.is_main_process and train_type == "pretrain":
+        if train_type == "pretrain":
             shared_jsonl_files = manager.dict()
             trainer_callback_dict[
                 "json_dataset_resume_callback"
