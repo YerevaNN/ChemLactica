@@ -1,10 +1,13 @@
 import os
 import sys
 import yaml
+import shutil
 from datetime import datetime
 import submitit
 
 use_accelerate = True
+fresh_copy = True
+root_path = ""
 num_gpus = 2
 model_name = "galactica"
 model_size = "125m"
@@ -57,9 +60,9 @@ cli_arguments = {
 
 
 def get_accelerate_config_file(root_path):
-    relative_path = "chemlactica/config/accelerate_config.yaml"
+    relative_path = "./config/accelerate_config.yaml"
     defaults_full_path = os.path.join(root_path, relative_path)
-    custom_relative_path = "chemlactica/config/accelerate_config_custom.yaml"
+    custom_relative_path = "./config/accelerate_config_custom.yaml"
     custom_full_path = os.path.join(root_path, custom_relative_path)
 
     with open(defaults_full_path, "r") as infile:
@@ -74,36 +77,45 @@ def get_accelerate_config_file(root_path):
     return custom_full_path
 
 
+def get_command(snapshot_path, use_accelerate):
+    python_executable = sys.executable
+    command = [python_executable]
+    if use_accelerate:
+        accelerate_path = get_accelerate_config_file(snapshot_path)
+        command.extend(
+            f"-m accelerate.commands.launch --config_file {accelerate_path}".split(" ")
+        )
+    command.append(f"{snapshot_path}/train.py")
+    for x, y in cli_arguments.items():
+        if isinstance(y, bool):
+            if y:
+                command.append(f"--{x}")
+        else:
+            command.append(f"--{x}={y}")
+
+    print(f'command being executed: {" ".join(command)}')
+    return command
+
+
 if __name__ == "__main__":
-    snapshot_path = (
-        "/raid/chem/rsyncsnapshots/"
-        f"{model_name}-{model_size}-{train_type}-{datetime.now().strftime('%Y-%m-%d-%H:%M')}"
-    )
+    train_name = "_".join([model_name, model_size, train_type])
+    print("train_name: ", train_name)
+
+    if fresh_copy:
+        snapshot_path = (
+            "/raid/chem/rsyncsnapshots/"
+            f"{train_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M')}"
+        )
+        os.makedirs(snapshot_path, exist_ok=True)
+        shutil.copytree("./chemlactica", snapshot_path)
+    else:
+        snapshot_path = root_path
     print("snapshot path: ", snapshot_path)
 
-    with submitit.helpers.RsyncSnapshot(snapshot_dir=snapshot_path):
-        python_executable = sys.executable
-        command = [python_executable]
+    command = get_command(snapshot_path, use_accelerate)
 
-        if use_accelerate:
-            accelerate_path = get_accelerate_config_file(snapshot_path)
-            command.extend(
-                f"-m accelerate.commands.launch --config_file {accelerate_path}".split(
-                    " "
-                )
-            )
-
-        command.append("chemlactica/train.py")
-        for x, y in cli_arguments.items():
-            if isinstance(y, bool):
-                if y:
-                    command.append(f"--{x}")
-            else:
-                command.append(f"--{x}={y}")
-        print(f'command being executed: {" ".join(command)}')
-
-        executor = submitit.AutoExecutor(folder="log_test/%j")
-        executor.update_parameters(**slurm_params)
-        function = submitit.helpers.CommandFunction(command, env=env_variables)
-        job = executor.submit(function)
-        print(job.result())
+    executor = submitit.AutoExecutor(folder="log_test/%j")
+    executor.update_parameters(**slurm_params)
+    function = submitit.helpers.CommandFunction(command, env=env_variables)
+    job = executor.submit(function)
+    print(job.result())

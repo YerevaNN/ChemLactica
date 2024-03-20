@@ -85,7 +85,7 @@ def load_model(
     from_pretrained: str,
     use_flash_attn=True,
     dtype=None,
-    train_config=None,
+    model_config=None,
     auth_token=None,
     gradient_checkpointing=True,
 ):
@@ -93,13 +93,13 @@ def load_model(
     if from_pretrained == "small_opt":
         return OPTForCausalLM(
             OPTConfig(
-                vocab_size=train_config["vocab_size"],
-                hidden_size=train_config["hidden_size"],
-                num_hidden_layers=train_config["num_hidden_layers"],
-                ffn_dim=train_config["ffn_dim"],
-                max_position_embeddings=train_config["max_position_embeddings"],
-                num_attention_heads=train_config["num_attention_heads"],
-                word_embed_proj_dim=train_config["word_sembed_proj_dim"],
+                vocab_size=model_config["vocab_size"],
+                hidden_size=model_config["hidden_size"],
+                num_hidden_layers=model_config["num_hidden_layers"],
+                ffn_dim=model_config["ffn_dim"],
+                max_position_embeddings=model_config["max_position_embeddings"],
+                num_attention_heads=model_config["num_attention_heads"],
+                word_embed_proj_dim=model_config["word_sembed_proj_dim"],
             )
         )
     if "galactica" in from_pretrained.lower():
@@ -119,7 +119,7 @@ def load_model(
             from_pretrained,
             torch_dtype=dtype,
             attn_implementation=attn_implementation,
-            sliding_window=train_config["sliding_window"],
+            sliding_window=model_config["sliding_window"],
         )
 
     if gradient_checkpointing:

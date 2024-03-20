@@ -1,7 +1,9 @@
 import os
 import json
+import yaml
 from transformers import AutoTokenizer
 from functools import cache
+from config.default_train_config import TrainConfig, ModelConfig
 
 
 default_tokenizer_path = "chemlactica/tokenizer/ChemLacticaTokenizer66"
@@ -124,3 +126,17 @@ if __name__ == "__main__":
     # print('*'*20)
     # print(prompt)
     # print(tokenizer.encode(prompt))
+
+
+def get_model_train_config(train_config_name):
+    model_config = ModelConfig()
+    train_config = TrainConfig()
+    root_path = "/".join(os.path.abspath(__file__).split("/")[:-2])
+    path = f"{root_path}/config/config_yamls/{train_config_name}_config.yaml"
+    with open(path, "r") as infile:
+        custom_config = yaml.full_load(infile)
+    for k, v in custom_config["model_config"].items():
+        model_config.k = v
+    for k, v in custom_config["train_config"].items():
+        train_config.k = v
+    return model_config, train_config
