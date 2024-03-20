@@ -259,6 +259,7 @@ def train(
             valid_data_dir,
             dir_data_types,
             train_config,
+            model_config,
             shared_jsonl_files,
             evaluate_only,
             slurm_eval,

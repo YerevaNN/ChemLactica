@@ -13,6 +13,7 @@ def get_dataset(
     valid_data_dir,
     dir_data_types,
     train_config,
+    model_config,
     shared_jsonl_files,
     evaluate_only,
     slurm_eval,
@@ -44,6 +45,7 @@ def get_dataset(
             dataset = process_dataset(
                 dataset=dataset,
                 train_config=train_config,
+                model_config=model_config,
                 process_batch_sizes=(50, 50),
                 is_eval=False,
                 assay=is_assay_split,
@@ -68,6 +70,7 @@ def get_dataset(
             processed_eval_dataset = process_dataset(
                 dataset=eval_dataset,
                 train_config=train_config,
+                model_config=model_config,
                 process_batch_sizes=(50, 50),
                 is_eval=True,
                 assay=False,
