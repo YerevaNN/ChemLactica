@@ -20,6 +20,9 @@ model_train_configs["125m"]["max_learning_rate"] = 2e-5  # used for sft training
 model_train_configs["125m"][
     "tokenizer_path"
 ] = "chemlactica/tokenizer/ChemLacticaTokenizer66"
+model_train_configs["small_opt"][
+    "tokenizer_path"
+] = "chemlactica/tokenizer/ChemLacticaTokenizer66"
 model_train_configs["1.3b"][
     "tokenizer_path"
 ] = "chemlactica/tokenizer/ChemLacticaTokenizer66"

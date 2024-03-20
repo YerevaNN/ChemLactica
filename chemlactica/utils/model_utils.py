@@ -99,7 +99,7 @@ def load_model(
                 ffn_dim=train_config["ffn_dim"],
                 max_position_embeddings=train_config["max_position_embeddings"],
                 num_attention_heads=train_config["num_attention_heads"],
-                word_embed_proj_dim=train_config["word_sembed_proj_dim"],
+                word_embed_proj_dim=train_config["word_embed_proj_dim"],
             )
         )
     if "galactica" in from_pretrained.lower():
