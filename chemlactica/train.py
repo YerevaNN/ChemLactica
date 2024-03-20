@@ -57,7 +57,7 @@ def train(
     slurm_eval,
     train_type,
     from_pretrained,
-    model_config,
+    model_config_name,
     training_data_dirs,
     dir_data_types,
     valid_data_dir,
@@ -91,7 +91,7 @@ def train(
         kwargs_handlers=[kwargs], log_with="all", project_dir=track_dir
     )
 
-    model_config, train_config = get_model_train_config(model_config)
+    model_config, train_config = get_model_train_config(model_config_name)
     checkpoint_path_components = from_pretrained.split(os.path.sep)
     if os.path.isdir(from_pretrained):
         organization = checkpoint_path_components[-4]
@@ -178,7 +178,7 @@ def train(
 
     if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
-            model_config, flash_attn
+            train_config, flash_attn
         )
 
     total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)

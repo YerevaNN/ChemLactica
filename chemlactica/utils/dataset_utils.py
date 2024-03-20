@@ -28,9 +28,9 @@ def load_jsonl_line(jsonl_line):
         raise ValueError(f"Error decoding JSON: {e}")
 
 
-def generate_assay_docs(examples, train_config):
-    tokenizer = get_tokenizer(train_config["tokenizer_path"])
-    MODEL_CONTEXT_LENGTH = train_config["block_size"]
+def generate_assay_docs(examples, train_config, model_config):
+    tokenizer = get_tokenizer(train_config.tokenizer_path)
+    MODEL_CONTEXT_LENGTH = model_config.block_size
     final = {
         "input_ids": [],
         # "token_type_ids": [],
@@ -64,7 +64,7 @@ def generate_assay_docs(examples, train_config):
 
 
 def tokenize_function(examples, train_config, tokenizer):
-    tokenizer = get_tokenizer(train_config["tokenizer_path"])
+    tokenizer = get_tokenizer(train_config.tokenizer_path)
     # print(f"Process id: {os.getpid()}, {tokenizer}")
     return tokenizer(examples["text"], return_token_type_ids=False)
 
@@ -81,7 +81,7 @@ def process_str(str, random_number_generator):
     return str
 
 
-def group_texts(examples, train_config, eos_token_id):
+def group_texts(examples, model_config, eos_token_id):
     # Concatenate all texts.
     concatenated_examples = {
         "input_ids": sum(
@@ -95,14 +95,12 @@ def group_texts(examples, train_config, eos_token_id):
     total_length = len(concatenated_examples[list(examples.keys())[0]])
     # We drop the small remainder,
     # we could add padding if the model supported it instead of this drop.
-    total_length = (total_length // train_config["block_size"]) * train_config[
-        "block_size"
-    ]
+    total_length = (total_length // model_config.block_size) * model_config.block_size
     # Split by chunks of max_len.
     result = {
         k: [
-            t[i : i + train_config["block_size"]]  # noqa
-            for i in range(0, total_length, train_config["block_size"])
+            t[i : i + model_config.block_size]  # noqa
+            for i in range(0, total_length, model_config.block_size)
         ]
         for k, t in concatenated_examples.items()
         # k : t[:total_length].view(-1, train_config["block_size"])
@@ -116,11 +114,12 @@ def group_texts(examples, train_config, eos_token_id):
 def process_dataset(
     dataset,
     train_config,
+    model_config,
     process_batch_sizes: tuple,
     is_eval=False,
     assay=True,
 ):
-    tokenizer = get_tokenizer(train_config["tokenizer_path"])
+    tokenizer = get_tokenizer(train_config.tokenizer_path)
     eos_token_id = tokenizer.eos_token_id
     rng = np.random.default_rng()
 
@@ -129,7 +128,7 @@ def process_dataset(
             lm_datasets = dataset.map(
                 generate_assay_docs,
                 batched=True,
-                fn_kwargs={"train_config": train_config},
+                fn_kwargs={"train_config": train_config, "model_config": model_config},
                 remove_columns=["text"],
                 batch_size=30,
                 num_proc=4,
@@ -138,7 +137,7 @@ def process_dataset(
             lm_datasets = dataset.map(
                 generate_assay_docs,
                 batched=True,
-                fn_kwargs={"train_config": train_config},
+                fn_kwargs={"train_config": train_config, "model_config": model_config},
                 remove_columns=["text"],
                 batch_size=30,
             )
@@ -160,7 +159,7 @@ def process_dataset(
             lm_datasets = tokenized_datasets.map(
                 group_texts,
                 batched=True,
-                fn_kwargs={"train_config": train_config, "eos_token_id": eos_token_id},
+                fn_kwargs={"model_config": model_config, "eos_token_id": eos_token_id},
                 num_proc=4,
             )
         else:
@@ -183,7 +182,7 @@ def process_dataset(
                     batched=True,
                     batch_size=process_batch_sizes[1],
                     fn_kwargs={
-                        "train_config": train_config,
+                        "model_config": model_config,
                         "eos_token_id": eos_token_id,
                     },
                 )
