@@ -5,7 +5,7 @@ import logging
 
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-from dataset_utils import process_dataset
+from chemlactica.utils.dataset_utils import process_dataset
 from transformers import TrainingArguments
 from transformers.data.data_collator import default_data_collator
 from transformers.trainer_pt_utils import IterableDatasetShard
