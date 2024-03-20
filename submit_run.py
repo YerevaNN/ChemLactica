@@ -1,12 +1,11 @@
-import os
 import sys
-import yaml
-import shutil
+from contextlib import nullcontext
 from datetime import datetime
 import submitit
 
 use_accelerate = True
-fresh_copy = True
+rsync_enabled = False
+executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
 num_gpus = 2
 model_name = "galactica"
@@ -15,12 +14,12 @@ train_type = "sft"
 
 slurm_params = {
     "slurm_job_name": "submitit_test",
-    "timeout_min": 60,
+    "timeout_min": 10,
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
     "cpus_per_task": num_gpus * 8,
-    "mem_gb": num_gpus * 25.0 + 20.0,
+    "mem_gb": num_gpus * 15.0 + 20.0,
     "stderr_to_stdout": True,
 }
 
@@ -34,7 +33,7 @@ env_variables = {
 cli_arguments = {
     "train_type": train_type,
     "from_pretrained": "facebook/galactica-125m",
-    "model_config": "125m",
+    "model_config": "galactica_125m_sft",
     "dir_data_types": "computed",
     "training_data_dirs": "/auto/home/menuab/code/sft_data/ADME_HLM",
     "valid_data_dir": "",
@@ -46,10 +45,10 @@ cli_arguments = {
     # "valid_batch_size":,
     "dataloader_num_workers": 30,
     "experiment_name": "testing_submitit",
-    "checkpoints_root_dir": "/raid/chem/checkpoints/",
+    "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",
     "flash_attn": False,
     "track": True,
-    "track_dir": "/raid/chem/aim/",
+    "track_dir": "/nfs/dgx/raid/chem/aim/",
     # "profile":,
     # "profile_dir":,
     # "gradient_accumulation_steps":,
@@ -59,33 +58,17 @@ cli_arguments = {
 }
 
 
-def get_accelerate_config_file(root_path):
-    relative_path = "./config/accelerate_config.yaml"
-    defaults_full_path = os.path.join(root_path, relative_path)
-    custom_relative_path = "./config/accelerate_config_custom.yaml"
-    custom_full_path = os.path.join(root_path, custom_relative_path)
-
-    with open(defaults_full_path, "r") as infile:
-        accelerate_config_defaults = yaml.full_load(infile)
-
-    for k, v in accelerate_config.items():
-        accelerate_config_defaults[k] = v
-
-    with open(custom_full_path, "w") as outfile:
-        yaml.dump(accelerate_config_defaults, outfile, default_flow_style=False)
-
-    return custom_full_path
-
-
-def get_command(snapshot_path, use_accelerate):
+def get_command(use_accelerate):
     python_executable = sys.executable
     command = [python_executable]
     if use_accelerate:
-        accelerate_path = get_accelerate_config_file(snapshot_path)
+        accelerate_path = "chemlactica/config/accelerate_config.yaml"
         command.extend(
             f"-m accelerate.commands.launch --config_file {accelerate_path}".split(" ")
         )
-    command.append(f"{snapshot_path}/train.py")
+        for k, v in accelerate_config.items():
+            command.append(f"--{k}={v}")
+    command.append("chemlactica/train.py")
     for x, y in cli_arguments.items():
         if isinstance(y, bool):
             if y:
@@ -97,25 +80,39 @@ def get_command(snapshot_path, use_accelerate):
     return command
 
 
+def get_conditional_context_manager(rsync_enabled, snapshot_path):
+    if rsync_enabled:
+        yield submitit.helpers.RsyncSnapshot(snapshot_path)
+    else:
+        yield nullcontext()
+
+
+def get_executor(executor_name, logs_path):
+    if executor_name == "slurm":
+        executor = submitit.AutoExecutor(folder=logs_path)
+    elif executor_name == "local":
+        executor = submitit.local.local.LocalExecutor(folder=logs_path)
+    return executor
+
+
 if __name__ == "__main__":
     train_name = "_".join([model_name, model_size, train_type])
+    logs_path = "/nfs/dgx/raid/chem/submitit_logs/%j"
+    snapshot_path = (
+        "/nfs/dgx/raid/chem/rsyncsnapshots/"
+        f"{train_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M')}"
+    )
     print("train_name: ", train_name)
-
-    if fresh_copy:
-        snapshot_path = (
-            "/raid/chem/rsyncsnapshots/"
-            f"{train_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M')}"
-        )
-        os.makedirs(snapshot_path, exist_ok=True)
-        shutil.copytree("./chemlactica", snapshot_path)
-    else:
-        snapshot_path = root_path
+    print("logs_path: ", logs_path)
     print("snapshot path: ", snapshot_path)
 
-    command = get_command(snapshot_path, use_accelerate)
-
-    executor = submitit.AutoExecutor(folder="log_test/%j")
-    executor.update_parameters(**slurm_params)
-    function = submitit.helpers.CommandFunction(command, env=env_variables)
-    job = executor.submit(function)
-    print(job.result())
+    context_manager = get_conditional_context_manager(
+        rsync_enabled=rsync_enabled, path=snapshot_path
+    )
+    with context_manager:
+        command = get_command(snapshot_path, use_accelerate)
+        executor = get_executor(executor_name, logs_path)
+        executor.update_parameters(**slurm_params)
+        function = submitit.helpers.CommandFunction(command, env=env_variables)
+        job = executor.submit(function)
+        print(job.result())
