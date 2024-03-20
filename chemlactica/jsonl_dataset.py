@@ -68,7 +68,7 @@ def samples_generator(
                 line = f.readline()
                 counter = 0
                 while line:
-                    line = f.readline()
+                    state["position"] = f.tell()
                     if should_yield_on_current_rank(
                         counter,
                         distributed_state.num_processes,
@@ -77,6 +77,6 @@ def samples_generator(
                         returned = True
                         ret = format_sample(line)
                         yield ret
-                    state["position"] = f.tell()
-                    shared_jsonl_files[file] = state
                     counter = counter + 1
+                    shared_jsonl_files[file] = state
+                    line = f.readline()
