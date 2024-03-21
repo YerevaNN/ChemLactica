@@ -108,7 +108,7 @@ if __name__ == "__main__":
                 os.environ["CUDA_VISIBLE_DEVICES"] = gpus
                 print(f"NOTE: Using GPU(s) '{gpus}' for testing.")
                 loader = unittest.TestLoader()
-                tests = loader.discover("tests", pattern="test_env.py")
+                tests = loader.discover("tests", pattern="test_*.py")
                 testRunner = unittest.runner.TextTestRunner(verbosity=2)
                 test_results = testRunner.run(tests)
                 if (

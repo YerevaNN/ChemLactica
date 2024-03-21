@@ -131,9 +131,14 @@ if __name__ == "__main__":
 def get_model_train_config(train_config_name):
     model_config = ModelConfig()
     train_config = TrainConfig()
-    root_path = "/".join(os.path.abspath(__file__).split("/")[:-2])
-    path = f"{root_path}/config/config_yamls/{train_config_name}_config.yaml"
-    with open(path, "r") as infile:
+    config_path = os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "config",
+        "config_yamls",
+        f"{train_config_name}_config.yaml",
+    )
+    with open(config_path, "r") as infile:
         custom_config = yaml.full_load(infile)
     for k, v in custom_config["model_config"].items():
         model_config.k = v
