@@ -77,6 +77,7 @@ class CustomAimCallback(AimCallback):
         self._run[self._checkpoints_dict_name] = {}
         self.blocksize = blocksize
         self.start_time = None
+        self._run["repo_path"] = str(os.path.abspath(os.getcwd()))
 
     def on_train_begin(self, args, state, control, **kwargs):
         super().on_train_begin(args, state, control, **kwargs)

@@ -3,7 +3,7 @@ import json
 import yaml
 from transformers import AutoTokenizer
 from functools import cache
-from config.default_train_config import TrainConfig, ModelConfig
+from chemlactica.config.default_train_config import TrainConfig, ModelConfig
 
 
 default_tokenizer_path = "chemlactica/tokenizer/ChemLacticaTokenizer66"
