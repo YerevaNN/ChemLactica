@@ -180,3 +180,4 @@ checkpoints/
 src/live_prompt.ipynb
 src/*.ipynb
 *.sh
+submitit_logs/*
