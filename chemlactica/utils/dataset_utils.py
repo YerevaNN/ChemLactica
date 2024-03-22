@@ -29,7 +29,7 @@ def load_jsonl_line(jsonl_line):
 
 
 def generate_assay_docs(examples, train_config, model_config):
-    tokenizer = get_tokenizer(train_config.tokenizer_path)
+    tokenizer = get_tokenizer(model_config.tokenizer_path)
     MODEL_CONTEXT_LENGTH = model_config.block_size
     final = {
         "input_ids": [],
@@ -63,13 +63,13 @@ def generate_assay_docs(examples, train_config, model_config):
     return final
 
 
-def tokenize_function(examples, train_config, tokenizer):
-    tokenizer = get_tokenizer(train_config.tokenizer_path)
+def tokenize_function(examples, model_config, tokenizer):
+    tokenizer = get_tokenizer(model_config.tokenizer_path)
     # print(f"Process id: {os.getpid()}, {tokenizer}")
     return tokenizer(examples["text"], return_token_type_ids=False)
 
 
-def process_str(str, random_number_generator):
+def process_str(str, random_number_generator, model_config):
     # it's wierd workaround but works for now
     try:
         compound = load_jsonl_line(str["text"])
@@ -77,7 +77,9 @@ def process_str(str, random_number_generator):
         print(e)
         return ""
     compound = delete_empty_tags(compound)
-    str["text"] = generate_formatted_string(compound, random_number_generator)
+    str["text"] = generate_formatted_string(
+        compound, random_number_generator, model_config
+    )
     return str
 
 
@@ -119,7 +121,7 @@ def process_dataset(
     is_eval=False,
     assay=True,
 ):
-    tokenizer = get_tokenizer(train_config.tokenizer_path)
+    tokenizer = get_tokenizer(model_config.tokenizer_path)
     eos_token_id = tokenizer.eos_token_id
     rng = np.random.default_rng()
 
@@ -146,12 +148,15 @@ def process_dataset(
             dataset = dataset.map(
                 process_str,
                 num_proc=8,
-                fn_kwargs={"random_number_generator": rng},
+                fn_kwargs={
+                    "random_number_generator": rng,
+                    "model_config": model_config,
+                },
             )
             tokenized_datasets = dataset.map(
                 tokenize_function,
                 batched=False,
-                fn_kwargs={"train_config": train_config, "tokenizer": tokenizer},
+                fn_kwargs={"model_config": model_config, "tokenizer": tokenizer},
                 remove_columns=["text"],
                 batch_size=process_batch_sizes[0],
                 num_proc=4,
@@ -166,13 +171,16 @@ def process_dataset(
             with state.main_process_first():
                 dataset = dataset.map(
                     process_str,
-                    fn_kwargs={"random_number_generator": rng},
+                    fn_kwargs={
+                        "random_number_generator": rng,
+                        "model_config": model_config,
+                    },
                 )
             with state.main_process_first():
                 tokenized_datasets = dataset.map(
                     tokenize_function,
                     batched=True,
-                    fn_kwargs={"train_config": train_config, "tokenizer": tokenizer},
+                    fn_kwargs={"model_config": model_config, "tokenizer": tokenizer},
                     batch_size=process_batch_sizes[0],
                     remove_columns=["text"],
                 )

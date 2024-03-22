@@ -5,6 +5,8 @@ from dataclasses import dataclass
 class ModelConfig:
     block_size: int = 2048
     vocab_size: int = 50000
+    separator_token: str = "</s>"
+    tokenizer_path: str = "chemlactica/tokenizer/ChemLacticaTokenizer66"
 
 
 @dataclass
@@ -19,7 +21,6 @@ class TrainConfig:
     max_learning_rate: float = 6.0e-4
     warmup_steps: int = 500
     weight_decay: float = 0.1
-    tokenizer_path: str = "chemlactica/tokenizer/ChemLacticaTokenizer66"
 
 
 @dataclass

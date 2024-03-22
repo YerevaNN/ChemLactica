@@ -5,15 +5,16 @@ from transformers import AutoTokenizer
 from functools import cache
 from chemlactica.config.default_train_config import TrainConfig, ModelConfig
 
-
-default_tokenizer_path = "chemlactica/tokenizer/ChemLacticaTokenizer66"
+default_tokenizer_path = (
+    "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/GemmaTokenizer"
+)
 
 
 @cache
 def get_start2end_tags_map(tokenizer_path: str = default_tokenizer_path):
     with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
         special_tokens_map = json.load(_f)
-    additional_tokens = special_tokens_map["additional_special_tokens"]
+    additional_tokens = special_tokens_map.get("additional_special_tokens", None)
     n = len(additional_tokens)
     assert (n & 1) == 0  # should be even, every opening tag needs a closing tag
     return {
@@ -21,10 +22,17 @@ def get_start2end_tags_map(tokenizer_path: str = default_tokenizer_path):
     } | {"[START_SMILES]": "[END_SMILES]"}
 
 
-def get_tokenizer_special_tokens(tokenizer_path: str = default_tokenizer_path):
-    with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
-        special_tokens_json = json.load(_f)
-    return special_tokens_json["additional_special_tokens"]
+# def get_tokenizer_special_tokens(tokenizer_path: str = default_tokenizer_path):
+#     with open(os.path.join(tokenizer_path, "special_tokens_map.json"), "r") as _f:
+#         special_tokens_json = json.load(_f)
+#     return special_tokens_json["additional_special_tokens"]
+
+
+def get_tokenizer_length():
+    tokenizer = get_tokenizer()
+    tokenizer_len = len(tokenizer)
+    del tokenizer
+    return tokenizer_len
 
 
 @cache
@@ -88,6 +96,25 @@ def remove_extraneous_args(args):
         delattr(args, "accelerate_eval_config_file")
 
 
+def get_model_train_config(train_config_name):
+    model_config = ModelConfig()
+    train_config = TrainConfig()
+    config_path = os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "config",
+        "config_yamls",
+        f"{train_config_name}_config.yaml",
+    )
+    with open(config_path, "r") as infile:
+        custom_config = yaml.full_load(infile)
+        for k, v in custom_config["model_config"].items():
+            setattr(model_config, k, v)
+        for k, v in custom_config["train_config"].items():
+            setattr(train_config, k, v)
+    return model_config, train_config
+
+
 if __name__ == "__main__":
     # import sys
     import glob
@@ -126,22 +153,3 @@ if __name__ == "__main__":
     # print('*'*20)
     # print(prompt)
     # print(tokenizer.encode(prompt))
-
-
-def get_model_train_config(train_config_name):
-    model_config = ModelConfig()
-    train_config = TrainConfig()
-    config_path = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "config",
-        "config_yamls",
-        f"{train_config_name}_config.yaml",
-    )
-    with open(config_path, "r") as infile:
-        custom_config = yaml.full_load(infile)
-    for k, v in custom_config["model_config"].items():
-        model_config.k = v
-    for k, v in custom_config["train_config"].items():
-        train_config.k = v
-    return model_config, train_config
