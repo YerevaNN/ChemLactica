@@ -1,16 +1,19 @@
-from typing import List, Dict
+# from typing import List, Dict
 import os
 import gc
 import signal
-import traceback
 import argparse
 import random
 import glob
 import tqdm
 
-from chemlactica.config.create_finetine_config import model_fine_tune_configs
+from chemlactica.utils.utils import get_model_train_config
 from chemlactica.eval_metrics import compute_metrics, preprocess_logits_for_metrics
-from chemlactica.utils.utils import signal_handler, get_tokenizer_special_tokens, get_tokenizer
+from chemlactica.utils.utils import (
+    signal_handler,
+    get_tokenizer_special_tokens,
+    get_tokenizer,
+)
 from chemlactica.utils.dataset_utils import process_dataset
 from chemlactica.utils.model_utils import load_model
 from custom_trainer import CustomIterativeSFTTrainer
@@ -36,7 +39,8 @@ from utils.callbacks import (
 )
 
 from rdkit import RDLogger
-RDLogger.DisableLog('rdApp.*')
+
+RDLogger.DisableLog("rdApp.*")
 
 logger = logging.get_logger("transformers")
 
@@ -52,7 +56,7 @@ def set_seed(seed: int):
 
 def fine_tine(
     from_pretrained,
-    model_config,
+    model_config_name,
     valid_data_dir,
     rounds,
     steps_per_round,
@@ -79,7 +83,7 @@ def fine_tine(
     transformers.utils.logging.enable_explicit_format()
     set_seed(seed)
 
-    train_config = model_fine_tune_configs[model_config]
+    model_config, train_config = get_model_train_config(model_config_name)
     train_config["max_learning_rate"] = max_learning_rate
     model = load_model(
         from_pretrained,
@@ -129,7 +133,7 @@ def fine_tine(
         else None,
     )
     trainer_callback_dict["wps_counter_callback"] = wps_counter_callback
-    
+
     if check_reproducability:
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
             model_config, use_flash_attn
@@ -194,7 +198,7 @@ def fine_tine(
     print("Warmup steps", train_config["warmup_steps"])
 
     valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
-    
+
     eval_dataset = load_dataset(
         "text", data_files={"validation": valid_data_files}, streaming=False
     )
@@ -202,6 +206,7 @@ def fine_tine(
     processed_eval_dataset = process_dataset(
         dataset=eval_dataset,
         train_config=train_config,
+        model_config=model_config,
         process_batch_sizes=(50, 50),
         is_eval=True,
         assay=False,
@@ -221,17 +226,25 @@ def fine_tine(
         trainer.add_callback(additional_callback)
 
     # trainer.evaluate()
-    trainer.control = trainer.callback_handler.on_train_begin(training_args, trainer.state, trainer.control)
-    trainer.control = trainer.callback_handler.on_epoch_begin(training_args, trainer.state, trainer.control)
+    trainer.control = trainer.callback_handler.on_train_begin(
+        training_args, trainer.state, trainer.control
+    )
+    trainer.control = trainer.callback_handler.on_epoch_begin(
+        training_args, trainer.state, trainer.control
+    )
     for i in tqdm.tqdm(range(1, rounds + 1)):
         print(f"---------Rej Sampling ROUND {i}---------")
         if trainer.state.global_step == 0:
             generator_checkpoint_path = from_pretrained
         else:
-            generator_checkpoint_path = os.path.join(training_args.output_dir, f"checkpoint-{trainer.state.global_step}")
+            generator_checkpoint_path = os.path.join(
+                training_args.output_dir, f"checkpoint-{trainer.state.global_step}"
+            )
         print(f"Generator model: {generator_checkpoint_path}")
         # lead_molecule = "CC(=O)NCCNC(=O)c1cnn(-c2ccc(C)c(Cl)c2)c1C1CC1"
-        lead_molecule = "c1ccc(-c2cc(N3C[C@H]4[C@@H]5CC[C@@H](O5)[C@H]4C3)c3ccccc3[nH+]2)cc1"
+        lead_molecule = (
+            "c1ccc(-c2cc(N3C[C@H]4[C@@H]5CC[C@@H](O5)[C@H]4C3)c3ccccc3[nH+]2)cc1"
+        )
 
         # generate and save rejection sampled samples
         train_ds_name = generate_dataset(
@@ -243,34 +256,54 @@ def fine_tine(
             lead_molecule=lead_molecule,
             use_flash_attn=use_flash_attn,
             device=device,
-            seed=seed
+            seed=seed,
         )
         gc.collect()
         torch.cuda.empty_cache()
         # read the rejection sampled samples
         df_samples = pd.read_csv(train_ds_name)
         del df_samples["Unnamed: 0"]
-        optimized_molecule_mask = np.bitwise_and(df_samples['qed'].values >= 0.9, df_samples['morgan_sim_to_lead'].values >= 0.4)
+        optimized_molecule_mask = np.bitwise_and(
+            df_samples["qed"].values >= 0.9,
+            df_samples["morgan_sim_to_lead"].values >= 0.4,
+        )
         found_optimized_molecule = len(np.where(optimized_molecule_mask == True)[0]) > 0
         print(f"Found optimized molecule: {found_optimized_molecule}")
         if trainer_callback_dict.get("aim_callback"):
-            trainer_callback_dict["aim_callback"]._run.track(found_optimized_molecule, name='optimized in round')
+            trainer_callback_dict["aim_callback"]._run.track(
+                found_optimized_molecule, name="optimized in round"
+            )
 
         rej_sampled_samples = list(df_samples["samples"].values)
         random.shuffle(rej_sampled_samples)
         for i in tqdm.tqdm(range(len(rej_sampled_samples) // train_batch_size)):
-            batch_of_texts = rej_sampled_samples[i * train_batch_size:min((i+1) * train_batch_size, len(rej_sampled_samples))]
+            batch_of_texts = rej_sampled_samples[
+                i
+                * train_batch_size : min(
+                    (i + 1) * train_batch_size, len(rej_sampled_samples)
+                )
+            ]
             if batch_of_texts:
-                trainer.control = trainer.callback_handler.on_step_begin(training_args, trainer.state, trainer.control)
+                trainer.control = trainer.callback_handler.on_step_begin(
+                    training_args, trainer.state, trainer.control
+                )
                 trainer.step(texts=batch_of_texts)
-                trainer.control = trainer.callback_handler.on_step_end(training_args, trainer.state, trainer.control)
+                trainer.control = trainer.callback_handler.on_step_end(
+                    training_args, trainer.state, trainer.control
+                )
         trainer._save_checkpoint(model=None, trial=None)
-        trainer.control = trainer.callback_handler.on_save(training_args, trainer.state, trainer.control)
+        trainer.control = trainer.callback_handler.on_save(
+            training_args, trainer.state, trainer.control
+        )
         gc.collect()
         torch.cuda.empty_cache()
-    
-    trainer.control = trainer.callback_handler.on_epoch_end(training_args, trainer.state, trainer.control)
-    trainer.control = trainer.callback_handler.on_train_end(training_args, trainer.state, trainer.control)
+
+    trainer.control = trainer.callback_handler.on_epoch_end(
+        training_args, trainer.state, trainer.control
+    )
+    trainer.control = trainer.callback_handler.on_train_end(
+        training_args, trainer.state, trainer.control
+    )
 
 
 if __name__ == "__main__":
@@ -444,12 +477,7 @@ if __name__ == "__main__":
         type=str,
         required=True,
     )
-    parser.add_argument(
-        "--seed",
-        type=str,
-        required=False,
-        default=42
-    )
+    parser.add_argument("--seed", type=str, required=False, default=42)
 
     args = parser.parse_args()
     fine_tine(**args.__dict__)

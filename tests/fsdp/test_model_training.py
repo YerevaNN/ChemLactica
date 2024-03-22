@@ -44,7 +44,7 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "train_type": "pretrain",
                 "from_pretrained": "facebook/galactica-125m",
-                "model_config": "125m",
+                "model_config": "galactica_125m_pretrain",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'assay_train')}",
                 "dir_data_types": "assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
@@ -79,7 +79,7 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "train_type": "pretrain",
                 "from_pretrained": "facebook/galactica-125m",
-                "model_config": "125m",
+                "model_config": "galactica_125m_pretrain",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
                 "dir_data_types": "computed assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
@@ -114,7 +114,7 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "train_type": "pretrain",
                 "from_pretrained": "facebook/galactica-125m",
-                "model_config": "125m",
+                "model_config": "galactica_125m_pretrain",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
                 "dir_data_types": "computed assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
@@ -148,7 +148,7 @@ class TestModelTraining(unittest.TestCase):
             script_args={
                 "train_type": "pretrain",
                 "from_pretrained": "facebook/galactica-125m",
-                "model_config": "125m",
+                "model_config": "galactica_125m_pretrain",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
                 "dir_data_types": "computed assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",
@@ -179,7 +179,7 @@ class TestModelTraining(unittest.TestCase):
                 "from_pretrained": os.path.join(
                     TEST_DIR, "checkpoints/facebook/galactica-125m/none/checkpoint-20"
                 ),
-                "model_config": "125m",
+                "model_config": "galactica_125m_pretrain",
                 "training_data_dirs": f"{os.path.join(TD_PATH, 'comp_train')} {os.path.join(TD_PATH, 'assay_train')}",  # noqa
                 "dir_data_types": "computed assay",
                 "valid_data_dir": f"{os.path.join(TD_PATH, 'comp_valid')}",

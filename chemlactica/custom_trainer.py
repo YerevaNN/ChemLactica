@@ -27,7 +27,7 @@ class CustomArguments(TrainingArguments):
     )
     command: str = field(default=None)
     experiment_name: str = field(default=None)
-    train_config: dict = field(default=None)
+    # train_config: dict = field(default=None)
 
 
 class CustomTrainer(Trainer):
