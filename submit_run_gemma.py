@@ -5,9 +5,9 @@ import submitit
 
 use_accelerate = True
 rsync_enabled = False
-executor_name = "local"  # options are ["slurm", "local"]
+executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 2
+num_gpus = 6
 model_name = "gemma"
 model_size = "2b"
 train_type = "pretrain"
@@ -45,17 +45,17 @@ cli_arguments = {
     "eval_steps": 20,
     "save_steps": 10,
     "train_batch_size": 1,
-    # "valid_batch_size":,
+    # "valid_batch_size":,s
     "dataloader_num_workers": 2,
     # "experiment_name": "testing_submitit",
     "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",
-    "flash_attn": False,
-    "track": True,
-    "track_dir": "/nfs/dgx/raid/chem/aim/",
+    "flash_attn": True,
+    # "track": True,
+    # "track_dir": "/nfs/dgx/raid/chem/aim/",
     # "profile":,
     # "profile_dir":,
     # "gradient_accumulation_steps":,
-    "gradient_checkpointing": False,
+    # "gradient_checkpointing": False,
     # "evaluate_only":,
     # "check_reproducability":,
 }
