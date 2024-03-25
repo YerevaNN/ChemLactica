@@ -1,8 +1,5 @@
 from typing import List
 
-# import torch
-
-# from io import StringIO
 import os
 from accelerate.state import PartialState
 
@@ -25,23 +22,6 @@ def setup_generator(shared_jsonl_files, files):
             file_states[file] = jsonl_state
             print(f"loaded {file}: {jsonl_state['position']}")
     return file_states
-
-
-# def get_batch(file, state, chunk_size):
-#     with open(file) as f:
-#         f.seek(state["position"])
-#         batch = f.read(chunk_size)
-#         if not batch:
-#             raise StopIteration
-
-#         batch += f.readline()
-#         batch = batch.splitlines()
-
-#         # batch = [line.rstrip("\n") for line in batch]
-#         state["position"] = f.tell()
-#         batch_len = len(batch)
-#         state["line_number"] += batch_len
-#     return batch, batch_len, state
 
 
 def should_yield_on_current_rank(i, num_processes, process_index):
