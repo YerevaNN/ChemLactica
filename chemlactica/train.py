@@ -15,7 +15,6 @@ from transformers import (
 from accelerate import Accelerator, logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
 
-from chemlactica.config.create_train_config import model_train_configs
 from chemlactica.custom_trainer import CustomArguments
 from chemlactica.utils.callbacks import (
     CustomAimCallback,
@@ -35,6 +34,7 @@ from chemlactica.utils.utils import (
 )
 from chemlactica.utils.parseargs import init_parser
 from chemlactica.utils.model_utils import load_model
+from chemlactica.utils.utils import get_model_train_config
 from chemlactica.utils.distributed_utils import get_experiment_hash
 from chemlactica.utils.flop_counter import get_theoretical_peak_flops
 from chemlactica.get_dataset import get_dataset
@@ -56,7 +56,7 @@ def train(
     slurm_eval,
     train_type,
     from_pretrained,
-    model_config,
+    model_config_name,
     training_data_dirs,
     dir_data_types,
     valid_data_dir,
@@ -90,7 +90,7 @@ def train(
         kwargs_handlers=[kwargs], log_with="all", project_dir=track_dir
     )
 
-    train_config = model_train_configs[model_config]
+    model_config, train_config = get_model_train_config(model_config_name)
     checkpoint_path_components = from_pretrained.split(os.path.sep)
     if os.path.isdir(from_pretrained):
         organization = checkpoint_path_components[-4]
@@ -105,18 +105,18 @@ def train(
     model = load_model(
         from_pretrained,
         use_flash_attn=flash_attn,
-        train_config=train_config,
+        model_config=model_config,
         gradient_checkpointing=gradient_checkpointing,
         # auth_token=auth_token,
     )
 
-    special_tokens = get_tokenizer_special_tokens(train_config["tokenizer_path"])
+    special_tokens = get_tokenizer_special_tokens(train_config.tokenizer_path)
     print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
 
     if not resume_from_checkpoint:
         # if we are continuing training, embeddings already resized
         model.resize_token_embeddings(
-            train_config["vocab_size"] + len(special_tokens), pad_to_multiple_of=8
+            model_config.vocab_size + len(special_tokens), pad_to_multiple_of=8
         )
 
     trainer_callback_dict = {}
@@ -129,7 +129,7 @@ def train(
                 repo=track_dir,
                 experiment=experiment_name,
                 model=model,
-                blocksize=train_config["block_size"],
+                blocksize=model_config.block_size,
                 run_hash=experiment_hash if experiment_hash != "none" else None,
             )
             trainer_callback_dict["aim_callback"] = aim_callback
@@ -162,7 +162,7 @@ def train(
         trainer_callback_dict["profiller_callback"] = ProfCallback(prof)
 
     wps_counter_callback = WPSCounterCallback(
-        train_config["block_size"],
+        model_config.block_size,
         trainer_callback_dict.get("aim_callback")._run
         if trainer_callback_dict.get("aim_callback") is not None
         else None,
@@ -177,7 +177,7 @@ def train(
 
     if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
-            model_config, flash_attn
+            train_config, flash_attn
         )
 
     total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)
@@ -213,7 +213,7 @@ def train(
             command=command,
             slurm_eval=slurm_eval,
             experiment_name=experiment_name,
-            train_config=train_config,
+            # train_config=train_config,
             do_train=not evaluate_only,
             output_dir=checkpoints_dir,
             per_device_train_batch_size=train_batch_size,
@@ -224,14 +224,12 @@ def train(
             bf16_full_eval=True,
             fp16=False,
             logging_dir=track_dir,
-            learning_rate=train_config["max_learning_rate"],
-            weight_decay=train_config["weight_decay"],
-            adam_beta1=train_config["adam_beta1"],
-            adam_beta2=train_config["adam_beta2"],
-            warmup_steps=train_config["warmup_steps"]
-            if train_type == "pretrain"
-            else 0,
-            max_grad_norm=train_config["global_gradient_norm"],
+            learning_rate=train_config.max_learning_rate,
+            weight_decay=train_config.weight_decay,
+            adam_beta1=train_config.adam_beta1,
+            adam_beta2=train_config.adam_beta2,
+            warmup_steps=train_config.warmup_steps,
+            max_grad_norm=train_config.global_gradient_norm,
             evaluation_strategy="steps",
             max_steps=scheduler_max_steps,
             num_train_epochs=num_train_epochs,
@@ -260,6 +258,7 @@ def train(
             valid_data_dir,
             dir_data_types,
             train_config,
+            model_config,
             shared_jsonl_files,
             evaluate_only,
             slurm_eval,

@@ -25,7 +25,7 @@ def init_parser():
         "--model_config",
         type=str,
         metavar="MC",
-        dest="model_config",
+        dest="model_config_name",
         required=True,
         help="the model configuration to use",
     )

@@ -5,7 +5,6 @@ import glob
 import gc
 import json
 
-from chemlactica.config.create_train_config import model_train_configs
 from .dataset_utils import process_dataset
 from datasets import load_dataset
 from .model_utils import load_model
@@ -78,6 +77,7 @@ class CustomAimCallback(AimCallback):
         self._run[self._checkpoints_dict_name] = {}
         self.blocksize = blocksize
         self.start_time = None
+        self._run["repo_path"] = str(os.path.abspath(os.getcwd()))
 
     def on_train_begin(self, args, state, control, **kwargs):
         super().on_train_begin(args, state, control, **kwargs)
@@ -179,9 +179,9 @@ class EpochCallback(TrainerCallback):
 
 
 class ReproducabilityCallback(TrainerCallback):
-    def __init__(self, model_config, use_flash_attn=False):
+    def __init__(self, train_config, model_config, use_flash_attn=False):
+        self.train_config = train_config
         self.model_config = model_config
-        self.train_config = model_train_configs[model_config]
         self.use_flash_attn = use_flash_attn
 
     def on_save(self, args, state, control, model, **kwargs):
@@ -199,6 +199,7 @@ class ReproducabilityCallback(TrainerCallback):
         processed_dataset = process_dataset(
             dataset=dataset,
             train_config=self.train_config,
+            model_config=self.model_config,
             process_batch_sizes=(100, 100),
         )
 
