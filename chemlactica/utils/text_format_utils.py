@@ -74,6 +74,7 @@ SPECIAL_TAGS = {
     "VAR_VAL": {"start": "[VAR_VAL]", "end": "[/VAR_VAL]"},
     "ASSAY_NAME": {"start": "[ASSAY_NAME]", "end": "[/ASSAY_NAME]"},
     "ASSAY_DESC": {"start": "[ASSAY_DESC]", "end": "[/ASSAY_DESC]"},
+    "formula": {"start": "[FORMULA]", "end": "[/FORMULA]"},
 }
 
 
@@ -84,7 +85,7 @@ def delete_empty_tags(compound_json):
     return compound_json
 
 
-def generate_formatted_string(compound_json, rng):
+def generate_formatted_string(compound_json, rng, model_config):
     key_value_pairs = []
     if compound_json.get("SMILES") and rng.random() < 0.5:
         key = "SMILES"
@@ -96,7 +97,7 @@ def generate_formatted_string(compound_json, rng):
     for key in keys:
         key_value_pairs.append(format_key_value(key, compound_json[key], rng))
     compound_formatted_string = (
-        "".join(key_value_pairs) + "</s>"
+        "".join(key_value_pairs) + model_config.separator_token
     )  # get_tokenizer().eos_token
     return compound_formatted_string
 

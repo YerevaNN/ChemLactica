@@ -1,6 +1,7 @@
 import os
 import random
-import signal
+
+# import signal
 import traceback
 import multiprocessing
 from datetime import timedelta
@@ -27,8 +28,9 @@ from chemlactica.utils.callbacks import (
     EarlyStoppingCallback,
 )
 from chemlactica.utils.utils import (
-    signal_handler,
-    get_tokenizer_special_tokens,
+    # signal_handler,
+    # get_tokenizer_special_tokens,
+    get_tokenizer_length,
     get_called_command,
     remove_extraneous_args,
 )
@@ -46,10 +48,10 @@ numpy.random.seed(42)
 logger = logging.get_logger("transformers")
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "caching_allocator"
-os.environ["TOKENIZERS_PARALLELISM"] = "true"
+# os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
+# signal.signal(signal.SIGINT, signal_handler)
+# signal.signal(signal.SIGTERM, signal_handler)
 
 
 def train(
@@ -102,23 +104,23 @@ def train(
         organization = checkpoint_path_components[-2]
         model_name = checkpoint_path_components[-1]
 
-    # auth_token = os.environ["HF_TOKEN"]
+    auth_token = os.environ["HF_TOKEN"]
     model = load_model(
         from_pretrained,
         use_flash_attn=flash_attn,
         model_config=model_config,
         gradient_checkpointing=gradient_checkpointing,
-        # auth_token=auth_token,
+        auth_token=auth_token,
     )
 
-    special_tokens = get_tokenizer_special_tokens(train_config.tokenizer_path)
-    print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
+    # special_tokens = get_tokenizer_special_tokens(model_config.tokenizer_path)
+    # print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
+    tokenizer_length = get_tokenizer_length()
+    print(f"{tokenizer_length=}")
 
     if not resume_from_checkpoint:
         # if we are continuing training, embeddings already resized
-        model.resize_token_embeddings(
-            model_config.vocab_size + len(special_tokens), pad_to_multiple_of=8
-        )
+        model.resize_token_embeddings(tokenizer_length, pad_to_multiple_of=8)
 
     trainer_callback_dict = {}
     experiment_hash = get_experiment_hash(from_pretrained, train_type)
@@ -243,13 +245,13 @@ def train(
             # which has some conflict with saving checkpoints
             dataloader_num_workers=dataloader_num_workers,
             logging_steps=1,
-            gradient_checkpointing=gradient_checkpointing,
-            gradient_checkpointing_kwargs={"use_reentrant": False},
-            gradient_accumulation_steps=gradient_accumulation_steps,
+            # gradient_checkpointing=gradient_checkpointing,
+            # gradient_checkpointing_kwargs={"use_reentrant": False},
+            # gradient_accumulation_steps=gradient_accumulation_steps,
             # save_total_limit=4, in order for offline eval to work, we keep all of them for now
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type="linear",
-            optim="adamw_torch",
+            optim="paged_adamw_8bit",
             # load_best_model=True
         )
 
