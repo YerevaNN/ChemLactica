@@ -36,7 +36,7 @@ def get_tokenizer_length():
 
 
 @cache
-def get_tokenizer(tokenizer_path: str = default_tokenizer_path):
+def get_tokenizer(tokenizer_path):
     return create_tokenizer(tokenizer_path)
 
 

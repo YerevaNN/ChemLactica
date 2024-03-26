@@ -21,7 +21,6 @@ from transformers.trainer_callback import (
     ProgressCallback,
 )
 from transformers.training_args import TrainingArguments
-from chemlactica.utils.utils import get_tokenizer
 import accelerate
 from accelerate.logging import get_logger
 
@@ -340,10 +339,10 @@ class EarlyStoppingCallback(TrainerCallback):
 
 
 class SFTNumericalEval(TrainerCallback):
-    def __init__(self, dataset_test, aim) -> None:
+    def __init__(self, dataset, aim_callback) -> None:
         super().__init__()
-        self.dataset = dataset_test
-        self.aim = aim
+        self.dataset = dataset
+        self.aim = aim_callback
 
     def on_evaluate(
         self,
@@ -351,35 +350,30 @@ class SFTNumericalEval(TrainerCallback):
         state: TrainerState,
         control: TrainerControl,
         model,
-        train_dataloader,
+        tokenizer,
         **kwargs,
     ):
         super().on_evaluate(args, state, control, **kwargs)
-        tokenizer = get_tokenizer()
         model.eval()
         ground_truths, gens, diffs = [], [], []
-        invalids = 0
-        for sample in self.dataset:
+        for sample in self.dataset["validation"]:
             ground_truth = round(sample["activity"], 2)
             prompt = f"[START_SMILES]{sample['smiles']}[END_SMILES][PROPERTY]activity "
             prompt = tokenizer(prompt, return_tensors="pt").to(model.device)
             out = model.generate(prompt.input_ids, do_sample=False, max_length=100)
             out = tokenizer.batch_decode(out)[0]
             try:
-                gen = float(
-                    out[
-                        out.find("activity ")
-                        + len("activity "):out.find("[/PROPERTY]")
-                    ]
-                )
+                gen = out[
+                    out.find("activity ") + len("activity ") : out.find("[/PROPERTY]")
+                ]
+                gen = float(gen)
                 diff = abs(ground_truth - gen)
-                # print("GT:", ground_truth, "Gen:", gen, "diff:", round(diff,2), out )
                 ground_truths.append(ground_truth)
                 gens.append(gen)
                 diffs.append(diff)
             except KeyError:
-                invalids += 1
+                print(f"could not generate for {sample['smiles']}")
                 pass
         rmse = root_mean_squared_error(ground_truths, gens)
-        self.aim._run.track({"numerical_val_rmse": rmse}, epoch=state.epoch)
+        self.aim._run.track({"numerical eval rmse": rmse}, step=state.global_step)
         print(f"{rmse=}")

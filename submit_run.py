@@ -39,7 +39,7 @@ cli_arguments = {
     "training_data_dirs": "gayane/freesolv",
     "valid_data_dir": "",
     # "max_steps":120000,
-    "num_train_epochs": 40,
+    "num_train_epochs": 15,
     "eval_steps": 8,
     "save_steps": 8,
     "train_batch_size": 32,

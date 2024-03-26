@@ -252,7 +252,7 @@ def train(
             # save_total_limit=4, in order for offline eval to work, we keep all of them for now
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type="linear",
-            optim="paged_adamw_8bit",
+            optim="adamw_torch",
             # load_best_model=True
         )
 
@@ -267,14 +267,13 @@ def train(
             evaluate_only,
             slurm_eval,
             shuffle_buffer_size,
-            accelerator,
         )
         trainer = get_trainer(
             train_type, model, dataset, training_args, evaluate_only, slurm_eval
         )
         if train_type == "sft":
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
-                dataset.get("validation"), aim_callback
+                dataset, aim_callback
             )
 
         trainer.remove_callback(ProgressCallback)
