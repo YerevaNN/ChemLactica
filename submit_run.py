@@ -4,8 +4,6 @@ from datetime import datetime
 import submitit
 
 use_accelerate = True
-# set to false if experimenting locally, otherwise commit and
-# push all changes before running with rsync enabled
 rsync_enabled = False
 executor_name = "local"  # options are ["slurm", "local"]
 root_path = ""
@@ -13,6 +11,7 @@ num_gpus = 2
 model_name = "galactica"
 model_size = "125m"
 train_type = "sft"
+train_name = "_".join([model_name, model_size, train_type])
 
 slurm_params = {
     "slurm_job_name": "submitit_test",
@@ -35,7 +34,7 @@ env_variables = {
 cli_arguments = {
     "train_type": train_type,
     "from_pretrained": "facebook/galactica-125m",
-    "model_config": "galactica_125m_sft",
+    "model_config": train_name,
     "dir_data_types": "computed",
     "training_data_dirs": "/auto/home/menuab/code/sft_data/ADME_RLM",
     "valid_data_dir": "",
@@ -100,7 +99,6 @@ def get_executor(executor_name, logs_path):
 
 
 if __name__ == "__main__":
-    train_name = "_".join([model_name, model_size, train_type])
     logs_path = "submitit_logs/%j"
     logs_path = "/nfs/dgx/raid/chem/" + logs_path if rsync_enabled else logs_path
     repo_path = (

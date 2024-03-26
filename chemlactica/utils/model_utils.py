@@ -1,5 +1,11 @@
-from transformers import OPTForCausalLM, OPTConfig, MistralForCausalLM
-from .utils import get_tokenizer_special_tokens
+from transformers import (
+    OPTForCausalLM,
+    OPTConfig,
+    MistralForCausalLM,
+    AutoModelForCausalLM,
+)
+
+# from .utils import get_tokenizer_special_tokens
 
 import bitsandbytes as bnb
 
@@ -75,10 +81,10 @@ def select_attention_implementation(use_flash_attn):
         return "eager"
 
 
-def get_llama_token_count():
-    added_chem_token_count = len(get_tokenizer_special_tokens())
-    added_pad_token_count = 1
-    return added_chem_token_count + added_pad_token_count
+# def get_llama_token_count():
+#     added_chem_token_count = len(get_tokenizer_special_tokens())
+#     added_pad_token_count = 1
+#     return added_chem_token_count + added_pad_token_count
 
 
 def load_model(
@@ -120,6 +126,13 @@ def load_model(
             torch_dtype=dtype,
             attn_implementation=attn_implementation,
             sliding_window=model_config["sliding_window"],
+        )
+
+    if "gemma" in from_pretrained.lower():
+        model = AutoModelForCausalLM.from_pretrained(
+            from_pretrained,
+            torch_dtype=dtype,
+            attn_implementation=attn_implementation,
         )
 
     if gradient_checkpointing:
