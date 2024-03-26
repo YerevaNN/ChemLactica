@@ -1,4 +1,5 @@
 import torch
+import argparse
 import multiprocessing
 from datasets.iterable_dataset import IterableDataset
 from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM
@@ -32,7 +33,10 @@ def find_all_linear_names(model):
 
 
 if __name__ == "__main__":
-    # accelerator = Accelerator()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output_dir", type=str, default="test-gemma")
+    parser.add_argument("--tokenizer_path", type=str, required=True)
+    args = parser.parse_args()
     model_id = "google/gemma-2b"
 
     config = AutoConfig.from_pretrained(model_id)
@@ -45,7 +49,7 @@ if __name__ == "__main__":
 
     args = TrainingArguments(
         lr_scheduler_type="linear",
-        output_dir="./test-galore",
+        output_dir=args.output_dir,
         dataloader_pin_memory=True,
         dataloader_prefetch_factor=4,
         max_steps=100,
@@ -84,15 +88,17 @@ if __name__ == "__main__":
                 "shared_jsonl_files": shared_jsonl_files,
             },
         )
-        train_config = {
-            "tokenizer_path": "/mnt/sxtn/gemma_tok/",
+        train_config = {}
+
+        model_config = {
+            "tokenizer_path": args.tokenizer_path,
             "block_size": 2048,
         }
 
         train_dataset = process_dataset(
             dataset=train_dataset,
             train_config=train_config,
-            tokenizer=tokenizer,
+            model_config=model_config,
             process_batch_sizes=(200, 200),
             is_eval=False,
             assay=False,
