@@ -26,6 +26,7 @@ from chemlactica.utils.callbacks import (
     ReproducabilityCallback,
     JsonlDatasetResumeCallback,
     EarlyStoppingCallback,
+    SFTNumericalEval,
 )
 from chemlactica.utils.utils import (
     # signal_handler,
@@ -104,7 +105,7 @@ def train(
         organization = checkpoint_path_components[-2]
         model_name = checkpoint_path_components[-1]
 
-    auth_token = os.environ["HF_TOKEN"]
+    auth_token = os.environ.get("HF_TOKEN", None)
     model = load_model(
         from_pretrained,
         use_flash_attn=flash_attn,
@@ -271,6 +272,10 @@ def train(
         trainer = get_trainer(
             train_type, model, dataset, training_args, evaluate_only, slurm_eval
         )
+        if train_type == "sft":
+            trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
+                dataset.get("validation"), aim_callback
+            )
 
         trainer.remove_callback(ProgressCallback)
         for additional_callback in list(trainer_callback_dict.values()):

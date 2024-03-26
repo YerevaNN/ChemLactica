@@ -3,11 +3,11 @@ from contextlib import contextmanager
 from datetime import datetime
 import submitit
 
-use_accelerate = True
+use_accelerate = False
 rsync_enabled = False
 executor_name = "local"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 2
+num_gpus = 1
 model_name = "galactica"
 model_size = "125m"
 train_type = "sft"
@@ -15,7 +15,7 @@ train_name = "_".join([model_name, model_size, train_type])
 
 slurm_params = {
     "slurm_job_name": "submitit_test",
-    "timeout_min": 10,
+    "timeout_min": 30,
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
@@ -36,16 +36,16 @@ cli_arguments = {
     "from_pretrained": "facebook/galactica-125m",
     "model_config": train_name,
     "dir_data_types": "computed",
-    "training_data_dirs": "/auto/home/menuab/code/sft_data/ADME_RLM",
+    "training_data_dirs": "gayane/freesolv",
     "valid_data_dir": "",
     # "max_steps":120000,
-    "num_train_epochs": 12,
-    "eval_steps": 16,
-    "save_steps": 16,
+    "num_train_epochs": 40,
+    "eval_steps": 8,
+    "save_steps": 8,
     "train_batch_size": 32,
-    # "valid_batch_size":,
+    "valid_batch_size": 32,
     "dataloader_num_workers": 30,
-    "experiment_name": "RLM_12e_0N_32bsize_2gpus",
+    "experiment_name": "freesolv_30e",
     "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",
     "flash_attn": False,
     "track": True,
@@ -115,4 +115,4 @@ if __name__ == "__main__":
         executor.update_parameters(**slurm_params)
         function = submitit.helpers.CommandFunction(command, env=env_variables)
         job = executor.submit(function)
-        print(job.result())
+        # print(job.result())
