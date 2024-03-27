@@ -181,7 +181,7 @@ def train(
 
     if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
-            train_config, flash_attn
+            train_config, model_config, flash_attn
         )
 
     total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)
