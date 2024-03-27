@@ -26,6 +26,7 @@ from chemlactica.utils.callbacks import (
     ReproducabilityCallback,
     JsonlDatasetResumeCallback,
     EarlyStoppingCallback,
+    SFTNumericalEval,
 )
 from chemlactica.utils.utils import (
     # signal_handler,
@@ -62,6 +63,7 @@ def train(
     training_data_dirs,
     dir_data_types,
     valid_data_dir,
+    learning_rate,
     scheduler_max_steps,
     eval_steps,
     save_steps,
@@ -103,7 +105,7 @@ def train(
         organization = checkpoint_path_components[-2]
         model_name = checkpoint_path_components[-1]
 
-    auth_token = os.environ["HF_TOKEN"]
+    auth_token = os.environ.get("HF_TOKEN", None)
     model = load_model(
         from_pretrained,
         use_flash_attn=flash_attn,
@@ -114,7 +116,7 @@ def train(
 
     # special_tokens = get_tokenizer_special_tokens(model_config.tokenizer_path)
     # print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
-    tokenizer_length = get_tokenizer_length()
+    tokenizer_length = get_tokenizer_length(model_config)
     print(f"{tokenizer_length=}")
 
     if not resume_from_checkpoint:
@@ -179,7 +181,7 @@ def train(
 
     if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
-            train_config, flash_attn
+            train_config, model_config, flash_attn
         )
 
     total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)
@@ -216,6 +218,7 @@ def train(
             slurm_eval=slurm_eval,
             experiment_name=experiment_name,
             # train_config=train_config,
+            tokenizer_path=model_config.tokenizer_path,
             do_train=not evaluate_only,
             output_dir=checkpoints_dir,
             per_device_train_batch_size=train_batch_size,
@@ -226,7 +229,9 @@ def train(
             bf16_full_eval=True,
             fp16=False,
             logging_dir=track_dir,
-            learning_rate=train_config.max_learning_rate,
+            learning_rate=learning_rate
+            if learning_rate
+            else train_config.max_learning_rate,
             weight_decay=train_config.weight_decay,
             adam_beta1=train_config.adam_beta1,
             adam_beta2=train_config.adam_beta2,
@@ -249,8 +254,8 @@ def train(
             # gradient_accumulation_steps=gradient_accumulation_steps,
             # save_total_limit=4, in order for offline eval to work, we keep all of them for now
             resume_from_checkpoint=resume_from_checkpoint,
-            lr_scheduler_type="linear",
-            optim="paged_adamw_8bit",
+            lr_scheduler_type=train_config.lr_scheduler_type,
+            optim=train_config.optimizer,
             # load_best_model=True
         )
 
@@ -265,11 +270,19 @@ def train(
             evaluate_only,
             slurm_eval,
             shuffle_buffer_size,
-            accelerator,
         )
         trainer = get_trainer(
-            train_type, model, dataset, training_args, evaluate_only, slurm_eval
+            train_type,
+            model,
+            dataset,
+            training_args,
+            evaluate_only,
+            slurm_eval,
         )
+        if train_type == "sft":
+            trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
+                dataset, aim_callback
+            )
 
         trainer.remove_callback(ProgressCallback)
         for additional_callback in list(trainer_callback_dict.values()):

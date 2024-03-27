@@ -9,6 +9,8 @@ from .dataset_utils import process_dataset
 from datasets import load_dataset
 from .model_utils import load_model
 from tqdm.auto import tqdm
+from sklearn.metrics import root_mean_squared_error
+
 
 from aim.hugging_face import AimCallback
 import torch
@@ -334,3 +336,44 @@ class EarlyStoppingCallback(TrainerCallback):
     def on_step_end(self, args, state, control, **kwargs):
         if state.global_step >= self.early_stopping_steps:
             control.should_training_stop = True
+
+
+class SFTNumericalEval(TrainerCallback):
+    def __init__(self, dataset, aim_callback) -> None:
+        super().__init__()
+        self.dataset = dataset
+        self.aim = aim_callback
+
+    def on_evaluate(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        model,
+        tokenizer,
+        **kwargs,
+    ):
+        super().on_evaluate(args, state, control, **kwargs)
+        model.eval()
+        ground_truths, gens, diffs = [], [], []
+        for sample in self.dataset["validation"]:
+            ground_truth = round(sample["activity"], 2)
+            prompt = f"[START_SMILES]{sample['smiles']}[END_SMILES][PROPERTY]activity "
+            prompt = tokenizer(prompt, return_tensors="pt").to(model.device)
+            out = model.generate(prompt.input_ids, do_sample=False, max_length=100)
+            out = tokenizer.batch_decode(out)[0]
+            try:
+                gen = out[
+                    out.find("activity ") + len("activity ") : out.find("[/PROPERTY]")
+                ]
+                gen = float(gen)
+                diff = abs(ground_truth - gen)
+                ground_truths.append(ground_truth)
+                gens.append(gen)
+                diffs.append(diff)
+            except KeyError:
+                print(f"could not generate for {sample['smiles']}")
+                pass
+        rmse = root_mean_squared_error(ground_truths, gens)
+        self.aim._run.track({"numerical eval rmse": rmse}, step=state.global_step)
+        print(f"{rmse=}")
