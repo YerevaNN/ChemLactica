@@ -28,8 +28,8 @@ def get_start2end_tags_map(tokenizer_path: str = default_tokenizer_path):
 #     return special_tokens_json["additional_special_tokens"]
 
 
-def get_tokenizer_length():
-    tokenizer = get_tokenizer()
+def get_tokenizer_length(model_config):
+    tokenizer = get_tokenizer(model_config.tokenizer_path)
     tokenizer_len = len(tokenizer)
     del tokenizer
     return tokenizer_len

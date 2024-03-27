@@ -108,14 +108,14 @@ if __name__ == "__main__":
         "/nfs/dgx/raid/chem/rsyncsnapshots/"
         f"{train_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M')}"
     )
-    print("train_name: ", train_name)
-    print("logs_path: ", logs_path)
-    print("repo path: ", repo_path)
 
     with conditional_context_manager(rsync_enabled, repo_path):
         command = get_command(use_accelerate)
         executor = get_executor(executor_name, logs_path)
         executor.update_parameters(**slurm_params)
+        print("train_name: ", train_name)
+        print("logs_path: ", logs_path)
+        print("repo path: ", repo_path)
         function = submitit.helpers.CommandFunction(command, env=env_variables)
         job = executor.submit(function)
         print(job.result())

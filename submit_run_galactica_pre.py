@@ -3,14 +3,14 @@ from contextlib import contextmanager
 from datetime import datetime
 import submitit
 
-use_accelerate = False
+use_accelerate = True
 rsync_enabled = False
 executor_name = "local"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 1
+num_gpus = 2
 model_name = "galactica"
 model_size = "125m"
-train_type = "sft"
+train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
 
 slurm_params = {
@@ -36,14 +36,14 @@ cli_arguments = {
     "from_pretrained": "facebook/galactica-125m",
     "model_config": train_name,
     "dir_data_types": "computed",
-    "training_data_dirs": "gayane/freesolv",
-    "valid_data_dir": "",
-    # "max_steps":120000,
-    "num_train_epochs": 15,
-    "eval_steps": 8,
-    "save_steps": 8,
-    "train_batch_size": 8,
-    "valid_batch_size": 8,
+    "training_data_dirs": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form",
+    "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
+    "max_steps": 120000,
+    # "num_train_epochs": 15,
+    "eval_steps": 1000,
+    "save_steps": 1000,
+    "train_batch_size": 16,
+    # "valid_batch_size": 16,
     "dataloader_num_workers": 30,
     "experiment_name": "freesolv_30e",
     "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",

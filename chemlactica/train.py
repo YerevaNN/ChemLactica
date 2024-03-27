@@ -116,7 +116,7 @@ def train(
 
     # special_tokens = get_tokenizer_special_tokens(model_config.tokenizer_path)
     # print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
-    tokenizer_length = get_tokenizer_length()
+    tokenizer_length = get_tokenizer_length(model_config)
     print(f"{tokenizer_length=}")
 
     if not resume_from_checkpoint:
@@ -269,7 +269,13 @@ def train(
             shuffle_buffer_size,
         )
         trainer = get_trainer(
-            train_type, model, dataset, training_args, evaluate_only, slurm_eval
+            train_type,
+            model,
+            model_config,
+            dataset,
+            training_args,
+            evaluate_only,
+            slurm_eval,
         )
         if train_type == "sft":
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
