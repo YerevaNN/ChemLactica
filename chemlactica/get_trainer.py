@@ -11,6 +11,7 @@ def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_
     if train_type == "pretrain":
         trainer = CustomTrainer(
             model=model,
+            # tokenizer_path=model_config.tokenizer_path,
             args=training_args,
             # compute_metrics=compute_metrics,
             train_dataset=dataset["train"] if not evaluate_only else None,
@@ -23,7 +24,7 @@ def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_
 
     elif train_type == "sft":
         sft_config = SFTTrainConfig()
-        tokenizer = get_tokenizer()
+        tokenizer = get_tokenizer(training_args.tokenizer_path)
         response_template = "[PROPERTY]activity "
         collator = DataCollatorForCompletionOnlyLM(
             response_template, tokenizer=tokenizer
