@@ -27,14 +27,17 @@ class CustomArguments(TrainingArguments):
     )
     command: str = field(default=None)
     experiment_name: str = field(default=None)
+    tokenizer_path: str = field(
+        default="/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
+    )
     # train_config: dict = field(default=None)
 
 
 class CustomTrainer(Trainer):
-    def __init__(self, tokenizer_path, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         # the number of samples to print when the training begins, for debugging purposes
         self.num_samples_to_print = 5
-        self.tokenizer_path = tokenizer_path
+        self.tokenizer_path = kwargs["args"].tokenizer_path
         super().__init__(*args, **kwargs)
 
     def training_step(self, model: Module, inputs: Dict[str, Tensor | Any]) -> Tensor:

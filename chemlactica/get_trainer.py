@@ -7,13 +7,11 @@ from utils.utils import get_tokenizer
 from config.default_train_config import SFTTrainConfig
 
 
-def get_trainer(
-    train_type, model, model_config, dataset, training_args, evaluate_only, slurm_eval
-):
+def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_eval):
     if train_type == "pretrain":
         trainer = CustomTrainer(
             model=model,
-            tokenizer_path=model_config.tokenizer_path,
+            # tokenizer_path=model_config.tokenizer_path,
             args=training_args,
             # compute_metrics=compute_metrics,
             train_dataset=dataset["train"] if not evaluate_only else None,
@@ -26,7 +24,7 @@ def get_trainer(
 
     elif train_type == "sft":
         sft_config = SFTTrainConfig()
-        tokenizer = get_tokenizer(model_config.tokenizer_path)
+        tokenizer = get_tokenizer(training_args.tokenizer_path)
         response_template = "[PROPERTY]activity "
         collator = DataCollatorForCompletionOnlyLM(
             response_template, tokenizer=tokenizer

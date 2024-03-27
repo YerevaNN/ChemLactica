@@ -64,6 +64,7 @@ def train(
     training_data_dirs,
     dir_data_types,
     valid_data_dir,
+    learning_rate,
     scheduler_max_steps,
     eval_steps,
     save_steps,
@@ -218,6 +219,7 @@ def train(
             slurm_eval=slurm_eval,
             experiment_name=experiment_name,
             # train_config=train_config,
+            tokenizer_path=model_config.tokenizer_path,
             do_train=not evaluate_only,
             output_dir=checkpoints_dir,
             per_device_train_batch_size=train_batch_size,
@@ -228,7 +230,9 @@ def train(
             bf16_full_eval=True,
             fp16=False,
             logging_dir=track_dir,
-            learning_rate=train_config.max_learning_rate,
+            learning_rate=learning_rate
+            if learning_rate
+            else train_config.max_learning_rate,
             weight_decay=train_config.weight_decay,
             adam_beta1=train_config.adam_beta1,
             adam_beta2=train_config.adam_beta2,
@@ -251,8 +255,8 @@ def train(
             # gradient_accumulation_steps=gradient_accumulation_steps,
             # save_total_limit=4, in order for offline eval to work, we keep all of them for now
             resume_from_checkpoint=resume_from_checkpoint,
-            lr_scheduler_type="linear",
-            optim="adamw_torch",
+            lr_scheduler_type=train_config.lr_scheduler_type,
+            optim=train_config.optimizer,
             # load_best_model=True
         )
 
@@ -271,7 +275,6 @@ def train(
         trainer = get_trainer(
             train_type,
             model,
-            model_config,
             dataset,
             training_args,
             evaluate_only,

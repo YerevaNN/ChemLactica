@@ -54,6 +54,15 @@ def init_parser():
         help="path to directory containing validation data",
     )
     parser.add_argument(
+        "--learning_rate",
+        type=int,
+        metavar="LR",
+        dest="learning_rate",
+        required=False,
+        default=None,
+        help="learning rate",
+    )
+    parser.add_argument(
         "--max_steps",
         type=int,
         metavar="MS",

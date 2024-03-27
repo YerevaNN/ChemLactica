@@ -5,7 +5,7 @@ import submitit
 
 use_accelerate = True
 rsync_enabled = False
-executor_name = "local"  # options are ["slurm", "local"]
+executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
 num_gpus = 2
 model_name = "galactica"
@@ -40,9 +40,10 @@ cli_arguments = {
     "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
     "max_steps": 120000,
     # "num_train_epochs": 15,
+    # "learning_rate": 5,
     "eval_steps": 1000,
     "save_steps": 1000,
-    "train_batch_size": 16,
+    "train_batch_size": 2,
     # "valid_batch_size": 16,
     "dataloader_num_workers": 30,
     "experiment_name": "freesolv_30e",
