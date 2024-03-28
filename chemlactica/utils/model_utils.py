@@ -131,7 +131,7 @@ def load_model(
     if "gemma" in from_pretrained.lower():
         model = AutoModelForCausalLM.from_pretrained(
             from_pretrained,
-            torch_dtype=dtype,
+            torch_dtype=torch.bfloat16,
             attn_implementation=attn_implementation,
         )
 

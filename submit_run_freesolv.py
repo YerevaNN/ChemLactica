@@ -12,11 +12,11 @@ model_name = "galactica"
 model_size = "125m"
 train_type = "sft"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "freesolve"
+job_name = "freesolv"
 
 slurm_params = {
     "slurm_job_name": job_name,
-    "timeout_min": 30,
+    "timeout_min": 120,
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
@@ -34,13 +34,14 @@ env_variables = {
 
 cli_arguments = {
     "train_type": train_type,
-    "from_pretrained": "facebook/galactica-125m",
+    "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/facebook/"\
+        "galactica-125m/9954e52e400b43d18d3a40f6/checkpoint-20480",
     "model_config": train_name,
     "dir_data_types": "computed",
     "training_data_dirs": "gayane/freesolv",
     "valid_data_dir": "",
     # "max_steps":120000,
-    "num_train_epochs": 24,
+    "num_train_epochs": 12,
     "eval_steps": 8,
     "save_steps": 8,
     "train_batch_size": 16,

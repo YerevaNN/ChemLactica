@@ -12,7 +12,7 @@ train_config:
   warmup_steps: 500
   weight_decay: 0.1
 model_config:
-  block_size: 8192
+  block_size: 2048
   vocab_size: 256000
   separator_token: <bos>
   tokenizer_path: "chemlactica/tokenizer/GemmaTokenizer"
