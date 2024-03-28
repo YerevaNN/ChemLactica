@@ -9,11 +9,11 @@ fsdp_config:
   fsdp_sharding_strategy: 1
   fsdp_state_dict_type: FULL_STATE_DICT
   fsdp_transformer_layer_cls_to_wrap: GemmaForCausalLM
-  fsdp_activation_checkpointing: false
+  fsdp_activation_checkpointing: true
   fsdp_use_orig_params: true
 machine_rank: 0
 main_training_function: main
-mixed_precision: bf16
+mixed_precision: 'no'
 num_machines: 1
 num_processes: 6
 rdzv_backend: static
