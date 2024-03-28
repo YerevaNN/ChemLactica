@@ -228,6 +228,7 @@ def train(
             bf16=True,
             bf16_full_eval=True,
             fp16=False,
+            tf32=True if train_type == "pretrain" else None,
             logging_dir=track_dir,
             learning_rate=learning_rate
             if learning_rate
@@ -249,9 +250,10 @@ def train(
             # which has some conflict with saving checkpoints
             dataloader_num_workers=dataloader_num_workers,
             logging_steps=1,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
             # gradient_checkpointing=gradient_checkpointing,
             # gradient_checkpointing_kwargs={"use_reentrant": False},
-            # gradient_accumulation_steps=gradient_accumulation_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
             # save_total_limit=4, in order for offline eval to work, we keep all of them for now
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type=train_config.lr_scheduler_type,

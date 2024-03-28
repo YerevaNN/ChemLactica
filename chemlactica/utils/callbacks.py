@@ -371,7 +371,7 @@ class SFTNumericalEval(TrainerCallback):
                 ground_truths.append(ground_truth)
                 gens.append(gen)
                 diffs.append(diff)
-            except KeyError:
+            except ValueError:
                 print(f"could not generate for {sample['smiles']}")
                 pass
         rmse = root_mean_squared_error(ground_truths, gens)

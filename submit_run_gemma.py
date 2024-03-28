@@ -15,7 +15,7 @@ train_name = "_".join([model_name, model_size, train_type])
 
 slurm_params = {
     "slurm_job_name": "gemma_test",
-    "timeout_min": 60,
+    "timeout_min": 3600,
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
@@ -40,21 +40,21 @@ cli_arguments = {
     "dir_data_types": "computed",
     "training_data_dirs": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form",
     "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
-    "max_steps": 100,
+    "max_steps": 123000,
     # "num_train_epochs": 2,
-    "eval_steps": 20,
-    "save_steps": 10,
-    "train_batch_size": 1,
+    "eval_steps": 2048,
+    "save_steps": 2048,
+    "train_batch_size": 2,
     # "valid_batch_size":,s
-    "dataloader_num_workers": 2,
+    "dataloader_num_workers": 1,
     # "experiment_name": "testing_submitit",
     "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",
     "flash_attn": True,
-    # "track": True,
-    # "track_dir": "/nfs/dgx/raid/chem/aim/",
+    "track": True,
+    "track_dir": "/nfs/dgx/raid/chem/aim/",
     # "profile":,
     # "profile_dir":,
-    # "gradient_accumulation_steps":,
+    "gradient_accumulation_steps": 64,
     # "gradient_checkpointing": False,
     # "evaluate_only":,
     # "check_reproducability":,
@@ -118,4 +118,3 @@ if __name__ == "__main__":
         print("repo path: ", repo_path)
         function = submitit.helpers.CommandFunction(command, env=env_variables)
         job = executor.submit(function)
-        print(job.result())

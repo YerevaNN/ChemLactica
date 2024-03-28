@@ -1,5 +1,5 @@
 {
-  "add_bos_token": true,
+  "add_bos_token": false,
   "add_eos_token": false,
   "added_tokens_decoder": {
     "0": {
