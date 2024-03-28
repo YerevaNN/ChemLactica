@@ -6,7 +6,7 @@ from functools import cache
 from chemlactica.config.default_train_config import TrainConfig, ModelConfig
 
 default_tokenizer_path = (
-    "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/GemmaTokenizer"
+    "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
 )
 
 
@@ -28,15 +28,15 @@ def get_start2end_tags_map(tokenizer_path: str = default_tokenizer_path):
 #     return special_tokens_json["additional_special_tokens"]
 
 
-def get_tokenizer_length():
-    tokenizer = get_tokenizer()
+def get_tokenizer_length(model_config):
+    tokenizer = get_tokenizer(model_config.tokenizer_path)
     tokenizer_len = len(tokenizer)
     del tokenizer
     return tokenizer_len
 
 
 @cache
-def get_tokenizer(tokenizer_path: str = default_tokenizer_path):
+def get_tokenizer(tokenizer_path):
     return create_tokenizer(tokenizer_path)
 
 

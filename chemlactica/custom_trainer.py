@@ -27,6 +27,9 @@ class CustomArguments(TrainingArguments):
     )
     command: str = field(default=None)
     experiment_name: str = field(default=None)
+    tokenizer_path: str = field(
+        default="/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
+    )
     # train_config: dict = field(default=None)
 
 
@@ -34,13 +37,14 @@ class CustomTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         # the number of samples to print when the training begins, for debugging purposes
         self.num_samples_to_print = 5
+        self.tokenizer_path = kwargs["args"].tokenizer_path
         super().__init__(*args, **kwargs)
 
     def training_step(self, model: Module, inputs: Dict[str, Tensor | Any]) -> Tensor:
         if self.num_samples_to_print:
-            tokeinzer = get_tokenizer()
+            tokenizer = get_tokenizer(self.tokenizer_path)
             for i in range(min(inputs["input_ids"].size(0), self.num_samples_to_print)):
-                print(f"Sample {i + 1}:", tokeinzer.decode(inputs["input_ids"][i]))
+                print(f"Sample {i + 1}:", tokenizer.decode(inputs["input_ids"][i]))
             self.num_samples_to_print = None
         return super().training_step(model, inputs)
 
@@ -144,8 +148,8 @@ class CustomIterativeSFTTrainer(IterativeSFTTrainer):
 
     def training_step(self, model: Module, inputs: Dict[str, Tensor | Any]) -> Tensor:
         if self.num_samples_to_print:
-            tokeinzer = get_tokenizer()
+            # tokeinzer = get_tokenizer()
             for i in range(min(inputs["input_ids"].size(0), self.num_samples_to_print)):
-                print(f"Sample {i + 1}:", tokeinzer.decode(inputs["input_ids"][i]))
+                print(f"Sample {i + 1}:", self.tokeinzer.decode(inputs["input_ids"][i]))
             self.num_samples_to_print = None
         return super().training_step(model, inputs)
