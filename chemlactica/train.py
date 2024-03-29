@@ -27,6 +27,7 @@ from chemlactica.utils.callbacks import (
     JsonlDatasetResumeCallback,
     EarlyStoppingCallback,
     SFTNumericalEval,
+    GradientAccumulationScheduler,
 )
 from chemlactica.utils.utils import (
     # signal_handler,
@@ -178,6 +179,12 @@ def train(
             early_stopping_steps=(max_steps)
         )
         trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
+        trainer_callback_dict["gradient_accumulation_scheduler"] = GradientAccumulationScheduler(
+            max_ga = 128,
+            ga_delta_steps=30,
+            ga_delta_percentage=0.05,
+            patience=1000
+            )
 
     if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
@@ -188,7 +195,6 @@ def train(
     trainer_callback_dict["progress_callback"] = CustomProgressCallback(
         max_steps, total_theoretical_peak_flops
     )
-
     accelerator.wait_for_everyone()
 
     with multiprocessing.Manager() as manager:

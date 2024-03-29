@@ -377,3 +377,24 @@ class SFTNumericalEval(TrainerCallback):
         rmse = root_mean_squared_error(ground_truths, gens)
         self.aim._run.track({"numerical eval rmse": rmse}, step=state.global_step)
         print(f"{rmse=}")
+
+class GradientAccumulationScheduler(TrainerCallback):
+    def __init__(self, max_ga = 128, ga_delta_steps=30, ga_delta_percentage=0.05, patience=1000) -> None:
+        super().__init__()
+        self.max_ga = max_ga
+        self.ga_delta_steps = ga_delta_steps
+        self.ga_delta_percentage = ga_delta_percentage
+        self.wait = 0
+        self.patience = patience
+        assert(self.ga_delta_steps<self.patience)
+
+    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        super().on_step_end(args, state, control, **kwargs)
+        if self.wait == self.patience:
+            last_n_loss = [s["loss"] for s in state.log_history[-self.ga_delta_steps:]]
+            if max(last_n_loss) - min(last_n_loss) > max(last_n_loss) * self.ga_delta_percentage:
+                args.gradient_accumulation_steps *= 2
+                args.gradient_accumulation_steps = min(args.gradient_accumulation_steps, self.max_ga)
+                self.wait = 0
+        else:
+            self.wait += 1
