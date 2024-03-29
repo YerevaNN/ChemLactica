@@ -179,12 +179,11 @@ def train(
             early_stopping_steps=(max_steps)
         )
         trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
-        trainer_callback_dict["gradient_accumulation_scheduler"] = GradientAccumulationScheduler(
-            max_ga = 128,
-            ga_delta_steps=30,
-            ga_delta_percentage=0.05,
-            patience=1000
-            )
+        trainer_callback_dict[
+            "gradient_accumulation_scheduler"
+        ] = GradientAccumulationScheduler(
+            max_ga=128, ga_delta_steps=30, ga_delta_percentage=0.05, patience=1000
+        )
 
     if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
