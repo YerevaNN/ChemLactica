@@ -1,4 +1,6 @@
 import torch
+from datasets import load_dataset
+from dataclasses import dataclass
 import argparse
 import multiprocessing
 from datasets.iterable_dataset import IterableDataset
@@ -32,35 +34,51 @@ def find_all_linear_names(model):
     return list(lora_module_names)
 
 
+@dataclass
+class DummyConfig:
+    tokenizer_path: str
+    block_size: int
+    separator_token: str = "<bos>"
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", type=str, default="test-gemma")
     parser.add_argument("--tokenizer_path", type=str, required=True)
     args = parser.parse_args()
     model_id = "google/gemma-2b"
+    model_config = DummyConfig(tokenizer_path=args.tokenizer_path, block_size=2048)
+    train_config = {}
+    print(model_config.tokenizer_path)
 
     config = AutoConfig.from_pretrained(model_id)
 
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     model = AutoModelForCausalLM.from_config(
-        config, attn_implementation="flash_attention_2"
+        config, attn_implementation="flash_attention_2", torch_dtype=torch.bfloat16
     )
-    linear_names = find_all_linear_names(model)
+    # linear_names = find_all_linear_names(model)
+    print("loaded model")
 
-    args = TrainingArguments(
+    targs = TrainingArguments(
         lr_scheduler_type="linear",
         output_dir=args.output_dir,
         dataloader_pin_memory=True,
         dataloader_prefetch_factor=4,
         max_steps=100,
-        save_steps=10,
+        save_steps=30,
+        eval_steps=30,
         bf16=True,
+        bf16_full_eval=True,
         # gradient_accumulation_steps = 43,
-        per_device_train_batch_size=2,
+        per_device_train_batch_size=1,
+        per_device_eval_batch_size=1,
         optim="adamw_torch",
         tf32=True,
         gradient_checkpointing_kwargs={"use_reentrant": False},
         dataloader_num_workers=1,
+        do_eval=True,
+        evaluation_strategy="steps",
         # ddp_find_unused_parameters = False,
         # gradient_checkpointing = True,
         # optim_args="rank=64, update_proj_gap=100, scale=0.10",
@@ -68,11 +86,37 @@ if __name__ == "__main__":
         # torch_compile = True,
     )
 
+    # model_config = {
+    #     "tokenizer_path": args.tokenizer_path,
+    #     "block_size": 2048,
+    # }
+    print("arguments specified")
+
     training_data_dir = (
         "/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form"
     )
+
+    eval_data_dir = "/mnt/sxtn/rdkit_computed_rel+form/valid_sub"
+
     training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-    print(training_data_files)
+    valid_data_files = glob.glob(eval_data_dir + "/*.jsonl")
+    print("loading eval dataset")
+
+    eval_dataset = load_dataset(
+        "text", data_files={"validation": valid_data_files}, streaming=False
+    )
+    print("processing eval dataset")
+    processed_eval_dataset = process_dataset(
+        dataset=eval_dataset["validation"],
+        train_config=train_config,
+        model_config=model_config,
+        process_batch_sizes=(50, 50),
+        is_eval=True,
+        assay=False,
+    )
+
+    print("starting manager")
+
     with (
         multiprocessing.Manager()
         if distributed_state.is_main_process
@@ -88,12 +132,6 @@ if __name__ == "__main__":
                 "shared_jsonl_files": shared_jsonl_files,
             },
         )
-        train_config = {}
-
-        model_config = {
-            "tokenizer_path": args.tokenizer_path,
-            "block_size": 2048,
-        }
 
         train_dataset = process_dataset(
             dataset=train_dataset,
@@ -106,11 +144,13 @@ if __name__ == "__main__":
 
         trainer = Trainer(
             model=model,
-            args=args,
+            args=targs,
             train_dataset=train_dataset,
+            eval_dataset=processed_eval_dataset,
             # tokenizer = tokenizer,
             # dataset_text_field='text',
             # max_seq_length=512,
         )
+        print("trainer created,starting training")
 
         trainer.train()
