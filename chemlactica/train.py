@@ -182,7 +182,7 @@ def train(
         trainer_callback_dict[
             "gradient_accumulation_scheduler"
         ] = GradientAccumulationScheduler(
-            max_ga=256, ga_delta_steps=100, ga_delta_percentage=0.1, patience=1000
+            max_ga=256, ga_delta_steps=90, ga_delta_percentage=0.1, patience=100
         )
 
     if check_reproducability and train_type == "pretrain":

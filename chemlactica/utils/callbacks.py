@@ -400,6 +400,9 @@ class GradientAccumulationScheduler(TrainerCallback):
         **kwargs,
     ):
         super().on_step_end(args, state, control, **kwargs)
+        print(
+            f"step: {state.global_step}, grad acc: {args.gradient_accumulation_steps}"
+        )
         if self.wait == self.patience:
             last_n_loss = [
                 s["loss"] for s in state.log_history[-self.ga_delta_steps :]  # noqa

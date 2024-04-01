@@ -22,7 +22,7 @@ class TrainConfig:
     warmup_steps: int = 500
     weight_decay: float = 0.1
     optimizer: str = "adamw_torch"
-    lr_scheduler_type: str = "linear"
+    lr_scheduler_type: str = "constant_with_warmup"
 
 
 @dataclass

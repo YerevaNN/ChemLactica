@@ -5,16 +5,17 @@ import submitit
 
 use_accelerate = True
 rsync_enabled = False
-executor_name = "slurm"  # options are ["slurm", "local"]
+executor_name = "local"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 6
+num_gpus = 2
 model_name = "gemma"
 model_size = "2b"
 train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
+job_name = "gemma_test_dynamic_ga"
 
 slurm_params = {
-    "slurm_job_name": "gemma_test",
+    "slurm_job_name": job_name,
     "timeout_min": 3600,
     "nodes": 1,
     "tasks_per_node": 1,
@@ -40,21 +41,21 @@ cli_arguments = {
     "dir_data_types": "computed",
     "training_data_dirs": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form",
     "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
-    "max_steps": 123000,
+    "max_steps": 22000,
     # "num_train_epochs": 2,
-    "eval_steps": 2048,
-    "save_steps": 2048,
-    "train_batch_size": 2,
+    "eval_steps": 4,
+    "save_steps": 2,
+    "train_batch_size": 1,
     # "valid_batch_size":,s
     "dataloader_num_workers": 1,
-    # "experiment_name": "testing_submitit",
+    "experiment_name": job_name,
     "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",
     "flash_attn": True,
     "track": True,
     "track_dir": "/nfs/dgx/raid/chem/aim/",
     # "profile":,
     # "profile_dir":,
-    "gradient_accumulation_steps": 64,
+    "gradient_accumulation_steps": 1,
     # "gradient_checkpointing": False,
     # "evaluate_only":,
     # "check_reproducability":,
