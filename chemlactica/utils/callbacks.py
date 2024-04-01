@@ -364,7 +364,8 @@ class SFTNumericalEval(TrainerCallback):
             out = tokenizer.batch_decode(out)[0]
             try:
                 gen = out[
-                    out.find("activity ") + len("activity ") : out.find("[/PROPERTY]")
+                    out.find("activity ")
+                    + len("activity ") : out.find("[/PROPERTY]")  # noqa
                 ]
                 gen = float(gen)
                 diff = abs(ground_truth - gen)
@@ -381,7 +382,7 @@ class SFTNumericalEval(TrainerCallback):
 
 class GradientAccumulationScheduler(TrainerCallback):
     def __init__(
-        self, max_ga=128, ga_delta_steps=30, ga_delta_percentage=0.05, patience=1000
+        self, max_ga=256, ga_delta_steps=100, ga_delta_percentage=0.1, patience=1000
     ) -> None:
         super().__init__()
         self.max_ga = max_ga
@@ -400,7 +401,9 @@ class GradientAccumulationScheduler(TrainerCallback):
     ):
         super().on_step_end(args, state, control, **kwargs)
         if self.wait == self.patience:
-            last_n_loss = [s["loss"] for s in state.log_history[-self.ga_delta_steps :]]
+            last_n_loss = [
+                s["loss"] for s in state.log_history[-self.ga_delta_steps :]  # noqa
+            ]  # noqa
             if (
                 max(last_n_loss) - min(last_n_loss)
                 > max(last_n_loss) * self.ga_delta_percentage
