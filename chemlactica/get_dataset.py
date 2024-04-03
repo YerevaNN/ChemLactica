@@ -67,7 +67,7 @@ def get_dataset(
                 "text", data_files={"validation": valid_data_files}, streaming=False
             )
             processed_eval_dataset = process_dataset(
-                dataset=eval_dataset,
+                dataset=eval_dataset["validation"],
                 train_config=train_config,
                 model_config=model_config,
                 process_batch_sizes=(50, 50),
