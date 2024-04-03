@@ -111,7 +111,8 @@ def format_key_value(key, value, rng):
             # value = random.sample(value, 5)
             value = rng.choice(value, size=10, replace=False, shuffle=False)
         for pair in value:
-            formatted_string += f"{SPECIAL_TAGS['similarity']['start']}{pair['SMILES']} {pair['similarity']}{SPECIAL_TAGS['similarity']['end']}"  # noqa
+            rounded_sim = "{:.2f}".format(float(pair["similarity"]))
+            formatted_string += f"{SPECIAL_TAGS['similarity']['start']}{pair['SMILES']} {rounded_sim}{SPECIAL_TAGS['similarity']['end']}"  # noqa
     elif key == "experimental":
         for pair in value:
             formatted_string += (
