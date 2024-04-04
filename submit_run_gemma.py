@@ -5,7 +5,7 @@ import submitit
 
 use_accelerate = True
 rsync_enabled = False
-executor_name = "local"  # options are ["slurm", "local"]
+executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
 num_gpus = 6
 model_name = "gemma"
@@ -43,16 +43,16 @@ cli_arguments = {
     "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
     "max_steps": 30000,
     # "num_train_epochs": 2,
-    "eval_steps": 100,
-    "save_steps": 200,
+    "eval_steps": 1024,
+    "save_steps": 1024,
     "train_batch_size": 1,
     # "valid_batch_size":,s
     "dataloader_num_workers": 1,
     "experiment_name": job_name,
     "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",
     "flash_attn": True,
-    # "track": True,
-    # "track_dir": "/nfs/dgx/raid/chem/aim/",
+    "track": True,
+    "track_dir": "/nfs/dgx/raid/chem/aim/",
     # "profile":,
     # "profile_dir":,
     "gradient_accumulation_steps": 1,

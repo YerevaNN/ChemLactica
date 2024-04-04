@@ -382,9 +382,15 @@ class SFTNumericalEval(TrainerCallback):
 
 class GradientAccumulationScheduler(TrainerCallback):
     def __init__(
-        self, max_ga=256, ga_delta_steps=100, ga_delta_percentage=0.1, patience=1000
+        self,
+        aim_callback,
+        max_ga=256,
+        ga_delta_steps=100,
+        ga_delta_percentage=0.1,
+        patience=1000,
     ) -> None:
         super().__init__()
+        self.aim = aim_callback
         self.max_ga = max_ga
         self.ga_delta_steps = ga_delta_steps
         self.ga_delta_percentage = ga_delta_percentage
@@ -418,3 +424,7 @@ class GradientAccumulationScheduler(TrainerCallback):
                 self.wait = 0
         else:
             self.wait += 1
+        self.aim._run.track(
+            {"gradient accumulation steps": args.gradient_accumulation_steps},
+            step=state.global_step,
+        )

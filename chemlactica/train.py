@@ -179,11 +179,6 @@ def train(
             early_stopping_steps=(max_steps)
         )
         trainer_callback_dict["epoch_callback"] = EpochCallback(num_epochs=1)
-        trainer_callback_dict[
-            "gradient_accumulation_scheduler"
-        ] = GradientAccumulationScheduler(
-            max_ga=256, ga_delta_steps=90, ga_delta_percentage=0.1, patience=100
-        )
 
     if check_reproducability and train_type == "pretrain":
         trainer_callback_dict["reproducability_callback"] = ReproducabilityCallback(
@@ -289,6 +284,16 @@ def train(
         if train_type == "sft":
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
                 dataset, aim_callback
+            )
+        elif train_type == "pretrain":
+            trainer_callback_dict[
+                "gradient_accumulation_scheduler"
+            ] = GradientAccumulationScheduler(
+                aim_callback,
+                max_ga=256,
+                ga_delta_steps=50,
+                ga_delta_percentage=0.03,
+                patience=2000,
             )
 
         trainer.remove_callback(ProgressCallback)
