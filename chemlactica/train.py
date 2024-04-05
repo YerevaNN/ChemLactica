@@ -254,7 +254,7 @@ def train(
             # gradient_checkpointing=gradient_checkpointing,
             # gradient_checkpointing_kwargs={"use_reentrant": False},
             gradient_accumulation_steps=gradient_accumulation_steps,
-            # save_total_limit=4, in order for offline eval to work, we keep all of them for now
+            save_total_limit=4,  # in order for offline eval to work, we keep all of them for now
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type=train_config.lr_scheduler_type,
             optim=train_config.optimizer,
@@ -289,10 +289,10 @@ def train(
             trainer_callback_dict[
                 "gradient_accumulation_scheduler"
             ] = GradientAccumulationScheduler(
-                aim_callback,
+                trainer_callback_dict.get("aim_callback", None),
                 max_ga=256,
-                ga_delta_steps=50,
-                ga_delta_percentage=0.03,
+                ga_delta_steps=100,
+                ga_delta_percentage=0.02,
                 patience=2000,
             )
 

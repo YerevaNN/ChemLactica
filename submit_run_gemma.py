@@ -12,11 +12,11 @@ model_name = "gemma"
 model_size = "2b"
 train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "gemma_test_dynamic_ga"
+job_name = "gemma_lr1e-4"
 
 slurm_params = {
     "slurm_job_name": job_name,
-    "timeout_min": 3600,
+    "timeout_min": 36000,
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,

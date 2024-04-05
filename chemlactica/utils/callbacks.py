@@ -134,6 +134,7 @@ class WPSCounterCallback(TrainerCallback):
         self._aim_run = aim_run
         self._block_size = block_size
         self._start_time = None
+        self.cum_words_seen = 0
 
     def on_step_begin(self, args, state, control, model, **kwargs):
         if state.is_world_process_zero and self._aim_run is not None:
@@ -146,12 +147,13 @@ class WPSCounterCallback(TrainerCallback):
                     * args.world_size
                     * args.gradient_accumulation_steps
                 )
+                self.cum_words_seen += num_words
                 # Calculate time taken for this step
                 elapsed_time = time.time() - self._start_time
                 # Calculate words per second
                 words_per_second = num_words / elapsed_time
                 self._aim_run.track(words_per_second, name="words per second")
-
+                self._aim_run.track(self.cum_words_seen, name="cum_words_seen")
             self._start_time = time.time()
 
 
@@ -407,24 +409,37 @@ class GradientAccumulationScheduler(TrainerCallback):
     ):
         super().on_step_end(args, state, control, **kwargs)
         print(
+            f"is local process zero: {state.is_local_process_zero}, "
             f"step: {state.global_step}, grad acc: {args.gradient_accumulation_steps}"
         )
         if self.wait == self.patience:
-            last_n_loss = [
+            last_far_loss = [
+                s["loss"]
+                for s in state.log_history[
+                    -20 * self.ga_delta_steps : -19 * self.ga_delta_steps  # noqa
+                ]  # noqa
+            ]  # noqa
+            last_near_loss = [
                 s["loss"] for s in state.log_history[-self.ga_delta_steps :]  # noqa
             ]  # noqa
-            if (
-                max(last_n_loss) - min(last_n_loss)
-                > max(last_n_loss) * self.ga_delta_percentage
-            ):
+            mean_far = sum(last_far_loss) / self.ga_delta_steps
+            mean_near = sum(last_near_loss) / self.ga_delta_steps
+            if mean_far - mean_near < mean_far * self.ga_delta_percentage:
                 args.gradient_accumulation_steps *= 2
                 args.gradient_accumulation_steps = min(
                     args.gradient_accumulation_steps, self.max_ga
                 )
                 self.wait = 0
+                if state.is_local_process_zero:
+                    print(f"far 100 mean: {mean_far}, near 100 mean: {mean_near}")
+                    print(
+                        "gradient accumulation updated to "
+                        f"{args.gradient_accumulation_steps} at step {state.global_step}"
+                    )
         else:
             self.wait += 1
-        self.aim._run.track(
-            {"gradient accumulation steps": args.gradient_accumulation_steps},
-            step=state.global_step,
-        )
+        if state.is_local_process_zero:
+            self.aim._run.track(
+                {"gradient accumulation steps": args.gradient_accumulation_steps},
+                step=state.global_step,
+            )
