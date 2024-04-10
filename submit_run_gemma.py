@@ -32,6 +32,11 @@ env_variables = {
     "HF_TOKEN": "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",
     "TOKENIZERS_PARALLELISM": "false",
     "CUDA_VISIBLE_DEVICES": "0, 1, 2, 3, 4, 5, 6, 7",
+    "NCCL_P2P_DISABLE": "1",
+    "NCCL_DEBUG": "INFO",
+    "NCCL_DEBUG_SUBSYS": "ALL",
+    "TORCH_DISTRIBUTED_DEBUG": "INFO",
+    "NCCL_TIMEOUT": "5400",
 }
 
 cli_arguments = {
