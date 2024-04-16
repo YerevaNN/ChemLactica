@@ -238,7 +238,7 @@ def train(
             adam_beta2=train_config.adam_beta2,
             warmup_steps=train_config.warmup_steps,
             max_grad_norm=train_config.global_gradient_norm,
-            evaluation_strategy="steps",
+            evaluation_strategy="no",
             max_steps=scheduler_max_steps,
             num_train_epochs=num_train_epochs,
             eval_steps=eval_steps,
@@ -286,15 +286,17 @@ def train(
                 dataset, aim_callback
             )
         elif train_type == "pretrain":
-            trainer_callback_dict[
-                "gradient_accumulation_scheduler"
-            ] = GradientAccumulationScheduler(
-                trainer_callback_dict.get("aim_callback", None),
-                max_ga=256,
-                ga_delta_steps=100,
-                ga_delta_percentage=0.02,
-                patience=2000,
-            )
+            if train_config.grad_accumulation_scheduler:
+                trainer_callback_dict[
+                    "gradient_accumulation_scheduler"
+                ] = GradientAccumulationScheduler(
+                    trainer_callback_dict.get("aim_callback", None),
+                    dynamic_ga=train_config.dynamic_grad_accumulation,
+                    max_ga=train_config.grad_accumulation_max,
+                    ga_delta_steps=train_config.grad_accumulation_delta_steps,
+                    ga_delta_percentage=train_config.grad_accumulation_delta_percentage,
+                    patience=train_config.grad_accumulation_patience,
+                )
 
         trainer.remove_callback(ProgressCallback)
         for additional_callback in list(trainer_callback_dict.values()):

@@ -386,6 +386,7 @@ class GradientAccumulationScheduler(TrainerCallback):
     def __init__(
         self,
         aim_callback,
+        dynamic_ga,
         max_ga=256,
         ga_delta_steps=100,
         ga_delta_percentage=0.1,
@@ -393,45 +394,48 @@ class GradientAccumulationScheduler(TrainerCallback):
     ) -> None:
         super().__init__()
         self.aim = aim_callback
+        self.dynamic_grad_ac = dynamic_ga
         self.max_ga = max_ga
         self.ga_delta_steps = ga_delta_steps
         self.ga_delta_percentage = ga_delta_percentage
         self.wait = 0
         self.patience = patience
-        assert self.ga_delta_steps < self.patience
+        assert self.ga_delta_steps * 20 < self.patience
 
-    def on_step_end(
+    def on_step_begin(
         self,
         args: TrainingArguments,
         state: TrainerState,
         control: TrainerControl,
         **kwargs,
     ):
-        super().on_step_end(args, state, control, **kwargs)
         print(
             f"is local process zero: {state.is_local_process_zero}, "
             f"step: {state.global_step}, grad acc: {args.gradient_accumulation_steps}"
         )
         if self.wait == self.patience:
-            last_far_loss = [
-                s["loss"]
-                for s in state.log_history[
-                    -20 * self.ga_delta_steps : -19 * self.ga_delta_steps  # noqa
+            condition = False
+            if self.dynamic_grad_ac:
+                last_far_loss = [
+                    s["loss"]
+                    for s in state.log_history[
+                        -20 * self.ga_delta_steps : -19 * self.ga_delta_steps  # noqa
+                    ]  # noqa
                 ]  # noqa
-            ]  # noqa
-            last_near_loss = [
-                s["loss"] for s in state.log_history[-self.ga_delta_steps :]  # noqa
-            ]  # noqa
-            mean_far = sum(last_far_loss) / self.ga_delta_steps
-            mean_near = sum(last_near_loss) / self.ga_delta_steps
-            if mean_far - mean_near < mean_far * self.ga_delta_percentage:
+                last_near_loss = [
+                    s["loss"] for s in state.log_history[-self.ga_delta_steps :]  # noqa
+                ]  # noqa
+                mean_far = sum(last_far_loss) / self.ga_delta_steps
+                mean_near = sum(last_near_loss) / self.ga_delta_steps
+                condition = mean_far - mean_near < mean_far * self.ga_delta_percentage
+                print(f"far 100 mean: {mean_far}, near 100 mean: {mean_near}")
+            if condition or not self.dynamic_grad_ac:
                 args.gradient_accumulation_steps *= 2
                 args.gradient_accumulation_steps = min(
                     args.gradient_accumulation_steps, self.max_ga
                 )
                 self.wait = 0
                 if state.is_local_process_zero:
-                    print(f"far 100 mean: {mean_far}, near 100 mean: {mean_near}")
                     print(
                         "gradient accumulation updated to "
                         f"{args.gradient_accumulation_steps} at step {state.global_step}"
@@ -443,3 +447,4 @@ class GradientAccumulationScheduler(TrainerCallback):
                 {"gradient accumulation steps": args.gradient_accumulation_steps},
                 step=state.global_step,
             )
+        super().on_step_begin(args, state, control, **kwargs)
