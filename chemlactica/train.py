@@ -238,7 +238,7 @@ def train(
             adam_beta2=train_config.adam_beta2,
             warmup_steps=train_config.warmup_steps,
             max_grad_norm=train_config.global_gradient_norm,
-            evaluation_strategy="every",
+            evaluation_strategy="steps",
             max_steps=scheduler_max_steps,
             num_train_epochs=num_train_epochs,
             eval_steps=eval_steps,
