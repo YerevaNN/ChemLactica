@@ -25,7 +25,7 @@ class TrainConfig:
     lr_scheduler_type: str = "constant_with_warmup"
     grad_accumulation_scheduler: str = "False"
     dynamic_grad_accumulation: str = "False"
-    grad_accumulation_patience: int = 400
+    grad_accumulation_patience: int = 4000
     grad_accumulation_max: int = 256
     grad_accumulation_delta_steps: int = 100
     grad_accumulation_delta_percentage: float = 0.02
