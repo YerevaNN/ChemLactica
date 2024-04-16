@@ -442,7 +442,7 @@ class GradientAccumulationScheduler(TrainerCallback):
                     )
         else:
             self.wait += 1
-        if state.is_local_process_zero:
+        if state.is_world_process_zero and self._aim_run is not None:
             self.aim._run.track(
                 {"gradient accumulation steps": args.gradient_accumulation_steps},
                 step=state.global_step,
