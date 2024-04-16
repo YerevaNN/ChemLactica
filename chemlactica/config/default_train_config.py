@@ -23,7 +23,7 @@ class TrainConfig:
     weight_decay: float = 0.1
     optimizer: str = "adamw_torch"
     lr_scheduler_type: str = "constant_with_warmup"
-    grad_accumulation_scheduler: str = "True"
+    grad_accumulation_scheduler: str = "False"
     dynamic_grad_accumulation: str = "False"
     grad_accumulation_patience: int = 400
     grad_accumulation_max: int = 256
