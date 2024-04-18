@@ -15,7 +15,7 @@ def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_
             args=training_args,
             # compute_metrics=compute_metrics,
             train_dataset=dataset["train"] if not evaluate_only else None,
-            eval_dataset=dataset["validation"]["validation"]
+            eval_dataset=dataset["validation"]
             if not evaluate_only or slurm_eval
             else None,
             # optimizers=[optimizer, lr_scheduler],

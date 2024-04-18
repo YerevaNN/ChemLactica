@@ -27,6 +27,7 @@ from chemlactica.utils.callbacks import (
     JsonlDatasetResumeCallback,
     EarlyStoppingCallback,
     SFTNumericalEval,
+    GradientAccumulationScheduler,
 )
 from chemlactica.utils.utils import (
     # signal_handler,
@@ -188,7 +189,6 @@ def train(
     trainer_callback_dict["progress_callback"] = CustomProgressCallback(
         max_steps, total_theoretical_peak_flops
     )
-
     accelerator.wait_for_everyone()
 
     with multiprocessing.Manager() as manager:
@@ -254,7 +254,7 @@ def train(
             # gradient_checkpointing=gradient_checkpointing,
             # gradient_checkpointing_kwargs={"use_reentrant": False},
             gradient_accumulation_steps=gradient_accumulation_steps,
-            # save_total_limit=4, in order for offline eval to work, we keep all of them for now
+            save_total_limit=4,  # in order for offline eval to work, we keep all of them for now
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type=train_config.lr_scheduler_type,
             optim=train_config.optimizer,
@@ -285,6 +285,18 @@ def train(
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
                 dataset, aim_callback
             )
+        elif train_type == "pretrain":
+            if train_config.grad_accumulation_scheduler:
+                trainer_callback_dict[
+                    "gradient_accumulation_scheduler"
+                ] = GradientAccumulationScheduler(
+                    aim_callback=trainer_callback_dict.get("aim_callback", None),
+                    dynamic_ga=train_config.dynamic_grad_accumulation,
+                    max_ga=train_config.grad_accumulation_max,
+                    ga_delta_steps=train_config.grad_accumulation_delta_steps,
+                    ga_delta_percentage=train_config.grad_accumulation_delta_percentage,
+                    patience=train_config.grad_accumulation_patience,
+                )
 
         trainer.remove_callback(ProgressCallback)
         for additional_callback in list(trainer_callback_dict.values()):

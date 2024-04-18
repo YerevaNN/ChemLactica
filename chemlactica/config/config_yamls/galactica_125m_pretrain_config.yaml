@@ -15,3 +15,4 @@ model_config:
   block_size: 2048
   vocab_size: 50000
   separator_token: </s>
+  tokenizer_path: "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
