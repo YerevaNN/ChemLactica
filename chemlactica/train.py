@@ -290,7 +290,7 @@ def train(
                 trainer_callback_dict[
                     "gradient_accumulation_scheduler"
                 ] = GradientAccumulationScheduler(
-                    trainer_callback_dict.get("aim_callback", None),
+                    aim_callback=trainer_callback_dict.get("aim_callback", None),
                     dynamic_ga=train_config.dynamic_grad_accumulation,
                     max_ga=train_config.grad_accumulation_max,
                     ga_delta_steps=train_config.grad_accumulation_delta_steps,

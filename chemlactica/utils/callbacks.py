@@ -393,6 +393,7 @@ class GradientAccumulationScheduler(TrainerCallback):
         patience=1000,
     ) -> None:
         super().__init__()
+        print("init dynamic ", dynamic_ga)
         self.aim = aim_callback
         self.dynamic_grad_ac = dynamic_ga
         self.max_ga = max_ga
@@ -400,6 +401,7 @@ class GradientAccumulationScheduler(TrainerCallback):
         self.ga_delta_percentage = ga_delta_percentage
         self.wait = 0
         self.patience = patience
+        # 20 is also an arbitrary number, look at the comment bellow.
         assert self.ga_delta_steps * 20 < self.patience
 
     def on_step_begin(
@@ -414,8 +416,9 @@ class GradientAccumulationScheduler(TrainerCallback):
             f"step: {state.global_step}, grad acc: {args.gradient_accumulation_steps}"
         )
         if self.wait == self.patience:
-            condition = False
             if self.dynamic_grad_ac:
+                # 20 and 19 are arbitrary numbers.
+                # taking the average of loss for a window of [-2000:-1900] for delta steps=100
                 last_far_loss = [
                     s["loss"]
                     for s in state.log_history[
@@ -427,19 +430,20 @@ class GradientAccumulationScheduler(TrainerCallback):
                 ]  # noqa
                 mean_far = sum(last_far_loss) / self.ga_delta_steps
                 mean_near = sum(last_near_loss) / self.ga_delta_steps
-                condition = mean_far - mean_near < mean_far * self.ga_delta_percentage
+                if mean_far - mean_near < mean_far * self.ga_delta_percentage:
+                    args.gradient_accumulation_steps *= 2
                 print(f"far 100 mean: {mean_far}, near 100 mean: {mean_near}")
-            if condition or not self.dynamic_grad_ac:
+            else:
                 args.gradient_accumulation_steps *= 2
-                args.gradient_accumulation_steps = min(
-                    args.gradient_accumulation_steps, self.max_ga
+            args.gradient_accumulation_steps = min(
+                args.gradient_accumulation_steps, self.max_ga
+            )
+            self.wait = 0
+            if state.is_local_process_zero:
+                print(
+                    "gradient accumulation updated to "
+                    f"{args.gradient_accumulation_steps} at step {state.global_step}"
                 )
-                self.wait = 0
-                if state.is_local_process_zero:
-                    print(
-                        "gradient accumulation updated to "
-                        f"{args.gradient_accumulation_steps} at step {state.global_step}"
-                    )
         else:
             self.wait += 1
         if state.is_world_process_zero and self.aim is not None:

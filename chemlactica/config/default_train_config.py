@@ -22,9 +22,11 @@ class TrainConfig:
     warmup_steps: int = 500
     weight_decay: float = 0.1
     optimizer: str = "adamw_torch"
-    lr_scheduler_type: str = "constant_with_warmup"
-    grad_accumulation_scheduler: str = "False"
-    dynamic_grad_accumulation: str = "False"
+    lr_scheduler_type: str = (
+        "constant_with_warmup"  # other options [Linear, constant_with_warmup]
+    )
+    grad_accumulation_scheduler: bool = True
+    dynamic_grad_accumulation: bool = True
     grad_accumulation_patience: int = 4000
     grad_accumulation_max: int = 256
     grad_accumulation_delta_steps: int = 100
