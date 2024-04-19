@@ -4,10 +4,10 @@ from datetime import datetime
 import submitit
 
 use_accelerate = True
-rsync_enabled = False
-executor_name = "local"  # options are ["slurm", "local"]
+rsync_enabled = True
+executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 2
+num_gpus = 6
 model_name = "gemma"
 model_size = "2b"
 train_type = "pretrain"
@@ -41,7 +41,7 @@ cli_arguments = {
     "dir_data_types": "computed",
     "training_data_dirs": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form",
     "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
-    "max_steps": 100,
+    "max_steps": 20000,
     # "num_train_epochs": 2,
     "eval_steps": 0,
     "save_steps": 2000,

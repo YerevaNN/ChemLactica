@@ -312,6 +312,7 @@ def train(
             try:
                 if not evaluate_only:
                     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+                    trainer.save_model(output_dir=os.path.join(checkpoints_dir, "last"))
                 else:
                     pass
             except Exception as e:
