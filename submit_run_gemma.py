@@ -12,7 +12,7 @@ model_name = "gemma"
 model_size = "2b"
 train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "gemma_sanity_check"
+job_name = "gemma_ga4k_lr5e-4_annealLR"
 
 slurm_params = {
     "slurm_job_name": job_name,
@@ -41,10 +41,10 @@ cli_arguments = {
     "dir_data_types": "computed",
     "training_data_dirs": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form",
     "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
-    "max_steps": 20000,
+    "max_steps": 100,
     # "num_train_epochs": 2,
-    "eval_steps": 20000,
-    "save_steps": 20000,
+    "eval_steps": 0,
+    "save_steps": 2000,
     "train_batch_size": 1,
     # "valid_batch_size":,s
     "dataloader_num_workers": 1,
