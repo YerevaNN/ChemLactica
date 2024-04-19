@@ -4,7 +4,7 @@ from datetime import datetime
 import submitit
 
 use_accelerate = True
-rsync_enabled = False
+rsync_enabled = True
 executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
 num_gpus = 6
@@ -12,7 +12,7 @@ model_name = "galactica"
 model_size = "125m"
 train_type = "sft"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "galactica_test"
+job_name = "gal_relform"
 
 slurm_params = {
     "slurm_job_name": job_name,
@@ -20,14 +20,15 @@ slurm_params = {
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
-    "cpus_per_task": num_gpus * 8,
-    "mem_gb": num_gpus * 15.0 + 20.0,
+    "cpus_per_task": num_gpus * 20,
+    "mem_gb": num_gpus * 20.0 + 20.0,
     "stderr_to_stdout": True,
 }
 
 accelerate_config = {"num_processes": num_gpus}
 
 env_variables = {
+    "HF_HOME": "/auto/home/menuab/",
     "TOKENIZERS_PARALLELISM": "true",
     "CUDA_VISIBLE_DEVICES": "0, 1, 2, 3, 4, 5, 6, 7",
 }
@@ -37,12 +38,12 @@ cli_arguments = {
     "from_pretrained": "facebook/galactica-125m",
     "model_config": train_name,
     "dir_data_types": "computed",
-    "training_data_dirs": "/nfs/dgx/raid/chem/rdkit_canon_data/computed_rel/",
-    "valid_data_dir": "/nfs/dgx/raid/chem/rdkit_canon_data/computed_valid/",
-    "max_steps": 30000,
+    "training_data_dirs": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form",
+    "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
+    "max_steps": 20000,
     # "num_train_epochs": 24,
-    "eval_steps": 2,
-    "save_steps": 4,
+    "eval_steps": 2000,
+    "save_steps": 2000,
     "train_batch_size": 16,
     "valid_batch_size": 16,
     "dataloader_num_workers": 1,
@@ -53,7 +54,7 @@ cli_arguments = {
     "track_dir": "/nfs/dgx/raid/chem/aim/",
     # "profile":,
     # "profile_dir":,
-    # "gradient_accumulation_steps":,
+    "gradient_accumulation_steps": 11,
     # "gradient_checkpointing":,
     # "evaluate_only":,
     # "check_reproducability":,
