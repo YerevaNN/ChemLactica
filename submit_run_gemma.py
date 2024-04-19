@@ -4,15 +4,15 @@ from datetime import datetime
 import submitit
 
 use_accelerate = True
-rsync_enabled = False
-executor_name = "local"  # options are ["slurm", "local"]
+rsync_enabled = True
+executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 2
+num_gpus = 6
 model_name = "gemma"
 model_size = "2b"
 train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "gemma_sanity_check"
+job_name = "gemma_ga4k_lr5e-4_annealLR"
 
 slurm_params = {
     "slurm_job_name": job_name,
@@ -43,8 +43,8 @@ cli_arguments = {
     "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
     "max_steps": 20000,
     # "num_train_epochs": 2,
-    "eval_steps": 20000,
-    "save_steps": 20000,
+    "eval_steps": 0,
+    "save_steps": 2000,
     "train_batch_size": 1,
     # "valid_batch_size":,s
     "dataloader_num_workers": 1,

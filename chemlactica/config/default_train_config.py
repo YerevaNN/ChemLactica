@@ -22,11 +22,16 @@ class TrainConfig:
     warmup_steps: int = 500
     weight_decay: float = 0.1
     optimizer: str = "adamw_torch"
-    lr_scheduler_type: str = (
-        "constant_with_warmup"  # other options [Linear, constant_with_warmup]
-    )
-    grad_accumulation_scheduler: bool = True
-    dynamic_grad_accumulation: bool = True
+    lr_scheduler_type: str = "linear"  # other options [linear, constant_with_warmup]
+    bf16: bool = True
+    bf16_full_eval: bool = True
+    fp16: bool = False
+    tf32: bool = True
+    evaluation_strategy: str = "steps"  # options are [no, steps, epoch]
+    # set manually to total number of checkpoints anticipated to minimize device OOM errors
+    save_total_limit: int = 4
+    grad_accumulation_scheduler: bool = False
+    dynamic_grad_accumulation: bool = False
     grad_accumulation_patience: int = 4000
     grad_accumulation_max: int = 256
     grad_accumulation_delta_steps: int = 100
