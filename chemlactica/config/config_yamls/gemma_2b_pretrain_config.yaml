@@ -13,7 +13,7 @@ train_config:
   bf16_full_eval: true
   fp16: false
   tf32: true
-  evaluation_strategy: no
+  evaluation_strategy: "no"
   save_total_limit: 10
   grad_accumulation_scheduler: true
   dynamic_grad_accumulation: false
