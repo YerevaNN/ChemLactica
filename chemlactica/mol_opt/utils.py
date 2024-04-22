@@ -32,10 +32,10 @@ def get_maccs_fingerprint(mol):
     return MACCSkeys.GenMACCSKeys(mol)
 
 
-def tanimoto_dist_func(mol1, mol2, fingerprint: str="morgan"):
+def tanimoto_dist_func(fing1, fing2, fingerprint: str="morgan"):
     return DataStructs.TanimotoSimilarity(
-        get_morgan_fingerprint(mol1) if fingerprint == 'morgan' else get_maccs_fingerprint(mol1),
-        get_morgan_fingerprint(mol2) if fingerprint == 'morgan' else get_maccs_fingerprint(mol2),
+        fing1 if fingerprint == 'morgan' else fing1,
+        fing2 if fingerprint == 'morgan' else fing2,
     )
 
 
@@ -44,8 +44,8 @@ def generate_random_number(lower, upper):
 
 
 def canonicalize(smiles):
-    smiles = Chem.MolToSmiles(Chem.MolFromSmiles(smiles), canonical=True)
-    return Chem.MolToSmiles(Chem.MolFromSmiles(smiles), kekuleSmiles=True)
+    return Chem.MolToSmiles(Chem.MolFromSmiles(smiles), canonical=True)
+    # return Chem.MolToSmiles(Chem.MolFromSmiles(smiles), kekuleSmiles=True)
 
 
 class MoleculeEntry:
@@ -53,16 +53,17 @@ class MoleculeEntry:
     def __init__(self, smiles, score=None, score_estimate=None, **kwargs):
         self.smiles = canonicalize(smiles)
         self.mol = Chem.MolFromSmiles(smiles)
-        self.inchi = Chem.MolToInchi(self.mol)
         self.fingerprint = get_morgan_fingerprint(self.mol)
         self.score = score
         self.score_estimate = score_estimate
         self.additional_properties = kwargs
 
     def __eq__(self, other):
-        return self.inchi == other.inchi
+        return self.smiles == other.smiles
 
     def __lt__(self, other):
+        if self.score == other.score:
+            return self.smiles < other.smiles
         return self.score < other.score
     
     def __str__(self):
@@ -72,7 +73,7 @@ class MoleculeEntry:
     
     def __repr__(self):
         return str(self)
-    
+
 
 class MoleculePool:
 
@@ -86,12 +87,17 @@ class MoleculePool:
         self.molecule_entries.sort(reverse=True)
 
         # remove doublicates
-        new_molecule_list = []
+        new_molecule_entries = []
         for mol in self.molecule_entries:
-            if len(new_molecule_list) == 0 or new_molecule_list[-1] != mol:
-                new_molecule_list.append(mol)
+            insert = True
+            for m in new_molecule_entries:
+                if mol == m or tanimoto_dist_func(mol.fingerprint, m.fingerprint) > 1.0:
+                    insert = False
+                    break
+            if insert:
+                new_molecule_entries.append(mol)
 
-        self.molecule_entries = new_molecule_list[:min(len(new_molecule_list), self.size)]
+        self.molecule_entries = new_molecule_entries[:min(len(new_molecule_entries), self.size)]
 
     def random_subset(self, subset_size):
         rand_inds = np.random.permutation(min(len(self.molecule_entries), subset_size))
