@@ -71,7 +71,7 @@ def optimize(
     # print("molecule generation arguments", config["generation_config"])
     molecule_pool = MoleculePool(config["molecule_pool_size"])
 
-    if config["strategy"] == "rej_sample":
+    if config["strategy"] == "rej-sample":
         training_entries = []
 
     num_iter = 1
@@ -116,15 +116,15 @@ def optimize(
         if oracle.finish:
             break
 
-        if config["strategy"] == "rej_sample":
+        if config["strategy"] == "rej-sample":
             top_k = int(len(current_entries) * config["rej_sample_config"]["rej_perc"])
             training_entries.extend(current_entries[:top_k])
             training_entries = list(np.unique(training_entries))[::-1]
             if len(training_entries) >= config["rej_sample_config"]["num_samples_per_round"]:
                 print(f"Num of train examples {len(training_entries)}.")
-                file.write("Training entries")
+                file.write("Training entries\n")
                 for i, mol in enumerate(training_entries):
-                    file.write(f"\t{i} smiles {mol.smiles}, score {mol.score:.4f}\n")
+                    file.write(f"\t{i} smiles: {mol.smiles}, score: {mol.score:.4f}\n")
                 train_dataset = Dataset.from_dict({
                     "sample": [
                         f"{entry.additional_properties['prompt']}{entry.smiles}[END_SMILES]</s>"
@@ -140,7 +140,7 @@ def optimize(
         molecule_pool.add(current_entries)
         file.write("Molecule pool\n")
         for i, mol in enumerate(molecule_pool.molecule_entries):
-            file.write(f"\t{i} smiles {mol.smiles}, score {mol.score:.4f}\n")
+            file.write(f"\t{i} smiles: {mol.smiles}, score: {mol.score:.4f}\n")
 
 
 # def optimize_reinvent(

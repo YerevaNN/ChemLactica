@@ -68,8 +68,8 @@ class MoleculeEntry:
     
     def __str__(self):
         return f"smiles: {self.smiles}, " \
-            f"score: {round(self.score, 4) if self.score else 'none'}, " \
-            f"score_estimate: {round(self.score_estimate, 4) if self.score_estimate else 'none'}"
+            f"score: {round(self.score, 4) if self.score != None else 'none'}, " \
+            f"score_estimate: {round(self.score_estimate, 4) if self.score_estimate != None else 'none'}"
     
     def __repr__(self):
         return str(self)
