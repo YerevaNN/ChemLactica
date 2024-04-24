@@ -72,7 +72,7 @@ def optimize(
     molecule_pool = MoleculePool(config["molecule_pool_size"])
 
     if config["strategy"] == "rej-sample":
-        training_entries = []
+        round_entries = []
 
     num_iter = 1
     while True:
@@ -117,10 +117,11 @@ def optimize(
             break
 
         if config["strategy"] == "rej-sample":
-            top_k = int(len(current_entries) * config["rej_sample_config"]["rej_perc"])
-            training_entries.extend(current_entries[:top_k])
-            training_entries = list(np.unique(training_entries))[::-1]
-            if len(training_entries) >= config["rej_sample_config"]["num_samples_per_round"]:
+            round_entries.extend(current_entries)
+            round_entries = list(np.unique(round_entries))[::-1]
+            top_k = int(len(round_entries) * config["rej_sample_config"]["rej_perc"])
+            if len(round_entries[:top_k]) >= config["rej_sample_config"]["num_samples_per_round"]:
+                training_entries = round_entries[:top_k]
                 print(f"Num of train examples {len(training_entries)}.")
                 file.write("Training entries\n")
                 for i, mol in enumerate(training_entries):
@@ -131,9 +132,10 @@ def optimize(
                         for entry in training_entries
                     ]
                 })
+                # train_dataset.shuffle(seed=42)
                 config["rej_sample_config"]["formatting_func"] = lambda x: x["sample"]
                 supervised_fine_tune(model, tokenizer, train_dataset, config["rej_sample_config"])
-                training_entries = []
+                round_entries = []
                 gc.collect()
                 torch.cuda.empty_cache()
 
