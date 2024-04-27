@@ -81,17 +81,24 @@ class MoleculePool:
         self.size = size
         self.molecule_entries: List[MoleculeEntry] = []
 
-    def add(self, entries: List[MoleculeEntry]):
+    def random_dump(self, num):
+        for _ in range(num):
+            rand_ind = random.randint(0, num - 1)
+            self.molecule_entries.pop(rand_ind)
+        print(f"Dump {num} random elements from pool, num pool mols {len(self)}")
+
+    def add(self, entries: List[MoleculeEntry], diversity_score=1.0):
         assert type(entries) == list
         self.molecule_entries.extend(entries)
         self.molecule_entries.sort(reverse=True)
 
+        # print(f"Updating with div_score {diversity_score:.4f}")
         # remove doublicates
         new_molecule_entries = []
         for mol in self.molecule_entries:
             insert = True
             for m in new_molecule_entries:
-                if mol == m or tanimoto_dist_func(mol.fingerprint, m.fingerprint) > 1.0:
+                if mol == m or tanimoto_dist_func(mol.fingerprint, m.fingerprint) > diversity_score:
                     insert = False
                     break
             if insert:
@@ -102,3 +109,6 @@ class MoleculePool:
     def random_subset(self, subset_size):
         rand_inds = np.random.permutation(min(len(self.molecule_entries), subset_size))
         return [self.molecule_entries[i] for i in rand_inds]
+    
+    def __len__(self):
+        return len(self.molecule_entries)

@@ -2,7 +2,7 @@ import torch
 from datasets import Dataset
 import multiprocessing
 import gc
-import re
+import math
 import numpy as np
 from collections import namedtuple
 from chemlactica.mol_opt.utils import MoleculeEntry, MoleculePool, generate_random_number
@@ -74,6 +74,8 @@ def optimize(
     if config["strategy"] == "rej-sample":
         round_entries = []
 
+    max_score = 0
+    tol_level = 0
     num_iter = 1
     while True:
         model.eval()
@@ -85,11 +87,13 @@ def optimize(
                 sim_range=config["sim_range"]
             )
             output_texts = []
-            generation_batch_size = 100
+            generation_batch_size = 64
             for i in range(0, len(prompts), generation_batch_size):
                 prompt_batch = prompts[i: min(len(prompts), i + generation_batch_size)]
                 data = tokenizer(prompt_batch, return_tensors="pt", padding=True).to(model.device)
                 del data["token_type_ids"]
+                for key, value in data.items():
+                    data[key] = value[:, -2048 + config["generation_config"]["max_new_tokens"]:]
                 output = model.generate(
                     **data,
                     **config["generation_config"]
@@ -105,6 +109,9 @@ def optimize(
                         entry.additional_properties["prompt"] = prompts[i]
                         current_entries.append(entry)
                         file.write(f"generated smiles: {entry.smiles}, score: {entry.score:.4f}\n")
+                        if entry.score > max_score + 0.01:
+                            max_score = entry.score
+                            tol_level = 0
                         if oracle.finish or len(current_entries) >= config["num_gens_per_iter"]:
                             break
 
@@ -112,11 +119,18 @@ def optimize(
                 break
 
         current_entries = list(np.unique(current_entries))[::-1]
+        tol_level += 1
         num_iter += 1
         if oracle.finish:
             break
 
-        if config["strategy"] == "rej-sample":
+        # print("tol_level", tol_level)
+        if tol_level >= 5:
+            num_to_dump = len(molecule_pool) // 2
+            molecule_pool.random_dump(num_to_dump)
+            file.write(f"Dump {num_to_dump} random elements from pool, num pool mols {len(molecule_pool)}\n")
+            tol_level = 0
+        if config["strategy"] == "rej-sample" and tol_level >= 5:
             round_entries.extend(current_entries)
             round_entries = list(np.unique(round_entries))[::-1]
             top_k = int(len(round_entries) * config["rej_sample_config"]["rej_perc"])
@@ -132,13 +146,14 @@ def optimize(
                         for entry in training_entries
                     ]
                 })
-                # train_dataset.shuffle(seed=42)
+                train_dataset.shuffle(seed=42)
                 config["rej_sample_config"]["formatting_func"] = lambda x: x["sample"]
                 supervised_fine_tune(model, tokenizer, train_dataset, config["rej_sample_config"])
                 round_entries = []
                 gc.collect()
                 torch.cuda.empty_cache()
 
+        # diversity_score = 1 / (1 + math.log(1 + repeated_max_score) / math.log(10))
         molecule_pool.add(current_entries)
         file.write("Molecule pool\n")
         for i, mol in enumerate(molecule_pool.molecule_entries):

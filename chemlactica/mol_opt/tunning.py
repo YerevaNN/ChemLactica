@@ -18,6 +18,7 @@ def supervised_fine_tune(
         dataloader_drop_last=False,
         dataloader_pin_memory=True,
         dataloader_num_workers=config["dataloader_num_workers"],
+        gradient_accumulation_steps=config["gradient_accumulation_steps"],
         logging_steps=1
     )
     optimizer = torch.optim.AdamW(
