@@ -1,4 +1,5 @@
 from typing import List
+import json
 
 import os
 from accelerate.state import PartialState
@@ -30,7 +31,13 @@ def should_yield_on_current_rank(i, num_processes, process_index):
 
 def format_sample(line):
     sample = line.strip()
-    ret = {"text": sample}
+    sample_d = json.loads(sample)
+    sample_d["yield"] = distributed_state.process_index
+    json_string = json.dumps(sample_d)
+    with open(f"{distributed_state.process_index}_in_yield.txt", "a") as f:
+        f.write(json_string + "\n")
+
+    ret = {"text": json_string}
     return ret
 
 
