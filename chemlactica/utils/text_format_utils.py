@@ -17,6 +17,8 @@ SPECIAL_TAGS = {
     "CLOGP": {"start": "[CLOGP]", "end": "[/CLOGP]", "type": float},
     "QED": {"start": "[QED]", "end": "[/QED]", "type": float},
     "NUMHDONORS": {"start": "[NUMHDONORS]", "end": "[/NUMHDONORS]"},
+    "index": {"start": "[INDEX]", "end": "[/INDEX]"},
+    "yield": {"start": "[YIELD]", "end": "[/YIELD]"},
     "NUMHACCEPTORS": {"start": "[NUMHACCEPTORS]", "end": "[/NUMHACCEPTORS]"},
     "NUMHETEROATOMS": {"start": "[NUMHETEROATOMS]", "end": "[/NUMHETEROATOMS]"},
     "NUMROTATABLEBONDS": {
