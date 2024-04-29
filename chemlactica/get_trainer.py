@@ -14,10 +14,7 @@ def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_
             # tokenizer_path=model_config.tokenizer_path,
             args=training_args,
             # compute_metrics=compute_metrics,
-            train_dataset=dataset["train"] if not evaluate_only else None,
-            eval_dataset=dataset["validation"]
-            if not evaluate_only or slurm_eval
-            else None,
+            train_dataset=dataset,
             # optimizers=[optimizer, lr_scheduler],
             # preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         )
