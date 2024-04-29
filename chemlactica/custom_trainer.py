@@ -8,6 +8,7 @@ from torch.nn.modules import Module
 #     FullyShardedDataParallel as FSDP,
 # )
 from transformers import Trainer, TrainingArguments
+from accelerate.state import PartialState
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 
 # from transformers.utils import is_torch_tpuc _available
@@ -15,6 +16,7 @@ from trl import IterativeSFTTrainer
 from chemlactica.utils.utils import get_tokenizer
 from dataclasses import dataclass, field
 
+distributed_state = PartialState()
 
 # if is_torch_tpu_available(check_device=False):
 #     import torch_xla.core.xla_model as xm
@@ -41,11 +43,13 @@ class CustomTrainer(Trainer):
         super().__init__(*args, **kwargs)
 
     def training_step(self, model: Module, inputs: Dict[str, Tensor | Any]) -> Tensor:
-        if self.num_samples_to_print:
-            tokenizer = get_tokenizer(self.tokenizer_path)
-            for i in range(min(inputs["input_ids"].size(0), self.num_samples_to_print)):
-                print(f"Sample {i + 1}:", tokenizer.decode(inputs["input_ids"][i]))
-            self.num_samples_to_print = None
+        tokenizer = get_tokenizer(self.tokenizer_path)
+        with open(f"{distributed_state.process_index}_in_train.txt", "a") as f:
+            f.write("---------------------" + str(self.state.global_step) + "\n")
+            for i in range(inputs["input_ids"].size(0)):
+                f.write(tokenizer.decode(inputs["input_ids"][i]) + "\n")
+            # print(f"Sample {i + 1}:", tokenizer.decode(inputs["input_ids"][i]))
+            # self.num_samples_to_print = None
         return super().training_step(model, inputs)
 
     def _build_slurm_eval_command(self, train_command, trial):
