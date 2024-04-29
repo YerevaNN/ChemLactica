@@ -3,19 +3,22 @@ from datasets import Dataset
 import multiprocessing
 import gc
 import math
+import tqdm
+import random
 import numpy as np
-from collections import namedtuple
 from chemlactica.mol_opt.utils import MoleculeEntry, MoleculePool, generate_random_number
 from chemlactica.mol_opt.tunning import supervised_fine_tune
 
 
-def create_optimization_prompts(num_prompts, molecule_pool, max_similars_in_prompt: int, sim_range):
+def create_optimization_prompts(num_prompts, molecule_pool, max_similars_in_prompt: int, sim_range, post_processor=None):
     prompts = []
     for i in range(num_prompts):
         similars_in_prompt = molecule_pool.random_subset(max_similars_in_prompt)
         prompt = "</s>"
         for mol in similars_in_prompt:
             prompt += f"[SIMILAR]{mol.smiles} {generate_random_number(sim_range[0], sim_range[1]):.2f}[/SIMILAR]"
+        if post_processor:
+            prompt = post_processor(prompt)
         prompt += "[START_SMILES]"
         prompts.append(prompt)
     return prompts
@@ -84,7 +87,7 @@ def optimize(
             prompts = create_optimization_prompts(
                 config["num_gens_per_iter"], molecule_pool,
                 max_similars_in_prompt=config["max_similars_in_prompt"],
-                sim_range=config["sim_range"]
+                sim_range=config["sim_range"], post_processor=config.get("prompts_post_processor")
             )
             output_texts = []
             generation_batch_size = 64
@@ -125,12 +128,12 @@ def optimize(
             break
 
         # print("tol_level", tol_level)
-        if tol_level >= 5:
-            num_to_dump = len(molecule_pool) // 2
+        if config["strategy"] == "pool-dump" and tol_level >= 5 and max_score < 0.99:
+            num_to_dump = int(len(molecule_pool) * config["pool_dump_config"]["dump_perc"])
             molecule_pool.random_dump(num_to_dump)
             file.write(f"Dump {num_to_dump} random elements from pool, num pool mols {len(molecule_pool)}\n")
             tol_level = 0
-        if config["strategy"] == "rej-sample" and tol_level >= 5:
+        if config["strategy"] == "rej-sample":
             round_entries.extend(current_entries)
             round_entries = list(np.unique(round_entries))[::-1]
             top_k = int(len(round_entries) * config["rej_sample_config"]["rej_perc"])
@@ -158,51 +161,3 @@ def optimize(
         file.write("Molecule pool\n")
         for i, mol in enumerate(molecule_pool.molecule_entries):
             file.write(f"\t{i} smiles: {mol.smiles}, score: {mol.score:.4f}\n")
-
-
-# def optimize_reinvent(
-#         model, prior_model,
-#         tokenizer, oracle,
-#         config
-#     ):
-#     print("molecule pool size", config["molecule_pool_size"])
-#     print("molecule generation arguments", config["mol_gen_kwargs"])
-#     molecule_pool = MoleculePool(config["molecule_pool_size"])
-
-#     num_iter = 1
-#     while True:
-#         generated_entries = []
-#         while len(generated_entries) < config["num_gens_per_iter"]:
-#             prompts = create_optimization_prompts(
-#                 config["num_gens_per_iter"], molecule_pool,
-#                 max_similars_in_prompt=config["max_similars_in_prompt"],
-#                 sim_range=config["sim_range"]
-#             )
-#             output_texts = []
-#             generation_batch_size = 200
-#             for i in range(0, len(prompts), generation_batch_size):
-#                 prompt_batch = prompts[i: min(len(prompts), i + generation_batch_size)]
-#                 data = tokenizer(prompt_batch, return_tensors="pt", padding=True).to(model.device)
-#                 del data["token_type_ids"]
-#                 output = model.generate(
-#                     **data,
-#                     **config["mol_gen_kwargs"]
-#                 )
-#                 gc.collect()
-#                 torch.cuda.empty_cache()
-#                 output_texts.extend(tokenizer.batch_decode(output))
-
-#             with multiprocessing.Pool(processes=config["num_processes"]) as pol:
-#                 for entry in pol.map(create_molecule_entry, output_texts) if entry]:
-#                     entry.score = oracle(entry.smiles)
-#                     generated_entries.append(entry)
-#                     if oracle.finish or len(generated_entries) >= config["num_gens_per_iter"]:
-#                         break
-
-#             if oracle.finish:
-#                 break
-
-#         num_iter += 1
-#         if oracle.finish:
-#             break
-#         molecule_pool.add(generated_entries)
