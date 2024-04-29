@@ -1,6 +1,6 @@
 import glob
 
-from datasets import load_dataset, interleave_datasets
+from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
 
 from chemlactica.utils.dataset_utils import process_dataset, DIR_DATA_TYPES
@@ -21,7 +21,6 @@ def get_dataset(
 ):
     if train_type == "pretrain":
         assert len(training_data_dirs) == len(dir_data_types)
-        train_dataset_dict = {}
         print("---Training dataset names---")
         for i, (training_data_dir, dir_data_type) in enumerate(
             zip(training_data_dirs, dir_data_types)
@@ -32,7 +31,7 @@ def get_dataset(
                     the following data types are supported: {DIR_DATA_TYPES}"""
                 )
             training_data_files = glob.glob(training_data_dir + "/*.jsonl")
-            ds_name = f"{dir_data_type}_{i}"
+            # ds_name = f"{dir_data_type}_{i}"
             is_assay_split = "assay" in dir_data_type
             dataset = IterableDataset.from_generator(
                 samples_generator,
@@ -49,34 +48,33 @@ def get_dataset(
                 is_eval=False,
                 assay=is_assay_split,
             )
-            if is_assay_split:
-                dataset.shuffle(buffer_size=shuffle_buffer_size)
-            print(f"Dataset {i}: {ds_name}")
-            train_dataset_dict[ds_name] = dataset
+        #     if is_assay_split:
+        #         dataset.shuffle(buffer_size=shuffle_buffer_size)
+        #     print(f"Dataset {i}: {ds_name}")
+        #     train_dataset_dict[ds_name] = dataset
 
-        valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
+        # valid_data_files = glob.glob(valid_data_dir + "/*.jsonl")
 
-        train_dataset = list(train_dataset_dict.values())
-        if len(train_dataset) > 1:
-            train_dataset = interleave_datasets(train_dataset)
-        else:
-            train_dataset = train_dataset[0]
+        # train_dataset = list(train_dataset_dict.values())
+        # if len(train_dataset) > 1:
+        #     train_dataset = interleave_datasets(train_dataset)
+        # else:
+        #     train_dataset = train_dataset[0]
 
-        if evaluate_only or not slurm_eval:
-            eval_dataset = load_dataset(
-                "text", data_files={"validation": valid_data_files}, streaming=False
-            )
-            processed_eval_dataset = process_dataset(
-                dataset=eval_dataset["validation"],
-                train_config=train_config,
-                model_config=model_config,
-                process_batch_sizes=(50, 50),
-                is_eval=True,
-                assay=False,
-            )
-        else:
-            processed_eval_dataset = None
-        dataset = {"train": train_dataset, "validation": processed_eval_dataset}
+        # if evaluate_only or not slurm_eval:
+        #     eval_dataset = load_dataset(
+        #         "text", data_files={"validation": valid_data_files}, streaming=False
+        #     )
+        #     processed_eval_dataset = process_dataset(
+        #         dataset=eval_dataset["validation"],
+        #         train_config=train_config,
+        #         model_config=model_config,
+        #         process_batch_sizes=(50, 50),
+        #         is_eval=True,
+        #         assay=False,
+        #     )
+        # with open("train_dataset_info.txt", "w") as f:
+        #     f.write(len(train_dataset))
 
     elif train_type == "sft":
         dataset = load_dataset(training_data_dirs[0])
