@@ -66,15 +66,10 @@ def generate_assay_docs(examples, train_config, model_config):
 def tokenize_function(examples, model_config, tokenizer):
     tokenizer = get_tokenizer(model_config.tokenizer_path)
     # print(f"Process id: {os.getpid()}, {tokenizer}")
-    with open(f"{distributed_state.process_index}_in_tok.txt", "a") as f:
-        f.write(examples["text"] + "\n")
     return tokenizer(examples["text"], return_token_type_ids=False)
 
 
 def process_str(str, random_number_generator, model_config):
-    with open(f"{distributed_state.process_index}_in_procstr.txt", "a") as f:
-        f.write(str["text"] + "\n")
-
     # it's wierd workaround but works for now
     try:
         compound = load_jsonl_line(str["text"])
