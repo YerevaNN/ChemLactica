@@ -1,16 +1,17 @@
+import os
 import sys
 from contextlib import contextmanager
 from datetime import datetime
 import submitit
 
 use_accelerate = True
-rsync_enabled = True
-executor_name = "slurm"  # options are ["slurm", "local"]
+rsync_enabled = False
+executor_name = "local"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 6
+num_gpus = 2
 model_name = "galactica"
 model_size = "125m"
-train_type = "sft"
+train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
 job_name = "gal_relform"
 
@@ -61,17 +62,17 @@ cli_arguments = {
 }
 
 
-def get_command(use_accelerate):
+def get_command(use_accelerate, repo_path):
     python_executable = sys.executable
     command = [python_executable]
     if use_accelerate:
-        accelerate_path = "chemlactica/config/accelerate_config.yaml"
+        accelerate_path = f"chemlactica/config/{model_name}_accelerate_config.yaml"
         command.extend(
             f"-m accelerate.commands.launch --config_file {accelerate_path}".split(" ")
         )
         for k, v in accelerate_config.items():
             command.append(f"--{k}={v}")
-    command.append("chemlactica/train.py")
+    command.append(os.path.join(repo_path, "chemlactica/train.py"))
     for x, y in cli_arguments.items():
         if isinstance(y, bool):
             if y:
@@ -101,15 +102,21 @@ def get_executor(executor_name, logs_path):
 
 
 if __name__ == "__main__":
+    train_name = "_".join([model_name, model_size, train_type])
+    current_path = os.getcwd()
     logs_path = "submitit_logs/%j"
     logs_path = "/nfs/dgx/raid/chem/" + logs_path if rsync_enabled else logs_path
     repo_path = (
-        "/nfs/dgx/raid/chem/rsyncsnapshots/"
-        f"{train_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M')}"
+        (
+            "/nfs/dgx/raid/chem/rsyncsnapshots/"
+            f"{train_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M')}"
+        )
+        if rsync_enabled
+        else current_path
     )
 
     with conditional_context_manager(rsync_enabled, repo_path):
-        command = get_command(use_accelerate)
+        command = get_command(use_accelerate, repo_path)
         executor = get_executor(executor_name, logs_path)
         executor.update_parameters(**slurm_params)
         print("train_name: ", train_name)
