@@ -170,6 +170,7 @@ def process_dataset(
             )
 
         else:
+            # with state.main_process_first():
             dataset = dataset.map(
                 process_str,
                 fn_kwargs={
@@ -177,6 +178,7 @@ def process_dataset(
                     "model_config": model_config,
                 },
             )
+            # with state.main_process_first():
             tokenized_datasets = dataset.map(
                 tokenize_function,
                 batched=True,
@@ -184,6 +186,7 @@ def process_dataset(
                 batch_size=process_batch_sizes[0],
                 remove_columns=["text"],
             )
+            # with state.main_process_first():
             lm_datasets = tokenized_datasets.map(
                 group_texts,
                 batched=True,
@@ -193,7 +196,6 @@ def process_dataset(
                     "eos_token_id": eos_token_id,
                 },
             )
-
     return lm_datasets
 
 

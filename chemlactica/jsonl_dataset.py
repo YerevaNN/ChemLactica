@@ -46,6 +46,7 @@ def samples_generator(
 ):
     file_states = setup_generator(shared_jsonl_files, files)
 
+    # TODO: there should be a more elegant way to do this without per line conditions
     returned = True
     while returned:
         returned = False
@@ -56,14 +57,14 @@ def samples_generator(
                 counter = 0
                 while line:
                     state["position"] = f.tell()
-                    if should_yield_on_current_rank(
-                        counter,
-                        distributed_state.num_processes,
-                        distributed_state.process_index,
-                    ):
-                        returned = True
-                        ret = format_sample(line)
-                        yield ret
+                    # if should_yield_on_current_rank(
+                    #     counter,
+                    #     distributed_state.num_processes,
+                    #     distributed_state.process_index,
+                    # ):
+                    #     returned = True
+                    ret = format_sample(line)
+                    yield ret
                     counter = counter + 1
                     shared_jsonl_files[file] = state
                     line = f.readline()
