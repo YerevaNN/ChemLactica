@@ -42,12 +42,7 @@ def get_tokenizer(tokenizer_path):
 
 def create_tokenizer(tokenizer_path):
     tok = AutoTokenizer.from_pretrained(tokenizer_path)
-    tok.bos_token = "<s>"
-    tok.bos_token_id = 0
-    tok.pad_token = "<pad>"
-    tok.pad_token_id = 1
-    tok.eos_token = "</s>"
-    tok.eos_token_id = 2
+    tok.add_bos_token = False
     print(f"Process {os.getpid()} created a tokenizer")
     return tok
 
