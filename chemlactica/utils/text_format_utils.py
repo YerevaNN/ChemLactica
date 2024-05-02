@@ -90,8 +90,9 @@ def generate_formatted_string(compound_json, rng, model_config):
     key = "SMILES"
     value = compound_json.get(key, "")
     if rng.integers(0, 1) == 0:
-        key_value_pairs.append(format_key_value(key, value, rng))
-        del compound_json[key]
+        if value:
+            key_value_pairs.append(format_key_value(key, value, rng))
+            del compound_json[key]
     keys = list(compound_json.keys())
     rng.shuffle(keys)
 
