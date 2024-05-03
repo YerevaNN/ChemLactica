@@ -56,7 +56,7 @@ class MoleculeEntry:
         self.fingerprint = get_morgan_fingerprint(self.mol)
         self.score = score
         self.score_estimate = score_estimate
-        self.additional_properties = kwargs
+        self.add_props = kwargs
 
     def __eq__(self, other):
         return self.smiles == other.smiles

@@ -74,7 +74,7 @@ def optimize(
     # print("molecule generation arguments", config["generation_config"])
     molecule_pool = MoleculePool(config["molecule_pool_size"])
 
-    if config["strategy"] == "rej-sample":
+    if "rej-sample" in config["strategy"]:
         round_entries = []
 
     max_score = 0
@@ -108,8 +108,12 @@ def optimize(
             with multiprocessing.Pool(processes=config["num_processes"]) as pol:
                 for i, entry in enumerate(pol.map(create_molecule_entry, output_texts)):
                     if entry:
-                        entry.score = oracle(entry.smiles)
-                        entry.additional_properties["prompt"] = prompts[i]
+                        if getattr(oracle, 'takes_entry', False):
+                            oracle_score = oracle(entry)
+                        else:
+                            oracle_score = oracle(entry.smiles)
+                        entry.score = oracle_score
+                        entry.add_props["prompt"] = prompts[i]
                         current_entries.append(entry)
                         file.write(f"generated smiles: {entry.smiles}, score: {entry.score:.4f}\n")
                         if entry.score > max_score + 0.01:
@@ -128,12 +132,12 @@ def optimize(
             break
 
         # print("tol_level", tol_level)
-        if config["strategy"] == "pool-dump" and tol_level >= 5 and max_score < 0.99:
+        if "pool-dump" in config["strategy"] and tol_level >= 5 and max_score < 0.99:
             num_to_dump = int(len(molecule_pool) * config["pool_dump_config"]["dump_perc"])
             molecule_pool.random_dump(num_to_dump)
             file.write(f"Dump {num_to_dump} random elements from pool, num pool mols {len(molecule_pool)}\n")
             tol_level = 0
-        if config["strategy"] == "rej-sample":
+        if "rej-sample" in config["strategy"]:
             round_entries.extend(current_entries)
             round_entries = list(np.unique(round_entries))[::-1]
             top_k = int(len(round_entries) * config["rej_sample_config"]["rej_perc"])
@@ -145,7 +149,7 @@ def optimize(
                     file.write(f"\t{i} smiles: {mol.smiles}, score: {mol.score:.4f}\n")
                 train_dataset = Dataset.from_dict({
                     "sample": [
-                        f"{entry.additional_properties['prompt']}{entry.smiles}[END_SMILES]</s>"
+                        f"{entry.add_props['prompt']}{entry.smiles}[END_SMILES]</s>"
                         for entry in training_entries
                     ]
                 })
