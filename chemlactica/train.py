@@ -224,7 +224,6 @@ def train(
             per_device_train_batch_size=train_batch_size,
             per_device_eval_batch_size=valid_batch_size,
             # log_level = "info",
-            dispatch_batches=False,
             # split_batches = True,
             log_on_each_node=True,
             do_eval=False,
