@@ -244,7 +244,6 @@ def train(
             num_train_epochs=num_train_epochs,
             eval_steps=eval_steps,
             save_steps=save_steps,
-            dispatch_batches=False,
             dataloader_drop_last=True,
             dataloader_pin_memory=True,
             dispatch_batches=False,
