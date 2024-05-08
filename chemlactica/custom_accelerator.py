@@ -1,7 +1,10 @@
-from accelerate import accelerator
+from accelerate.state import (
+    DistributedType,
+)
 import torch
-from accelerate import optimizer
+from accelerate import optimizer, accelerator
 import inspect
+from chemlactica.utils.distributed_utils import custom_prepare_data_loader
 
 
 class CustomAcceleratedOptimizer(optimizer.AcceleratedOptimizer):
@@ -39,3 +42,36 @@ class CustomAccelerator(accelerator.Accelerator):
         )
         self._optimizers.append(optimizer)
         return optimizer
+
+    def prepare_data_loader(
+        self,
+        data_loader: torch.utils.data.DataLoader,
+        device_placement=None,
+        slice_fn_for_dispatch=None,
+    ):
+        # Ensure we can't double wrap a DataLoader due to `find_batch_size`
+        if getattr(data_loader, "_is_accelerate_prepared", False):
+            if data_loader not in self._dataloaders:
+                self._dataloaders.append(data_loader)
+            return data_loader
+        if device_placement is None:
+            device_placement = (
+                self.device_placement
+                if self.distributed_type != DistributedType.XLA
+                else False
+            )
+        prepared_data_loader = custom_prepare_data_loader(
+            data_loader,
+            self.device,
+            num_processes=self.num_processes,
+            process_index=self.process_index,
+            split_batches=self.split_batches,
+            put_on_device=device_placement,
+            rng_types=self.rng_types.copy(),
+            dispatch_batches=self.dispatch_batches,
+            even_batches=self.even_batches,
+            slice_fn_for_dispatch=slice_fn_for_dispatch,
+            use_seedable_sampler=self.use_seedable_sampler,
+        )
+        self._dataloaders.append(prepared_data_loader)
+        return prepared_data_loader

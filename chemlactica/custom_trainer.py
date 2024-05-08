@@ -3,6 +3,9 @@ from typing import Any, Dict
 import os
 from torch._tensor import Tensor
 from torch.nn.modules import Module
+from custom_accelerator import CustomAccelerator
+from transformers.utils import is_accelerate_available
+from accelerate.utils import GradientAccumulationPlugin
 
 # from torch.distributed.fsdp.fully_sharded_data_parallel import (
 #     FullyShardedDataParallel as FSDP,
@@ -14,7 +17,6 @@ from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 from trl import IterativeSFTTrainer
 from chemlactica.utils.utils import get_tokenizer
 from dataclasses import dataclass, field
-
 
 # if is_torch_tpu_available(check_device=False):
 #     import torch_xla.core.xla_model as xm
@@ -47,6 +49,78 @@ class CustomTrainer(Trainer):
                 print(f"Sample {i + 1}:", tokenizer.decode(inputs["input_ids"][i]))
             self.num_samples_to_print = None
         return super().training_step(model, inputs)
+
+    def create_accelerator_and_postprocess(self):
+        grad_acc_kwargs = {"num_steps": self.args.gradient_accumulation_steps}
+        grad_acc_kwargs["sync_with_dataloader"] = False
+        gradient_accumulation_plugin = GradientAccumulationPlugin(**grad_acc_kwargs)
+
+        # create accelerator object
+        self.accelerator = CustomAccelerator(
+            deepspeed_plugin=self.args.deepspeed_plugin,
+            gradient_accumulation_plugin=gradient_accumulation_plugin,
+            **self.args.accelerator_config.to_dict(),
+        )
+        # some Trainer classes need to use `gather` instead of `gather_for_metrics`,
+        # thus we store a flag
+        self.gather_function = self.accelerator.gather_for_metrics
+
+        # deepspeed and accelerate flags covering both trainer args and accelerate launcher
+        self.is_deepspeed_enabled = (
+            getattr(self.accelerator.state, "deepspeed_plugin", None) is not None
+        )
+        self.is_fsdp_enabled = (
+            getattr(self.accelerator.state, "fsdp_plugin", None) is not None
+        )
+
+        # post accelerator creation setup
+        if self.is_fsdp_enabled:
+            fsdp_plugin = self.accelerator.state.fsdp_plugin
+            fsdp_plugin.limit_all_gathers = self.args.fsdp_config.get(
+                "limit_all_gathers", fsdp_plugin.limit_all_gathers
+            )
+            if is_accelerate_available("0.23.0"):
+                fsdp_plugin.activation_checkpointing = self.args.fsdp_config.get(
+                    "activation_checkpointing", fsdp_plugin.activation_checkpointing
+                )
+                if (
+                    fsdp_plugin.activation_checkpointing
+                    and self.args.gradient_checkpointing
+                ):
+                    raise ValueError(
+                        "The activation_checkpointing in FSDP config and "
+                        "the gradient_checkpointing in training arg "
+                        "can't be set to True simultaneously. "
+                        "Please use FSDP's activation_checkpointing logic "
+                        "when using FSDP."
+                    )
+
+        if (
+            self.is_deepspeed_enabled
+            and getattr(self.args, "hf_deepspeed_config", None) is None
+        ):
+            self.propagate_args_to_deepspeed()
+
+        # `save_only_model` can't be used with DeepSpeed/FSDP along with `load_best_model_at_end`
+        if (
+            self.args.save_only_model
+            and (self.is_deepspeed_enabled or self.is_fsdp_enabled)
+            and self.args.load_best_model_at_end
+        ):
+            wrapper = "DeepSpeed" if self.is_deepspeed_enabled else "FSDP"
+            raise ValueError(
+                f"{wrapper} can't be used with `save_only_model` "
+                "along with `load_best_model_at_end`."
+            )
+
+        # `auto_find_batch_size` isn't yet supported with DeepSpeed/FSDP
+        if (
+            self.is_deepspeed_enabled or self.is_fsdp_enabled
+        ) and self.args.auto_find_batch_size:
+            wrapper = "DeepSpeed" if self.is_deepspeed_enabled else "FSDP"
+            raise NotImplementedError(
+                f"`{wrapper}` doesn't support `auto_find_batch_size`."
+            )
 
     def _build_slurm_eval_command(self, train_command, trial):
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
