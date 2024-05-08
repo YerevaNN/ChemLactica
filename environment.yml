@@ -29,8 +29,6 @@ dependencies:
   - cuda-libraries=11.8.0=0
   - cuda-libraries-dev=11.8.0=0
   - cuda-memcheck=11.8.86=0
-  - cuda-nsight=11.8.86=0
-  - cuda-nsight-compute=11.8.0=0
   - cuda-nvcc=11.8.89=0
   - cuda-nvdisasm=11.8.86=0
   - cuda-nvml-dev=11.8.86=0
