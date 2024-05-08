@@ -13,8 +13,9 @@ import transformers
 from transformers import (
     ProgressCallback,
 )
-from accelerate import Accelerator, logging, InitProcessGroupKwargs
+from accelerate import logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
+from custom_accelerator import CustomAccelerator
 
 from chemlactica.custom_trainer import CustomArguments
 from chemlactica.utils.callbacks import (
@@ -91,7 +92,7 @@ def train(
 
     kwargs = InitProcessGroupKwargs(timeout=timedelta(seconds=7200))
 
-    accelerator = Accelerator(
+    accelerator = CustomAccelerator(
         kwargs_handlers=[kwargs], log_with="all", project_dir=track_dir
     )
 
