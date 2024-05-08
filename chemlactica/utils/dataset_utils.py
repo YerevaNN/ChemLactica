@@ -168,32 +168,32 @@ def process_dataset(
                 num_proc=4,
             )
         else:
-            with state.main_process_first():
-                dataset = dataset.map(
-                    process_str,
-                    fn_kwargs={
-                        "random_number_generator": rng,
-                        "model_config": model_config,
-                    },
-                )
-            with state.main_process_first():
-                tokenized_datasets = dataset.map(
-                    tokenize_function,
-                    batched=True,
-                    fn_kwargs={"model_config": model_config, "tokenizer": tokenizer},
-                    batch_size=process_batch_sizes[0],
-                    remove_columns=["text"],
-                )
-            with state.main_process_first():
-                lm_datasets = tokenized_datasets.map(
-                    group_texts,
-                    batched=True,
-                    batch_size=process_batch_sizes[1],
-                    fn_kwargs={
-                        "model_config": model_config,
-                        "eos_token_id": eos_token_id,
-                    },
-                )
+            # with state.main_process_first():
+            dataset = dataset.map(
+                process_str,
+                fn_kwargs={
+                    "random_number_generator": rng,
+                    "model_config": model_config,
+                },
+            )
+            # with state.main_process_first():
+            tokenized_datasets = dataset.map(
+                tokenize_function,
+                batched=True,
+                fn_kwargs={"model_config": model_config, "tokenizer": tokenizer},
+                batch_size=process_batch_sizes[0],
+                remove_columns=["text"],
+            )
+            # with state.main_process_first():
+            lm_datasets = tokenized_datasets.map(
+                group_texts,
+                batched=True,
+                batch_size=process_batch_sizes[1],
+                fn_kwargs={
+                    "model_config": model_config,
+                    "eos_token_id": eos_token_id,
+                },
+            )
 
     return lm_datasets
 
