@@ -15,7 +15,7 @@ from transformers import (
 )
 from accelerate import logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
-from custom_accelerator import CustomAccelerator
+from chemlactica.custom_accelerator import CustomAccelerator
 
 from chemlactica.custom_trainer import CustomArguments
 from chemlactica.utils.callbacks import (
