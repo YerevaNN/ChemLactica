@@ -245,6 +245,7 @@ def train(
             save_steps=save_steps,
             dataloader_drop_last=True,
             dataloader_pin_memory=True,
+            dispatch_batches=False,
             # torch_compile=True,
             # torch_compile requires to set use_orig_params=true
             # which has some conflict with saving checkpoints
