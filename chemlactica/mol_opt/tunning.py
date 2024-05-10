@@ -45,7 +45,7 @@ def supervised_fine_tune(
         packing=config["packing"],
         tokenizer=tokenizer,
         max_seq_length=config["max_seq_length"],
-        data_collator=collator,
+        # data_collator=collator,
         optimizers=[optimizer, lr_scheduler]
     )
     trainer.train()
