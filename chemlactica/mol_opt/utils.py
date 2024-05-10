@@ -5,7 +5,6 @@ import numpy as np
 import torch
 from rdkit import Chem, DataStructs, RDLogger
 from rdkit.Chem import AllChem, MACCSkeys
-from rdkit.Chem.QED import qed
 
 # Disable RDKit logs
 RDLogger.DisableLog('rdApp.*')
