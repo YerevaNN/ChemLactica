@@ -1,7 +1,34 @@
+from transformers.trainer_callback import TrainerControl, TrainerState
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
-from transformers import TrainingArguments, get_polynomial_decay_schedule_with_warmup
+from transformers import TrainingArguments, get_polynomial_decay_schedule_with_warmup, TrainerCallback
 from torch.optim.lr_scheduler import ConstantLR
 import torch
+import math
+
+
+class CustomSFTTrainer(SFTTrainer):
+
+    def __init__(self, *args, patience, toll, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.patience = patience
+        self.initial_pat = patience
+        self.toll = toll
+        self.best_loss = math.inf
+
+    def log(self, logs) -> None:
+        if logs.get("loss"):
+            curr_loss = logs["loss"]
+            if curr_loss > self.best_loss - self.toll:
+                self.patience -= 1
+                print(f"loss did not improve, patience {self.patience}")
+            else:
+                print("loss improved")
+                self.best_loss = curr_loss
+                self.patience = self.initial_pat
+            if self.patience == 0:
+                print("The loss does not improve, stop training.")
+                self.control.should_training_stop = True
+        return super().log(logs)
 
 
 def supervised_fine_tune(
@@ -19,7 +46,8 @@ def supervised_fine_tune(
         dataloader_pin_memory=True,
         dataloader_num_workers=config["dataloader_num_workers"],
         gradient_accumulation_steps=config["gradient_accumulation_steps"],
-        logging_steps=1
+        logging_steps=1,
+        metric_for_best_model="loss",
     )
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -37,7 +65,7 @@ def supervised_fine_tune(
     collator = DataCollatorForCompletionOnlyLM(
         config["response_template"], tokenizer=tokenizer
     )
-    trainer = SFTTrainer(
+    trainer = CustomSFTTrainer(
         model=model,
         train_dataset=train_dataset,
         formatting_func=config["formatting_func"],
@@ -46,6 +74,8 @@ def supervised_fine_tune(
         tokenizer=tokenizer,
         max_seq_length=config["max_seq_length"],
         # data_collator=collator,
-        optimizers=[optimizer, lr_scheduler]
+        optimizers=[optimizer, lr_scheduler],
+        patience=2,
+        toll=0.0001
     )
     trainer.train()

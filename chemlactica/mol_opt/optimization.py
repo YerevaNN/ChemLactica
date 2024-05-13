@@ -160,7 +160,12 @@ def optimize(
             # round_entries = list(np.unique(round_entries))[::-1]
             # top_k = int(len(all_entries) * config["rej_sample_config"]["rej_perc"])
             # if top_k >= config["rej_sample_config"]["num_samples_per_round"]:
+<<<<<<< HEAD
             if tol_level >= 3 and num_iter > initial_num_iter:
+=======
+            # if num_iter > initial_num_iter and num_iter % 3 == 0:
+            if tol_level >= 2:
+>>>>>>> 44cfb4b (rej-sample-v2.1)
                 training_entries = molecule_pool.molecule_entries
                 print(f"Num of train examples {len(training_entries)}.")
                 file.write("Training entries\n")
