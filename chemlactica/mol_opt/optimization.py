@@ -11,23 +11,28 @@ from chemlactica.mol_opt.utils import MoleculeEntry, MoleculePool, generate_rand
 from chemlactica.mol_opt.tunning import supervised_fine_tune
 
 
-def create_optimization_prompts(num_prompts, molecule_pool, max_mols_in_prompt: int, post_processor=None):
+def create_optimization_prompts(num_prompts, molecule_pool, max_mols_in_prompt: int, strategy: str, eos_token: str, post_processor=None):
     prompts = []
     for i in range(num_prompts):
         similars_in_prompt = molecule_pool.random_subset(max_mols_in_prompt)
-        prompt = "</s>"
+        prompt = eos_token
         oracle_scores_of_mols_in_prompt = []
         for mol in similars_in_prompt:
-            prompt += f"[ORACLE_SCORE]{mol.score:.2f}[/ORACLE_SCORE][START_SMILES]{mol.smiles}[END_SMILES]"
-            # prompt += f"[SIMILAR]{mol.smiles} {generate_random_number(0.8, 0.9)}[/SIMILAR]"
+            if "default" in strategy:
+                prompt += f"[SIMILAR]{mol.smiles} {generate_random_number(0.8, 0.9):.2f}[/SIMILAR]"
+            elif "rej-sample" in strategy:
+                prompt += f"[ORACLE_SCORE]{mol.score:.2f}[/ORACLE_SCORE][START_SMILES]{mol.smiles}[END_SMILES]"
             # prompt += f"[START_SMILES]{mol.smiles}[END_SMILES]"
             oracle_scores_of_mols_in_prompt.append(mol.score)
         if post_processor:
             prompt = post_processor(prompt)
         q_0_9 = np.quantile(oracle_scores_of_mols_in_prompt, 0.9) if oracle_scores_of_mols_in_prompt else 0
         required_oracle_score = generate_random_number(q_0_9, 1.0) # TODO: change the hard coded 1.0
-        prompt += f"[ORACLE_SCORE]{required_oracle_score:.2f}[/ORACLE_SCORE][START_SMILES]"
-        # prompt += f"[START_SMILES]"
+        if "default" in strategy:
+            prompt += f"[START_SMILES]"
+        elif "rej-sample" in strategy:
+            prompt += f"[ORACLE_SCORE]{required_oracle_score:.2f}[/ORACLE_SCORE][START_SMILES]"
+        
         prompts.append(prompt)
     return prompts
 
@@ -52,25 +57,25 @@ def create_molecule_entry(output_text):
         return None
 
 
-def query_molecule_properties(model, tokenizer, smiles, property_tag, prop_pred_kwargs):
-    property_start_tag, property_end_tag = f"[{property_tag}]", f"[/{property_tag}]"
-    prompts = [f"</s>[START_SMILES]{smiles}[END_SMILES][{property_tag}]"]
-    data = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
-    del data["token_type_ids"]
-    outputs = model.generate(
-        **data,
-        **prop_pred_kwargs
-    )
-    predicted_property_values = []
-    output_texts = tokenizer.batch_decode(outputs)
-    for output_text in output_texts:
-        start_ind = output_text.find(property_start_tag)
-        end_ind = output_text.find(property_end_tag)
-        if start_ind != -1 and end_ind != -1:
-            predicted_property_values.append(output_text[start_ind+len(property_start_tag):end_ind])
-        else:
-            predicted_property_values.append(None)
-    return predicted_property_values
+# def query_molecule_properties(model, tokenizer, smiles, property_tag, prop_pred_kwargs):
+#     property_start_tag, property_end_tag = f"[{property_tag}]", f"[/{property_tag}]"
+#     prompts = [f"</s>[START_SMILES]{smiles}[END_SMILES][{property_tag}]"]
+#     data = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
+#     del data["token_type_ids"]
+#     outputs = model.generate(
+#         **data,
+#         **prop_pred_kwargs
+#     )
+#     predicted_property_values = []
+#     output_texts = tokenizer.batch_decode(outputs)
+#     for output_text in output_texts:
+#         start_ind = output_text.find(property_start_tag)
+#         end_ind = output_text.find(property_end_tag)
+#         if start_ind != -1 and end_ind != -1:
+#             predicted_property_values.append(output_text[start_ind+len(property_start_tag):end_ind])
+#         else:
+#             predicted_property_values.append(None)
+#     return predicted_property_values
 
 
 def optimize(
@@ -83,7 +88,7 @@ def optimize(
     molecule_pool = MoleculePool(config["molecule_pool_size"])
 
     if "rej-sample" in config["strategy"]:
-        round_entries = {}
+        all_entries = {}
 
     max_score = 0
     tol_level = 0
@@ -93,8 +98,11 @@ def optimize(
         current_entries = []
         while len(current_entries) < config["num_gens_per_iter"]:
             prompts = create_optimization_prompts(
-                config["num_gens_per_iter"], molecule_pool,
+                config["num_gens_per_iter"],
+                molecule_pool,
                 max_mols_in_prompt=config["max_mols_in_prompt"],
+                eos_token=config["eos_token"],
+                strategy=config["strategy"],
                 post_processor=config.get("prompts_post_processor")
             )
             output_texts = []
@@ -134,27 +142,27 @@ def optimize(
             if oracle.finish:
                 break
 
-        current_entries = list(np.unique(current_entries))[::-1]
-        tol_level += 1
-        num_iter += 1
         if oracle.finish:
             break
+        current_entries = list(np.unique(current_entries))[::-1]
+        initial_num_iter = num_iter
+        num_iter = len(oracle.mol_buffer) // config["num_gens_per_iter"]
+        print("num_iter: ", num_iter)
 
-        # print("tol_level", tol_level)
-        if "pool-dump" in config["strategy"] and tol_level >= 5:
-            num_to_dump = int(len(molecule_pool) * config["pool_dump_config"]["dump_perc"])
-            molecule_pool.random_dump(num_to_dump)
-            file.write(f"Dump {num_to_dump} random elements from pool, num pool mols {len(molecule_pool)}\n")
-            tol_level = 0
+        # diversity_score = 1 / (1 + math.log(1 + repeated_max_score) / math.log(10))
+        molecule_pool.add(current_entries)
+        file.write("Molecule pool\n")
+        for i, mol in enumerate(molecule_pool.molecule_entries):
+            file.write(f"\t{i} smiles: {mol.smiles}, score: {mol.score:.4f}\n")
+
         if "rej-sample" in config["strategy"]:
             # round_entries.extend(current_entries)
             # round_entries = list(np.unique(round_entries))[::-1]
-            for entry in current_entries:
-                round_entries[entry.smiles] = entry
-            top_k = int(len(round_entries) * config["rej_sample_config"]["rej_perc"])
+            # top_k = int(len(all_entries) * config["rej_sample_config"]["rej_perc"])
             # if top_k >= config["rej_sample_config"]["num_samples_per_round"]:
-            if num_iter % 10 == 0:
-                training_entries = np.unique(molecule_pool.molecule_entries)[-top_k:]
+            # if num_iter > initial_num_iter and num_iter % 3 == 0:
+            if tol_level >= 2:
+                training_entries = molecule_pool.molecule_entries
                 print(f"Num of train examples {len(training_entries)}.")
                 file.write("Training entries\n")
                 for i, mol in enumerate(training_entries):
@@ -162,7 +170,7 @@ def optimize(
 
                 def create_training_sample(entry):
                     sample = entry.add_props["prompt"]
-                    return sample + f"[START_SMILES]{entry.smiles}[END_SMILES]</s>"
+                    return sample + f"[START_SMILES]{entry.smiles}[END_SMILES]"
                 
                 train_dataset = Dataset.from_dict({
                     "sample": [
@@ -173,12 +181,11 @@ def optimize(
                 train_dataset.shuffle(seed=42)
                 config["rej_sample_config"]["formatting_func"] = lambda x: x["sample"]
                 supervised_fine_tune(model, tokenizer, train_dataset, config["rej_sample_config"])
-                round_entries = {}
                 gc.collect()
                 torch.cuda.empty_cache()
-
-        # diversity_score = 1 / (1 + math.log(1 + repeated_max_score) / math.log(10))
-        molecule_pool.add(current_entries)
-        file.write("Molecule pool\n")
-        for i, mol in enumerate(molecule_pool.molecule_entries):
-            file.write(f"\t{i} smiles: {mol.smiles}, score: {mol.score:.4f}\n")
+                tol_level = 0
+        if "pool-dump" in config["strategy"] and tol_level >= 10:
+            num_to_dump = int(len(molecule_pool) * config["pool_dump_config"]["dump_perc"])
+            molecule_pool.random_dump(num_to_dump)
+            file.write(f"Dump {num_to_dump} random elements from pool, num pool mols {len(molecule_pool)}\n")
+            tol_level = 0
