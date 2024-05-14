@@ -8,12 +8,12 @@ use_accelerate = True
 rsync_enabled = True
 executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 4
+num_gpus = 6
 model_name = "gemma"
 model_size = "2b"
 train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "gemma_4Btokens"
+job_name = "gemma_2.1Bcomputecontrol_"
 
 slurm_params = {
     "slurm_job_name": job_name,
@@ -43,10 +43,10 @@ cli_arguments = {
     "training_data_dirs": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form",
     # "training_data_dirs": "/auto/home/menuab/code/data",
     "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
-    "max_steps": 30000,
+    "max_steps": 11000,
     # "num_train_epochs": 2,
     "eval_steps": 0,
-    "save_steps": 5000,
+    "save_steps": 3000,
     "train_batch_size": 1,
     # "valid_batch_size":,s
     "dataloader_num_workers": 1,

@@ -38,7 +38,7 @@ class CustomArguments(TrainingArguments):
 class CustomTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         # the number of samples to print when the training begins, for debugging purposes
-        self.num_samples_to_print = 5
+        self.num_samples_to_print = 10
         self.tokenizer_path = kwargs["args"].tokenizer_path
         super().__init__(*args, **kwargs)
 

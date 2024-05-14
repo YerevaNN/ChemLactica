@@ -122,7 +122,7 @@ def process_dataset(
     assay=True,
 ):
     tokenizer = get_tokenizer(model_config.tokenizer_path)
-    eos_token_id = tokenizer.eos_token_id
+    eos_token_id = model_config.separator_token
     rng = np.random.default_rng()
 
     if assay:
