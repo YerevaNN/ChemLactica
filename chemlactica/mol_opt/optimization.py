@@ -57,27 +57,6 @@ def create_molecule_entry(output_text):
         return None
 
 
-# def query_molecule_properties(model, tokenizer, smiles, property_tag, prop_pred_kwargs):
-#     property_start_tag, property_end_tag = f"[{property_tag}]", f"[/{property_tag}]"
-#     prompts = [f"</s>[START_SMILES]{smiles}[END_SMILES][{property_tag}]"]
-#     data = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
-#     del data["token_type_ids"]
-#     outputs = model.generate(
-#         **data,
-#         **prop_pred_kwargs
-#     )
-#     predicted_property_values = []
-#     output_texts = tokenizer.batch_decode(outputs)
-#     for output_text in output_texts:
-#         start_ind = output_text.find(property_start_tag)
-#         end_ind = output_text.find(property_end_tag)
-#         if start_ind != -1 and end_ind != -1:
-#             predicted_property_values.append(output_text[start_ind+len(property_start_tag):end_ind])
-#         else:
-#             predicted_property_values.append(None)
-#     return predicted_property_values
-
-
 def optimize(
         model, tokenizer,
         oracle, config
@@ -160,12 +139,7 @@ def optimize(
             # round_entries = list(np.unique(round_entries))[::-1]
             # top_k = int(len(all_entries) * config["rej_sample_config"]["rej_perc"])
             # if top_k >= config["rej_sample_config"]["num_samples_per_round"]:
-<<<<<<< HEAD
             if tol_level >= 3 and num_iter > initial_num_iter:
-=======
-            # if num_iter > initial_num_iter and num_iter % 3 == 0:
-            if tol_level >= 2:
->>>>>>> 44cfb4b (rej-sample-v2.1)
                 training_entries = molecule_pool.molecule_entries
                 print(f"Num of train examples {len(training_entries)}.")
                 file.write("Training entries\n")
