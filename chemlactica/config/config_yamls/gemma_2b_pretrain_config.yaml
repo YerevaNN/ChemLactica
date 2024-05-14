@@ -27,6 +27,7 @@ model_config:
   block_size: 2048
   vocab_size: 256000
   separator_token: <bos>
+  separator_token_id: 2
   # tokenizer_path: "./chemlactica/tokenizer/GemmaTokenizer"
   tokenizer_path: "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/GemmaTokenizer"
   # tokenizer_path: "google/gemma-2b"
