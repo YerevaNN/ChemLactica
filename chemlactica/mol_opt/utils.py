@@ -54,12 +54,13 @@ def canonicalize(smiles):
 
 
 class MoleculeEntry:
-    def __init__(self, smiles, score=None, score_estimate=None, **kwargs):
-        self.smiles = canonicalize(smiles)
-        self.mol = Chem.MolFromSmiles(smiles)
-        self.fingerprint = get_morgan_fingerprint(self.mol)
-        self.score = score
-        self.score_estimate = score_estimate
+    def __init__(self, smiles, score=None, **kwargs):
+        self.smiles = smiles
+        if smiles:
+            self.smiles = canonicalize(smiles)
+            self.mol = Chem.MolFromSmiles(smiles)
+            self.fingerprint = get_morgan_fingerprint(self.mol)
+            self.score = score
         self.add_props = kwargs
 
     def __eq__(self, other):
@@ -73,56 +74,55 @@ class MoleculeEntry:
     def __str__(self):
         return (
             f"smiles: {self.smiles}, "
-            f"score: {round(self.score, 4) if self.score != None else 'none'}, "
-            f"score_estimate: {round(self.score_estimate, 4) if self.score_estimate != None else 'none'}"  # noqa
+            f"score: {round(self.score, 4) if self.score != None else 'none'}"
         )
 
     def __repr__(self):
         return str(self)
 
 
-class MoleculePool:
+class Pool:
     def __init__(self, size):
         self.size = size
-        self.molecule_entries: List[MoleculeEntry] = []
+        self.optim_entries: List[OptimEntry] = []
 
-    def random_dump(self, num):
-        for _ in range(num):
-            rand_ind = random.randint(0, num - 1)
-            self.molecule_entries.pop(rand_ind)
-        print(f"Dump {num} random elements from pool, num pool mols {len(self)}")
+    # def random_dump(self, num):
+    #     for _ in range(num):
+    #         rand_ind = random.randint(0, num - 1)
+    #         self.molecule_entries.pop(rand_ind)
+    #     print(f"Dump {num} random elements from pool, num pool mols {len(self)}")
 
     def add(self, entries: List[MoleculeEntry], diversity_score=1.0):
         assert type(entries) == list
-        self.molecule_entries.extend(entries)
-        self.molecule_entries.sort(reverse=True)
+        self.optim_entries.extend(entries)
+        self.optim_entries.sort(key=lambda x: x.last_entry, reverse=True)
 
         # print(f"Updating with div_score {diversity_score:.4f}")
         # remove doublicates
-        new_molecule_entries = []
-        for mol in self.molecule_entries:
+        new_optim_entries = []
+        for entry in self.optim_entries:
             insert = True
-            for m in new_molecule_entries:
+            for e in new_optim_entries:
                 if (
-                    mol == m
-                    or tanimoto_dist_func(mol.fingerprint, m.fingerprint)
+                    entry == e
+                    or tanimoto_dist_func(entry.last_entry.fingerprint, e.last_entry.fingerprint)
                     > diversity_score
                 ):
                     insert = False
                     break
             if insert:
-                new_molecule_entries.append(mol)
+                new_optim_entries.append(entry)
 
-        self.molecule_entries = new_molecule_entries[
-            : min(len(new_molecule_entries), self.size)
+        self.optim_entries = new_optim_entries[
+            : min(len(new_optim_entries), self.size)
         ]
 
     def random_subset(self, subset_size):
-        rand_inds = np.random.permutation(min(len(self.molecule_entries), subset_size))
-        return [self.molecule_entries[i] for i in rand_inds]
+        rand_inds = np.random.permutation(min(len(self.optim_entries), subset_size))
+        return [self.optim_entries[i] for i in rand_inds]
 
     def __len__(self):
-        return len(self.molecule_entries)
+        return len(self.optim_entries)
 
 
 def make_output_files_base(input_path, results_dir, run_name, config):
@@ -136,3 +136,62 @@ def make_output_files_base(input_path, results_dir, run_name, config):
     output_dir = os.path.join(base, f"{strategy}-{v}")
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
+
+
+def create_prompt_with_similars(mol_entry: MoleculeEntry, sim_range=None):
+    prompt = ""
+    for sim_mol_entry in mol_entry.add_props["similar_mol_entries"]:
+        if sim_range:
+            prompt += f"[SIMILAR]{sim_mol_entry.smiles} {generate_random_number(sim_range[0], sim_range[1]):.2f}[/SIMILAR]"
+        else:
+            prompt += f"[SIMILAR]{sim_mol_entry.smiles} {tanimoto_dist_func(sim_mol_entry.fingerprint, mol_entry.fingerprint):.2f}[/SIMILAR]"
+    return prompt
+
+
+class OptimEntry:
+
+    def __init__(self, last_entry, mol_entries):
+        self.last_entry: MoleculeEntry = last_entry
+        self.mol_entries: List[MoleculeEntry] = mol_entries
+
+    def to_prompt(self, is_generation, config):
+        prompt = ""
+        for mol_entry in self.mol_entries:
+            prompt += config["eos_token"]
+            if "default" in config["strategy"]:
+                prompt += create_prompt_with_similars(mol_entry=mol_entry)
+            elif "rej-sample-v2" in config["strategy"]:
+                prompt += create_prompt_with_similars(mol_entry=mol_entry)
+                prompt += f"[PROPERTY]oracle_score {mol_entry.score:.2f}[/PROPERTY]"
+            else:
+                raise Exception(f"Strategy {config['strategy']} not known.")
+            prompt += f"[START_SMILES]{mol_entry.smiles}[END_SMILES]"
+
+        assert self.last_entry
+        prompt += config["eos_token"]
+        if is_generation:
+            prompt_with_similars = create_prompt_with_similars(self.last_entry, sim_range=config["sim_range"])
+        else:
+            prompt_with_similars = create_prompt_with_similars(self.last_entry)
+        
+        if "default" in config["strategy"]:
+            prompt += prompt_with_similars
+        elif "rej-sample-v2" in config["strategy"]:
+            prompt += prompt_with_similars
+            if is_generation:
+                oracle_scores_of_mols_in_prompt = [e.score for e in self.mol_entries]
+                q_0_9 = np.quantile(oracle_scores_of_mols_in_prompt, 0.9) if oracle_scores_of_mols_in_prompt else 0
+                desired_oracle_score = generate_random_number(q_0_9, 1.0) # TODO: change the hard coded 1.0
+                oracle_score = desired_oracle_score
+            else:
+                oracle_score = self.last_entry.score
+            prompt += f"[PROPERTY]oracle_score {oracle_score:.2f}[/PROPERTY]"
+        else:
+            raise Exception(f"Strategy {config['strategy']} not known.")
+        
+        if is_generation:
+            prompt += "[START_SMILES]"
+        else:
+            prompt += f"[START_SMILES]{self.last_entry.smiles}[END_SMILES]"
+
+        return prompt
