@@ -205,3 +205,9 @@ class OptimEntry:
             prompt += f"[START_SMILES]{self.last_entry.smiles}[END_SMILES]"
 
         return prompt
+
+    def contains_entry(self, mol_entry: MoleculeEntry):
+        for entry in self.mol_entries:
+            if mol_entry == entry:
+                return True
+        return False
