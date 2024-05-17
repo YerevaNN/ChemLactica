@@ -54,13 +54,13 @@ def canonicalize(smiles):
 
 
 class MoleculeEntry:
-    def __init__(self, smiles, score=None, **kwargs):
+    def __init__(self, smiles, score=0, **kwargs):
         self.smiles = smiles
+        self.score = score
         if smiles:
             self.smiles = canonicalize(smiles)
             self.mol = Chem.MolFromSmiles(smiles)
             self.fingerprint = get_morgan_fingerprint(self.mol)
-            self.score = score
         self.add_props = kwargs
 
     def __eq__(self, other):

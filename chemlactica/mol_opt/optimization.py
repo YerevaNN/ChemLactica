@@ -73,6 +73,7 @@ def optimize(
     max_score = 0
     tol_level = 0
     num_iter = 0
+    prev_train_iter = 0
     while True:
         model.eval()
         iter_optim_entries: List[OptimEntry] = []
@@ -138,7 +139,9 @@ def optimize(
             break
         initial_num_iter = num_iter
         num_iter = len(oracle.mol_buffer) // config["num_gens_per_iter"]
-        print("num_iter: ", num_iter)
+        print(f"num_iter: {num_iter}, tol_level: {tol_level}, prev_train_iter: {prev_train_iter}")
+        if num_iter > initial_num_iter:
+            tol_level += 1
 
         # diversity_score = 1 / (1 + math.log(1 + repeated_max_score) / math.log(10))
         pool.add(iter_optim_entries)
@@ -151,7 +154,7 @@ def optimize(
             # round_entries = list(np.unique(round_entries))[::-1]
             # top_k = int(len(all_entries) * config["rej_sample_config"]["rej_perc"])
             # if top_k >= config["rej_sample_config"]["num_samples_per_round"]:
-            if num_iter % 5 == 0 and num_iter > initial_num_iter:
+            if config["rej_sample_config"]["train_condition"](num_iter, tol_level, prev_train_iter):
                 training_entries = pool.optim_entries
                 print(f"Num of train examples {len(training_entries)}.")
                 file.write("Training entries\n")
@@ -169,4 +172,4 @@ def optimize(
                 supervised_fine_tune(model, tokenizer, train_dataset, config["rej_sample_config"])
                 gc.collect()
                 torch.cuda.empty_cache()
-                tol_level = 0
+                prev_train_iter = num_iter
