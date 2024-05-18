@@ -6,15 +6,15 @@ train_config:
   eval_step: 256
   global_gradient_norm: 1.0
   learning_rate_decay: 0.1
-  max_learning_rate: 1.4e-3
-  warmup_steps: 500
+  max_learning_rate: 2.0e-5
+  warmup_steps: 0
   weight_decay: 0.1
   bf16: true
   bf16_full_eval: true
   fp16: false
   tf32: true
   evaluation_strategy: "steps"
-  save_total_limit: 8
+  save_total_limit: 4
   grad_accumulation_scheduler: false
   dynamic_grad_accumulation: false
   grad_accumulation_patience: 4000
@@ -23,8 +23,9 @@ train_config:
   grad_accumulation_delta_percentage: 0.02
 model_config:
   n_heads: 12
-  n_layers: 12
+  n_layers: 18
   block_size: 2048
-  vocab_size: 50000
-  separator_token: </s>
-  tokenizer_path: "./chemlactica/tokenizer/ChemLacticaTokenizer66"
+  vocab_size: 256000
+  separator_token: <bos>
+  separator_token_id: 2
+  tokenizer_path: "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/GemmaTokenizer"
