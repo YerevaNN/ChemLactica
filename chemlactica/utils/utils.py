@@ -6,7 +6,7 @@ from functools import cache
 from chemlactica.config.default_train_config import TrainConfig, ModelConfig
 
 default_tokenizer_path = (
-    "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
+    "/home/admin/code/ChemLactica/chemlactica/tokenizer/GemmaTokenizer"
 )
 
 

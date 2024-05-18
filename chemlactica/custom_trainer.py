@@ -30,7 +30,7 @@ class CustomArguments(TrainingArguments):
     command: str = field(default=None)
     experiment_name: str = field(default=None)
     tokenizer_path: str = field(
-        default="/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
+        default="/home/admin/code/ChemLactica/chemlactica/tokenizer/GemmaTokenizer"
     )
     # train_config: dict = field(default=None)
 
