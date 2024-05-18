@@ -89,7 +89,7 @@ def generate_formatted_string(compound_json, rng, model_config):
     key_value_pairs = []
     key = "SMILES"
     value = compound_json.get(key, "")
-    if rng.integers(0, 1) == 0:
+    if rng.integers(2) == 0:
         if value:
             key_value_pairs.append(format_key_value(key, value, rng))
             del compound_json[key]

@@ -5,24 +5,24 @@ from datetime import datetime
 import submitit
 
 use_accelerate = True
-rsync_enabled = False
-executor_name = "local"  # options are ["slurm", "local"]
+rsync_enabled = True
+executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 2
+num_gpus = 6
 model_name = "galactica"
 model_size = "125m"
 train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "gal_relform"
+job_name = "gal_relform2"
 
 slurm_params = {
     "slurm_job_name": job_name,
-    "timeout_min": 30,
+    "timeout_min": 60 * 24 * 2,
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
     "cpus_per_task": num_gpus * 20,
-    "mem_gb": num_gpus * 20.0 + 20.0,
+    "mem_gb": num_gpus * 40.0 + 20.0,
     "stderr_to_stdout": True,
 }
 
@@ -50,7 +50,7 @@ cli_arguments = {
     "dataloader_num_workers": 1,
     "experiment_name": job_name,
     "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",
-    "flash_attn": False,
+    "flash_attn": True,
     "track": True,
     "track_dir": "/nfs/dgx/raid/chem/aim/",
     # "profile":,

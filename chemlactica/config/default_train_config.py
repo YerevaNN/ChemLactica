@@ -6,6 +6,7 @@ class ModelConfig:
     block_size: int = 2048
     vocab_size: int = 50000
     separator_token: str = "</s>"
+    separator_token_id: int = 2
     tokenizer_path: str = "chemlactica/tokenizer/ChemLacticaTokenizer66"
 
 

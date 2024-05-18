@@ -56,8 +56,8 @@ def samples_generator(
                         distributed_state.process_index,
                     ):
                         returned = True
-                    ret = format_sample(line)
-                    yield ret
+                        ret = format_sample(line)
+                        yield ret
                     counter = counter + 1
                     shared_jsonl_files[file] = state
                     line = f.readline()

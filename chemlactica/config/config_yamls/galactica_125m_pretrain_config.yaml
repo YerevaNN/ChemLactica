@@ -14,7 +14,7 @@ train_config:
   fp16: false
   tf32: true
   evaluation_strategy: "steps"
-  save_total_limit: 4
+  save_total_limit: 8
   grad_accumulation_scheduler: false
   dynamic_grad_accumulation: false
   grad_accumulation_patience: 4000
