@@ -5,23 +5,23 @@ from datetime import datetime
 import submitit
 
 use_accelerate = True
-rsync_enabled = True
-executor_name = "slurm"  # options are ["slurm", "local"]
+rsync_enabled = False
+executor_name = "local"  # options are ["slurm", "local"]
 root_path = ""
-num_gpus = 3
+num_gpus = 8
 model_name = "gemma"
 model_size = "2b"
 train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "gemma_400Mtokens_qedfirst"
+job_name = "gemma_40Btokens"
 
 slurm_params = {
     "slurm_job_name": job_name,
-    "timeout_min": 60 * 24 * 2,
+    "timeout_min": 60 * 24 * 10,
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
-    "cpus_per_task": num_gpus * 17,
+    "cpus_per_task": num_gpus * 11,
     "mem_gb": num_gpus * 30.0 + 20.0,
     "stderr_to_stdout": True,
 }
@@ -29,7 +29,7 @@ slurm_params = {
 accelerate_config = {"num_processes": num_gpus, "main_process_port": 30002}
 
 env_variables = {
-    "HF_HOME": "/auto/home/menuab/",
+    "HF_HOME": "/home/admin/",
     "HF_TOKEN": "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",
     "TOKENIZERS_PARALLELISM": "false",
     "CUDA_VISIBLE_DEVICES": "0, 1, 2, 3, 4, 5, 6, 7",
@@ -40,21 +40,21 @@ cli_arguments = {
     "from_pretrained": "google/gemma-2b",
     "model_config": train_name,
     "dir_data_types": "computed",
-    "training_data_dirs": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form",
+    "training_data_dirs": "/home/admin/train_rdkit_computed_rel+form",
     # "training_data_dirs": "/auto/home/menuab/code/data",
-    "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
-    "max_steps": 2100,
+    "valid_data_dir": "/home/admin/valid_rdkit_computed_rel+form",
+    "max_steps": 19000,
     # "num_train_epochs": 2,
     "eval_steps": 0,
     "save_steps": 1000,
-    "train_batch_size": 1,
+    "train_batch_size": 4,
     # "valid_batch_size":,s
     "dataloader_num_workers": 1,
     "experiment_name": job_name,
-    "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",
+    "checkpoints_root_dir": "/home/admin/checkpoints/",
     "flash_attn": True,
     "track": True,
-    "track_dir": "/nfs/dgx/raid/chem/aim/",
+    "track_dir": "/home/admin/aim/",
     # "profile":,
     # "profile_dir":,
     "gradient_accumulation_steps": 32,
@@ -107,10 +107,10 @@ if __name__ == "__main__":
     train_name = "_".join([model_name, model_size, train_type])
     current_path = os.getcwd()
     logs_path = "submitit_logs/%j"
-    logs_path = "/nfs/dgx/raid/chem/" + logs_path if rsync_enabled else logs_path
+    logs_path = "/home/admin/logs/" + logs_path if rsync_enabled else logs_path
     repo_path = (
         (
-            "/nfs/dgx/raid/chem/rsyncsnapshots/"
+            "/home/admin/rsyncsnapshots/"
             f"{train_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M')}"
         )
         if rsync_enabled
