@@ -89,7 +89,10 @@ def optimize(
                 )
                 optim_entries[i].last_entry = last_entry
 
-            prompts = [optim_entry.to_prompt(is_generation=True, config=config) for optim_entry in optim_entries]
+            prompts = [
+                optim_entry.to_prompt(is_generation=True, include_oracle_score=prev_train_iter != 0, config=config)
+                for optim_entry in optim_entries
+            ]
 
             output_texts = []
             for i in range(0, len(prompts), config["generation_batch_size"]):
@@ -154,7 +157,7 @@ def optimize(
             # round_entries = list(np.unique(round_entries))[::-1]
             # top_k = int(len(all_entries) * config["rej_sample_config"]["rej_perc"])
             # if top_k >= config["rej_sample_config"]["num_samples_per_round"]:
-            if config["rej_sample_config"]["train_condition"](num_iter, tol_level, prev_train_iter):
+            if config["rej_sample_config"]["should_train"](num_iter, tol_level, prev_train_iter):
                 training_entries = pool.optim_entries
                 print(f"Num of train examples {len(training_entries)}.")
                 file.write("Training entries\n")
@@ -163,7 +166,7 @@ def optimize(
                 
                 train_dataset = Dataset.from_dict({
                     "sample": [
-                        optim_entry.to_prompt(is_generation=False, config=config)
+                        optim_entry.to_prompt(is_generation=False, include_oracle_score=True, config=config)
                         for optim_entry in training_entries
                     ]
                 })

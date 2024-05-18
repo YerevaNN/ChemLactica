@@ -156,21 +156,23 @@ class OptimEntry:
         self.last_entry: MoleculeEntry = last_entry
         self.mol_entries: List[MoleculeEntry] = mol_entries
 
-    def to_prompt(self, is_generation, config):
+    def to_prompt(self, is_generation: bool, include_oracle_score: bool, config):
         prompt = ""
+        prompt = config["eos_token"]
         for mol_entry in self.mol_entries:
-            prompt += config["eos_token"]
+            # prompt += config["eos_token"]
             if "default" in config["strategy"]:
                 prompt += create_prompt_with_similars(mol_entry=mol_entry)
             elif "rej-sample-v2" in config["strategy"]:
                 prompt += create_prompt_with_similars(mol_entry=mol_entry)
-                prompt += f"[PROPERTY]oracle_score {mol_entry.score:.2f}[/PROPERTY]"
+                if include_oracle_score:
+                    prompt += f"[ORACLE_SCORE]{mol_entry.score:.2f}[/ORACLE_SCORE]"
             else:
                 raise Exception(f"Strategy {config['strategy']} not known.")
             prompt += f"[START_SMILES]{mol_entry.smiles}[END_SMILES]"
 
         assert self.last_entry
-        prompt += config["eos_token"]
+        # prompt += config["eos_token"]
         if is_generation:
             prompt_with_similars = create_prompt_with_similars(
                 self.last_entry, sim_range=config["sim_range"]
@@ -195,7 +197,8 @@ class OptimEntry:
                 oracle_score = desired_oracle_score
             else:
                 oracle_score = self.last_entry.score
-            prompt += f"[PROPERTY]oracle_score {oracle_score:.2f}[/PROPERTY]"
+            if include_oracle_score:
+                prompt += f"[ORACLE_SCORE]{oracle_score:.2f}[/ORACLE_SCORE]"
         else:
             raise Exception(f"Strategy {config['strategy']} not known.")
 
