@@ -68,7 +68,7 @@ def optimize(
     file = open(config["log_dir"], "w")
     print("config", config)
     # print("molecule generation arguments", config["generation_config"])
-    pool = Pool(config["pool_size"])
+    pool = Pool(config["pool_size"], validation_perc=config["validation_perc"])
 
     max_score = 0
     tol_level = 0
@@ -129,7 +129,7 @@ def optimize(
                 current_optim_entries[i].last_entry = entry
                 iter_optim_entries.append(current_optim_entries[i])
                 file.write(f"generated smiles: {entry.smiles}, score: {entry.score:.4f}\n")
-                if entry.score > max_score + 0.01:
+                if entry.score > max_score:
                     max_score = entry.score
                     tol_level = 0
                 if oracle.finish or len(iter_optim_entries) >= config["num_gens_per_iter"]:
@@ -158,21 +158,35 @@ def optimize(
             # top_k = int(len(all_entries) * config["rej_sample_config"]["rej_perc"])
             # if top_k >= config["rej_sample_config"]["num_samples_per_round"]:
             if config["rej_sample_config"]["should_train"](num_iter, tol_level, prev_train_iter):
-                training_entries = pool.optim_entries
-                print(f"Num of train examples {len(training_entries)}.")
+                train_entries, validation_entries = pool.get_train_valid_entries()
+                print(f"Num of training examples: {len(train_entries)}, num of validation examples: {len(validation_entries)}.")
                 file.write("Training entries\n")
-                for i, optim_entry in enumerate(training_entries):
+                for i, optim_entry in enumerate(train_entries):
+                    file.write(f"\t{i} smiles: {optim_entry.last_entry.smiles}, score: {optim_entry.last_entry.score:.4f}\n")
+                file.write("Validation entries\n")
+                for i, optim_entry in enumerate(validation_entries):
                     file.write(f"\t{i} smiles: {optim_entry.last_entry.smiles}, score: {optim_entry.last_entry.score:.4f}\n")
                 
                 train_dataset = Dataset.from_dict({
                     "sample": [
                         optim_entry.to_prompt(is_generation=False, include_oracle_score=True, config=config)
-                        for optim_entry in training_entries
+                        for optim_entry in train_entries
+                    ]
+                })
+                validation_dataset = Dataset.from_dict({
+                    "sample": [
+                        optim_entry.to_prompt(is_generation=False, include_oracle_score=True, config=config)
+                        for optim_entry in validation_entries
                     ]
                 })
                 train_dataset.shuffle(seed=42)
+                validation_dataset.shuffle(seed=42)
                 config["rej_sample_config"]["formatting_func"] = lambda x: x["sample"]
-                supervised_fine_tune(model, tokenizer, train_dataset, config["rej_sample_config"])
+                supervised_fine_tune(
+                    model, tokenizer,
+                    train_dataset, validation_dataset,
+                    config["rej_sample_config"]
+                )
                 gc.collect()
                 torch.cuda.empty_cache()
                 prev_train_iter = num_iter

@@ -82,9 +82,10 @@ class MoleculeEntry:
 
 
 class Pool:
-    def __init__(self, size):
+    def __init__(self, size, validation_perc: float):
         self.size = size
         self.optim_entries: List[OptimEntry] = []
+        self.num_validation_entries = int(size * validation_perc)
 
     # def random_dump(self, num):
     #     for _ in range(num):
@@ -92,12 +93,11 @@ class Pool:
     #         self.molecule_entries.pop(rand_ind)
     #     print(f"Dump {num} random elements from pool, num pool mols {len(self)}")
 
-    def add(self, entries: List[MoleculeEntry], diversity_score=1.0):
+    def add(self, entries: List, diversity_score=1.0):
         assert type(entries) == list
         self.optim_entries.extend(entries)
         self.optim_entries.sort(key=lambda x: x.last_entry, reverse=True)
 
-        # print(f"Updating with div_score {diversity_score:.4f}")
         # remove doublicates
         new_optim_entries = []
         for entry in self.optim_entries:
@@ -116,6 +116,34 @@ class Pool:
                 new_optim_entries.append(entry)
 
         self.optim_entries = new_optim_entries[: min(len(new_optim_entries), self.size)]
+        curr_num_validation_entries = sum([entry.entry_status == EntryStatus.valid for entry in self.optim_entries])
+
+        i = 0
+        while curr_num_validation_entries < self.num_validation_entries:
+            if self.optim_entries[i].entry_status == EntryStatus.none:
+                self.optim_entries[i].entry_status = EntryStatus.valid
+                curr_num_validation_entries += 1
+            i += 1
+        
+        for j in range(i, len(self.optim_entries)):
+            if self.optim_entries[j].entry_status == EntryStatus.none:
+                self.optim_entries[j].entry_status = EntryStatus.train
+        
+        curr_num_validation_entries = sum([entry.entry_status == EntryStatus.valid for entry in self.optim_entries])
+        assert curr_num_validation_entries == min(len(self.optim_entries), self.num_validation_entries)
+
+    def get_train_valid_entries(self):
+        train_entries = []
+        valid_entries = []
+        for entry in self.optim_entries:
+            if entry.entry_status == EntryStatus.train:
+                train_entries.append(entry)
+            elif entry.entry_status == EntryStatus.valid:
+                valid_entries.append(entry)
+            else:
+                raise Exception(f"EntryStatus of an entry in pool cannot be {entry.entry_status}.")
+        assert min(len(self.optim_entries), self.num_validation_entries) == len(valid_entries)
+        return train_entries, valid_entries
 
     def random_subset(self, subset_size):
         rand_inds = np.random.permutation(min(len(self.optim_entries), subset_size))
@@ -123,9 +151,6 @@ class Pool:
 
     def __len__(self):
         return len(self.optim_entries)
-
-    def __hash__(self):
-        return hash(self.smiles)
 
 
 def make_output_files_base(input_path, results_dir, run_name, config):
@@ -151,10 +176,17 @@ def create_prompt_with_similars(mol_entry: MoleculeEntry, sim_range=None):
     return prompt
 
 
+class EntryStatus:
+    none = 0
+    train = 1
+    valid = 2
+
+
 class OptimEntry:
     def __init__(self, last_entry, mol_entries):
         self.last_entry: MoleculeEntry = last_entry
         self.mol_entries: List[MoleculeEntry] = mol_entries
+        self.entry_status: EntryStatus = EntryStatus.none
 
     def to_prompt(self, is_generation: bool, include_oracle_score: bool, config):
         prompt = ""
@@ -192,8 +224,8 @@ class OptimEntry:
                     else 0
                 )
                 desired_oracle_score = generate_random_number(
-                    q_0_9, 1.0
-                )  # TODO: change the hard coded 1.0
+                    q_0_9, config["max_possible_oracle_score"]
+                )
                 oracle_score = desired_oracle_score
             else:
                 oracle_score = self.last_entry.score
