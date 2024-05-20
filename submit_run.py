@@ -13,7 +13,7 @@ model_name = "galactica"
 model_size = "125m"
 train_type = "pretrain"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "gal_relform2"
+job_name = "gal_relform3"
 
 slurm_params = {
     "slurm_job_name": job_name,
@@ -21,7 +21,7 @@ slurm_params = {
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
-    "cpus_per_task": num_gpus * 20,
+    "cpus_per_task": num_gpus * 10,
     "mem_gb": num_gpus * 40.0 + 20.0,
     "stderr_to_stdout": True,
 }
@@ -41,10 +41,10 @@ cli_arguments = {
     "dir_data_types": "computed",
     "training_data_dirs": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/train_rdkit_computed_rel+form",
     "valid_data_dir": "/nfs/ap/mnt/sxtn/rdkit_computed_rel+form/valid_rdkit_computed_rel+form",
-    "max_steps": 20000,
+    "max_steps": 19000,
     # "num_train_epochs": 24,
-    "eval_steps": 2000,
-    "save_steps": 2000,
+    "eval_steps": 0,
+    "save_steps": 6300,
     "train_batch_size": 16,
     "valid_batch_size": 16,
     "dataloader_num_workers": 1,

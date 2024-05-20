@@ -13,7 +13,7 @@ train_config:
   bf16_full_eval: true
   fp16: false
   tf32: true
-  evaluation_strategy: "steps"
+  evaluation_strategy: "no"
   save_total_limit: 8
   grad_accumulation_scheduler: false
   dynamic_grad_accumulation: false
@@ -27,4 +27,5 @@ model_config:
   block_size: 2048
   vocab_size: 50000
   separator_token: </s>
+  separator_token_id: 2
   tokenizer_path: "./chemlactica/tokenizer/ChemLacticaTokenizer66"

@@ -73,14 +73,15 @@ def process_str(str, random_number_generator, model_config):
     # it's wierd workaround but works for now
     try:
         compound = load_jsonl_line(str["text"])
+        compound = delete_empty_tags(compound)
+        str["text"] = generate_formatted_string(
+            compound, random_number_generator, model_config
+        )
+        string = str
     except Exception as e:
         print(e)
-        return ""
-    compound = delete_empty_tags(compound)
-    str["text"] = generate_formatted_string(
-        compound, random_number_generator, model_config
-    )
-    return str
+        string = ""
+    return string
 
 
 def group_texts(examples, model_config, eos_token_id):
