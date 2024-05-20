@@ -198,7 +198,7 @@ class OptimEntry:
             elif "rej-sample-v2" in config["strategy"]:
                 prompt += create_prompt_with_similars(mol_entry=mol_entry)
                 if include_oracle_score:
-                    prompt += f"[ORACLE_SCORE]{mol_entry.score:.2f}[/ORACLE_SCORE]"
+                    prompt += f"[PROPERTY]oracle_score {mol_entry.score:.2f}[/PROPERTY]"
             else:
                 raise Exception(f"Strategy {config['strategy']} not known.")
             prompt += f"[START_SMILES]{mol_entry.smiles}[END_SMILES]"
@@ -230,7 +230,7 @@ class OptimEntry:
             else:
                 oracle_score = self.last_entry.score
             if include_oracle_score:
-                prompt += f"[ORACLE_SCORE]{oracle_score:.2f}[/ORACLE_SCORE]"
+                prompt += f"[PROPERTY]oracle_score {oracle_score:.2f}[/PROPERTY]"
         else:
             raise Exception(f"Strategy {config['strategy']} not known.")
 
