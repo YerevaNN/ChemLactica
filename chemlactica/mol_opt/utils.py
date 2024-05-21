@@ -57,6 +57,7 @@ class MoleculeEntry:
     def __init__(self, smiles, score=0, **kwargs):
         self.smiles = smiles
         self.score = score
+        self.similar_mol_entries = []
         if smiles:
             self.smiles = canonicalize(smiles)
             self.mol = Chem.MolFromSmiles(smiles)
@@ -168,7 +169,7 @@ def make_output_files_base(input_path, results_dir, run_name, config):
 
 def create_prompt_with_similars(mol_entry: MoleculeEntry, sim_range=None):
     prompt = ""
-    for sim_mol_entry in mol_entry.add_props["similar_mol_entries"]:
+    for sim_mol_entry in mol_entry.similar_mol_entries:
         if sim_range:
             prompt += f"[SIMILAR]{sim_mol_entry.smiles} {generate_random_number(sim_range[0], sim_range[1]):.2f}[/SIMILAR]"  # noqa
         else:
@@ -188,7 +189,10 @@ class OptimEntry:
         self.mol_entries: List[MoleculeEntry] = mol_entries
         self.entry_status: EntryStatus = EntryStatus.none
 
-    def to_prompt(self, is_generation: bool, include_oracle_score: bool, config):
+    def to_prompt(
+            self, is_generation: bool,
+            include_oracle_score: bool, config,
+        ):
         prompt = ""
         prompt = config["eos_token"]
         for mol_entry in self.mol_entries:
@@ -201,6 +205,8 @@ class OptimEntry:
                     prompt += f"[PROPERTY]oracle_score {mol_entry.score:.2f}[/PROPERTY]"
             else:
                 raise Exception(f"Strategy {config['strategy']} not known.")
+            for prop_name, prop_spec in mol_entry.add_props.items():
+                prompt += f"{prop_spec['start_tag']}{prop_spec['value']}{prop_spec['end_tag']}"
             prompt += f"[START_SMILES]{mol_entry.smiles}[END_SMILES]"
 
         assert self.last_entry
@@ -234,6 +240,9 @@ class OptimEntry:
         else:
             raise Exception(f"Strategy {config['strategy']} not known.")
 
+        for prop_name, prop_spec in self.last_entry.add_props.items():
+            prompt += prop_spec["start_tag"] + prop_spec["infer_value"](self.last_entry) + prop_spec["end_tag"]
+
         if is_generation:
             prompt += "[START_SMILES]"
         else:
@@ -245,4 +254,8 @@ class OptimEntry:
         for entry in self.mol_entries:
             if mol_entry == entry:
                 return True
+            for sim_entry in entry.similar_mol_entries:
+                if mol_entry == sim_entry:
+                    return True
+
         return False

@@ -6,6 +6,7 @@ import gc
 import math
 import tqdm
 import random
+from functools import partial
 import numpy as np
 from transformers import OPTForCausalLM
 from chemlactica.mol_opt.utils import OptimEntry, MoleculeEntry, Pool, generate_random_number, tanimoto_dist_func
@@ -33,7 +34,7 @@ def create_optimization_entries(num_entries, pool, config):
         entries = []
         for mol_entry in mol_entries:
             similar_mol_entries = create_similar_mol_entries(pool, mol_entry, num_similars=config["num_similars"])
-            mol_entry.add_props["similar_mol_entries"] = similar_mol_entries
+            mol_entry.similar_mol_entries = similar_mol_entries
             entries.append(mol_entry)
         optim_entries.append(OptimEntry(None, entries))
     return optim_entries
@@ -49,21 +50,19 @@ def create_molecule_entry(output_text):
     if len(generated_smiles) == 0:
         return None
 
-    for output in output_text.split(start_smiles_tag)[:-1]:
-        smiles_in_prompt = output.split(end_smiles_tag)[0]
-        if generated_smiles == smiles_in_prompt:
-            return None
     try:
-        return MoleculeEntry(
+        molecule = MoleculeEntry(
             smiles=generated_smiles,
         )
+        return molecule
     except:
         return None
 
 
 def optimize(
         model, tokenizer,
-        oracle, config
+        oracle, config,
+        additional_properties=[]
     ):
     file = open(config["log_dir"], "w")
     print("config", config)
@@ -84,9 +83,11 @@ def optimize(
             )
             for i in range(len(optim_entries)):
                 last_entry = MoleculeEntry(smiles="")
-                last_entry.add_props["similar_mol_entries"] = create_similar_mol_entries(
+                last_entry.similar_mol_entries = create_similar_mol_entries(
                     pool, last_entry, config["num_similars"]
                 )
+                for prop_name, prop_spec in additional_properties.items():
+                    last_entry.add_props[prop_name] = prop_spec
                 optim_entries[i].last_entry = last_entry
 
             prompts = [
@@ -125,7 +126,10 @@ def optimize(
             for i, oracle_score in enumerate(oracle_scores):
                 entry = current_mol_entries[i]
                 entry.score = oracle_score
-                entry.add_props["similar_mol_entries"] = current_optim_entries[i].last_entry.add_props["similar_mol_entries"]
+                entry.similar_mol_entries = current_optim_entries[i].last_entry.similar_mol_entries
+                for prop_name, prop_spec in additional_properties.items():
+                    entry.add_props[prop_name] = prop_spec
+                    entry.add_props[prop_name]["value"] = entry.add_props[prop_name]["calculate_value"](entry)
                 current_optim_entries[i].last_entry = entry
                 iter_optim_entries.append(current_optim_entries[i])
                 file.write(f"generated smiles: {entry.smiles}, score: {entry.score:.4f}\n")
@@ -142,9 +146,9 @@ def optimize(
             break
         initial_num_iter = num_iter
         num_iter = len(oracle.mol_buffer) // config["num_gens_per_iter"]
-        print(f"num_iter: {num_iter}, tol_level: {tol_level}, prev_train_iter: {prev_train_iter}")
         if num_iter > initial_num_iter:
             tol_level += 1
+        print(f"num_iter: {num_iter}, tol_level: {tol_level}, prev_train_iter: {prev_train_iter}")
 
         # diversity_score = 1 / (1 + math.log(1 + repeated_max_score) / math.log(10))
         pool.add(iter_optim_entries)

@@ -88,9 +88,6 @@ def supervised_fine_tune(
         lr_end=0.999 * config["max_learning_rate"],
         power=1.0,
     )
-    collator = DataCollatorForCompletionOnlyLM(
-        config["response_template"], tokenizer=tokenizer
-    )
     early_stopping_callback = CustomEarlyStopCallback(
         early_stopping_patience=1,
         early_stopping_threshold=0.001
