@@ -197,16 +197,18 @@ class OptimEntry:
         prompt = config["eos_token"]
         for mol_entry in self.mol_entries:
             # prompt += config["eos_token"]
+            prompt += create_prompt_with_similars(mol_entry=mol_entry)
+
+            for prop_name, prop_spec in mol_entry.add_props.items():
+                prompt += f"{prop_spec['start_tag']}{prop_spec['value']}{prop_spec['end_tag']}"
+                
             if "default" in config["strategy"]:
-                prompt += create_prompt_with_similars(mol_entry=mol_entry)
+                pass
             elif "rej-sample-v2" in config["strategy"]:
-                prompt += create_prompt_with_similars(mol_entry=mol_entry)
                 if include_oracle_score:
                     prompt += f"[PROPERTY]oracle_score {mol_entry.score:.2f}[/PROPERTY]"
             else:
                 raise Exception(f"Strategy {config['strategy']} not known.")
-            for prop_name, prop_spec in mol_entry.add_props.items():
-                prompt += f"{prop_spec['start_tag']}{prop_spec['value']}{prop_spec['end_tag']}"
             prompt += f"[START_SMILES]{mol_entry.smiles}[END_SMILES]"
 
         assert self.last_entry
@@ -218,10 +220,14 @@ class OptimEntry:
         else:
             prompt_with_similars = create_prompt_with_similars(self.last_entry)
 
+        prompt += prompt_with_similars
+
+        for prop_name, prop_spec in self.last_entry.add_props.items():
+            prompt += prop_spec["start_tag"] + prop_spec["infer_value"](self.last_entry) + prop_spec["end_tag"]
+
         if "default" in config["strategy"]:
-            prompt += prompt_with_similars
+            pass
         elif "rej-sample-v2" in config["strategy"]:
-            prompt += prompt_with_similars
             if is_generation:
                 oracle_scores_of_mols_in_prompt = [e.score for e in self.mol_entries]
                 q_0_9 = (
@@ -239,9 +245,6 @@ class OptimEntry:
                 prompt += f"[PROPERTY]oracle_score {oracle_score:.2f}[/PROPERTY]"
         else:
             raise Exception(f"Strategy {config['strategy']} not known.")
-
-        for prop_name, prop_spec in self.last_entry.add_props.items():
-            prompt += prop_spec["start_tag"] + prop_spec["infer_value"](self.last_entry) + prop_spec["end_tag"]
 
         if is_generation:
             prompt += "[START_SMILES]"

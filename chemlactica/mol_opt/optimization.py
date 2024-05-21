@@ -62,7 +62,7 @@ def create_molecule_entry(output_text):
 def optimize(
         model, tokenizer,
         oracle, config,
-        additional_properties=[]
+        additional_properties={}
     ):
     file = open(config["log_dir"], "w")
     print("config", config)
@@ -94,7 +94,6 @@ def optimize(
                 optim_entry.to_prompt(is_generation=True, include_oracle_score=prev_train_iter != 0, config=config)
                 for optim_entry in optim_entries
             ]
-
             output_texts = []
             for i in range(0, len(prompts), config["generation_batch_size"]):
                 prompt_batch = prompts[i: min(len(prompts), i + config["generation_batch_size"])]
