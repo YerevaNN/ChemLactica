@@ -106,9 +106,10 @@ def optimize(
                         **data,
                         **config["generation_config"]
                     )
+                    output_texts.extend(tokenizer.batch_decode(output))
+                    del output
                     gc.collect()
                     torch.cuda.empty_cache()
-                    output_texts.extend(tokenizer.batch_decode(output))
 
                 current_mol_entries = []
                 current_optim_entries = []

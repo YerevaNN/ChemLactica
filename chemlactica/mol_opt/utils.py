@@ -96,7 +96,7 @@ class Pool:
     #         self.molecule_entries.pop(rand_ind)
     #     print(f"Dump {num} random elements from pool, num pool mols {len(self)}")
 
-    def add(self, entries: List, diversity_score=1.r9):
+    def add(self, entries: List, diversity_score=1.0):
         assert type(entries) == list
         self.optim_entries.extend(entries)
         self.optim_entries.sort(key=lambda x: x.last_entry, reverse=True)
