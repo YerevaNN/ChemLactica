@@ -65,6 +65,7 @@ def supervised_fine_tune(
     training_args = TrainingArguments(
         output_dir=config["checkpoints_dir"],
         per_device_train_batch_size=config["train_batch_size"],
+        per_device_eval_batch_size=config["train_batch_size"],
         max_grad_norm=config["global_gradient_norm"],
         num_train_epochs=config["num_train_epochs"],
         evaluation_strategy="epoch",
