@@ -107,7 +107,7 @@ class Pool:
             insert = True
             for e in new_optim_entries:
                 if (
-                    entry == e
+                    entry.last_entry == e.last_entry
                     or tanimoto_dist_func(
                         entry.last_entry.fingerprint, e.last_entry.fingerprint
                     )
