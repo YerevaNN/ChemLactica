@@ -341,10 +341,11 @@ class EarlyStoppingCallback(TrainerCallback):
 
 
 class SFTNumericalEval(TrainerCallback):
-    def __init__(self, dataset, aim_callback) -> None:
+    def __init__(self, dataset, aim_callback, separator_token) -> None:
         super().__init__()
         self.dataset = dataset
         self.aim = aim_callback
+        self.separator_token = separator_token
 
     def on_evaluate(
         self,
@@ -358,11 +359,20 @@ class SFTNumericalEval(TrainerCallback):
         super().on_evaluate(args, state, control, **kwargs)
         model.eval()
         ground_truths, gens, diffs = [], [], []
+        eos_token_id = tokenizer.encode("[/PROPERTY]")[0]
         for sample in self.dataset["validation"]:
             ground_truth = round(sample["activity"], 2)
-            prompt = f"[START_SMILES]{sample['smiles']}[END_SMILES][PROPERTY]activity "
+            prompt = (
+                f"{self.separator_token}[START_SMILES]{sample['smiles']}"
+                "[END_SMILES][PROPERTY]activity"
+            )
             prompt = tokenizer(prompt, return_tensors="pt").to(model.device)
-            out = model.generate(prompt.input_ids, do_sample=False, max_length=100)
+            out = model.generate(
+                prompt.input_ids,
+                do_sample=False,
+                eos_token_id=eos_token_id,
+                max_new_tokens=100,
+            )
             out = tokenizer.batch_decode(out)[0]
             try:
                 gen = out[

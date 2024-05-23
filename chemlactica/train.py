@@ -285,7 +285,7 @@ def train(
         )
         if train_type == "sft":
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
-                dataset, aim_callback
+                dataset, aim_callback, model_config.separator_token
             )
         elif train_type == "pretrain":
             if train_config.grad_accumulation_scheduler:

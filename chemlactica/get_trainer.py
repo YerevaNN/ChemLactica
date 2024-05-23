@@ -25,7 +25,7 @@ def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_
     elif train_type == "sft":
         sft_config = SFTTrainConfig()
         tokenizer = get_tokenizer(training_args.tokenizer_path)
-        response_template = "[PROPERTY]activity "
+        response_template = tokenizer.encode("[PROPERTY]activity")
         collator = DataCollatorForCompletionOnlyLM(
             response_template, tokenizer=tokenizer
         )
