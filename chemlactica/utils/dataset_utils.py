@@ -203,8 +203,8 @@ def sft_formatting_prompts_func(example):
     output_texts = []
     for i in range(len(example["smiles"])):
         text = (
-            f"[START_SMILES]{example['smiles'][i]}[END_SMILES]"
-            f"[PROPERTY]activity {round(example['activity'][i], 2)}[/PROPERTY]"
+            f"<bos>[START_SMILES]{example['smiles'][i]}[END_SMILES]"
+            "[PROPERTY]activity {round(example['activity'][i], 2)}[/PROPERTY]"
         )
         output_texts.append(text)
     return output_texts

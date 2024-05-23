@@ -55,12 +55,21 @@ def init_parser():
     )
     parser.add_argument(
         "--learning_rate",
-        type=int,
+        type=float,
         metavar="LR",
         dest="learning_rate",
         required=False,
         default=None,
         help="learning rate",
+    )
+    parser.add_argument(
+        "--warmup",
+        type=int,
+        metavar="WA",
+        dest="warmup_steps",
+        required=False,
+        default=None,
+        help="warmup steps",
     )
     parser.add_argument(
         "--max_steps",

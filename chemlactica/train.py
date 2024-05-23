@@ -66,6 +66,7 @@ def train(
     dir_data_types,
     valid_data_dir,
     learning_rate,
+    warmup_steps,
     scheduler_max_steps,
     eval_steps,
     save_steps,
@@ -115,7 +116,6 @@ def train(
         gradient_checkpointing=gradient_checkpointing,
         auth_token=auth_token,
     )
-
     # special_tokens = get_tokenizer_special_tokens(model_config.tokenizer_path)
     # print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
     tokenizer_length = get_tokenizer_length(model_config)
@@ -237,7 +237,7 @@ def train(
             weight_decay=train_config.weight_decay,
             adam_beta1=train_config.adam_beta1,
             adam_beta2=train_config.adam_beta2,
-            warmup_steps=train_config.warmup_steps,
+            warmup_steps=warmup_steps if warmup_steps else train_config.warmup_steps,
             max_grad_norm=train_config.global_gradient_norm,
             evaluation_strategy=train_config.evaluation_strategy,
             max_steps=scheduler_max_steps,
@@ -285,7 +285,7 @@ def train(
         )
         if train_type == "sft":
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
-                dataset, aim_callback
+                dataset, aim_callback, model_config.separator_token
             )
         elif train_type == "pretrain":
             if train_config.grad_accumulation_scheduler:

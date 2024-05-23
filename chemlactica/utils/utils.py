@@ -43,6 +43,7 @@ def get_tokenizer(tokenizer_path):
 def create_tokenizer(tokenizer_path):
     tok = AutoTokenizer.from_pretrained(tokenizer_path)
     tok.add_bos_token = False
+    tok.padding_side = "right"
     print(f"Process {os.getpid()} created a tokenizer")
     return tok
 
