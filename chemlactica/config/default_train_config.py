@@ -42,5 +42,5 @@ class TrainConfig:
 @dataclass
 class SFTTrainConfig:
     packing: bool = False
-    max_seq_length: int = 512
-    neftune_noise_alpha: int = 0
+    max_seq_length: int = 64
+    neftune_noise_alpha: int = 10

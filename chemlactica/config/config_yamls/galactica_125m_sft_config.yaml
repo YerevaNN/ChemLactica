@@ -6,7 +6,7 @@ train_config:
   eval_step: 256
   global_gradient_norm: 1.0
   learning_rate_decay: 0.1
-  max_learning_rate: 2.0e-5
+  max_learning_rate: 1.0e-4
   warmup_steps: 0
   weight_decay: 0.1
   bf16: true
@@ -27,4 +27,5 @@ model_config:
   block_size: 2048
   vocab_size: 50000
   separator_token: </s>
+  separator_token_id: 2
   tokenizer_path: "./chemlactica/tokenizer/ChemLacticaTokenizer66"
