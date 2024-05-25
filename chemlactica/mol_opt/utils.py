@@ -49,7 +49,8 @@ def generate_random_number(lower, upper):
 
 
 def canonicalize(smiles):
-    return Chem.MolToSmiles(Chem.MolFromSmiles(smiles), canonical=True)
+    mol = Chem.MolFromSmiles(smiles)
+    return Chem.MolToSmiles(mol, canonical=True)
     # return Chem.MolToSmiles(Chem.MolFromSmiles(smiles), kekuleSmiles=True)
 
 
@@ -194,11 +195,12 @@ class OptimEntry:
     def to_prompt(
             self, is_generation: bool,
             include_oracle_score: bool, config,
+            max_score=None
         ):
         prompt = ""
-        prompt = config["eos_token"]
+        # prompt = config["eos_token"]
         for mol_entry in self.mol_entries:
-            # prompt += config["eos_token"]
+            prompt += config["eos_token"]
             prompt += create_prompt_with_similars(mol_entry=mol_entry)
 
             for prop_name, prop_spec in mol_entry.add_props.items():
@@ -214,7 +216,7 @@ class OptimEntry:
             prompt += f"[START_SMILES]{mol_entry.smiles}[END_SMILES]"
 
         assert self.last_entry
-        # prompt += config["eos_token"]
+        prompt += config["eos_token"]
         if is_generation:
             prompt_with_similars = create_prompt_with_similars(
                 self.last_entry, sim_range=config["sim_range"]
@@ -231,15 +233,16 @@ class OptimEntry:
             pass
         elif "rej-sample-v2" in config["strategy"]:
             if is_generation:
-                oracle_scores_of_mols_in_prompt = [e.score for e in self.mol_entries]
-                q_0_9 = (
-                    np.quantile(oracle_scores_of_mols_in_prompt, 0.9)
-                    if oracle_scores_of_mols_in_prompt
-                    else 0
-                )
-                desired_oracle_score = generate_random_number(
-                    q_0_9, config["max_possible_oracle_score"]
-                )
+                # oracle_scores_of_mols_in_prompt = [e.score for e in self.mol_entries]
+                # q_0_9 = (
+                #     np.quantile(oracle_scores_of_mols_in_prompt, 0.9)
+                #     if oracle_scores_of_mols_in_prompt
+                #     else 0
+                # )
+                # desired_oracle_score = generate_random_number(
+                #     q_0_9, config["max_possible_oracle_score"]
+                # )
+                desired_oracle_score = max_score
                 oracle_score = desired_oracle_score
             else:
                 oracle_score = self.last_entry.score
@@ -252,6 +255,7 @@ class OptimEntry:
             prompt += "[START_SMILES]"
         else:
             prompt += f"[START_SMILES]{self.last_entry.smiles}[END_SMILES]"
+            prompt += config["eos_token"]
 
         return prompt
 
