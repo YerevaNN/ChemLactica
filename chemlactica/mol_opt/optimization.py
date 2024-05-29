@@ -175,7 +175,7 @@ def optimize(
             # round_entries = list(np.unique(round_entries))[::-1]
             # top_k = int(len(all_entries) * config["rej_sample_config"]["rej_perc"])
             # if top_k >= config["rej_sample_config"]["num_samples_per_round"]:
-            if config["rej_sample_config"]["should_train"](num_iter, tol_level, prev_train_iter):
+            if config["rej_sample_config"]["should_train"](tol_level, config["rej_sample_config"]["train_tol_level"]):
                 train_entries, validation_entries = pool.get_train_valid_entries()
                 print(f"Num of training examples: {len(train_entries)}, num of validation examples: {len(validation_entries)}.")
                 file.write("Training entries\n")

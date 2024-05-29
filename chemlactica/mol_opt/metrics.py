@@ -2,6 +2,26 @@ import numpy as np
 import torch
 
 
+def top_auc(buffer, top_n, finish, freq_log, max_oracle_calls):
+    sum = 0
+    prev = 0
+    called = 0
+    ordered_results = list(sorted(buffer.items(), key=lambda kv: kv[1][1], reverse=False))
+    for idx in range(freq_log, min(len(buffer), max_oracle_calls), freq_log):
+        temp_result = ordered_results[:idx]
+        temp_result = list(sorted(temp_result, key=lambda kv: kv[1][0], reverse=True))[:top_n]
+        top_n_now = np.mean([item[1][0] for item in temp_result])
+        sum += freq_log * (top_n_now + prev) / 2
+        prev = top_n_now
+        called = idx
+    temp_result = list(sorted(ordered_results, key=lambda kv: kv[1][0], reverse=True))[:top_n]
+    top_n_now = np.mean([item[1][0] for item in temp_result])
+    sum += (len(buffer) - called) * (top_n_now + prev) / 2
+    if finish and len(buffer) < max_oracle_calls:
+        sum += (max_oracle_calls - len(buffer)) * top_n_now
+    return sum / max_oracle_calls
+
+
 def average_agg_tanimoto(stock_vecs, gen_vecs,
                          batch_size=5000, agg='max',
                          device='cpu', p=1):
