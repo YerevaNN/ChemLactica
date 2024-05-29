@@ -57,12 +57,8 @@ class CustomEarlyStopCallback(TrainerCallback):
     #     return super().log(logs)
 
 
-def supervised_fine_tune(
-        model, tokenizer,
-        train_dataset, validation_dataset, config
-    ):
-    model.train()
-    training_args = TrainingArguments(
+def get_training_arguments(config):
+    return TrainingArguments(
         output_dir=config["checkpoints_dir"],
         per_device_train_batch_size=config["train_batch_size"],
         per_device_eval_batch_size=config["train_batch_size"],
@@ -76,6 +72,9 @@ def supervised_fine_tune(
         logging_steps=1,
         metric_for_best_model="loss"
     )
+
+
+def get_optimizer_and_lr_scheduler(model, config, tr_ds_size):
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=config["max_learning_rate"],
@@ -85,25 +84,8 @@ def supervised_fine_tune(
     lr_scheduler = get_polynomial_decay_schedule_with_warmup(
         optimizer,
         num_warmup_steps=config["warmup_steps"],
-        num_training_steps=config["num_train_epochs"] * (len(train_dataset) // config["train_batch_size"] + 1),
-        lr_end=0.999 * config["max_learning_rate"],
+        num_training_steps=config["num_train_epochs"] * (tr_ds_size // config["train_batch_size"] + 1),
+        lr_end=0.99999 * config["max_learning_rate"],
         power=1.0,
     )
-    early_stopping_callback = CustomEarlyStopCallback(
-        early_stopping_patience=1,
-        early_stopping_threshold=0.001
-    )
-    trainer = SFTTrainer(
-        model=model,
-        train_dataset=train_dataset,
-        eval_dataset=validation_dataset,
-        formatting_func=config["formatting_func"],
-        args=training_args,
-        packing=config["packing"],
-        tokenizer=tokenizer,
-        max_seq_length=config["max_seq_length"],
-        # data_collator=collator,
-        optimizers=[optimizer, lr_scheduler],
-        callbacks=[early_stopping_callback],
-    )
-    trainer.train()
+    return optimizer, lr_scheduler

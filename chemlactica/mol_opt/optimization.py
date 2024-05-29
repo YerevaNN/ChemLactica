@@ -7,10 +7,11 @@ import math
 import tqdm
 import random
 from functools import partial
+from trl import SFTTrainer
 import numpy as np
 from transformers import OPTForCausalLM
 from chemlactica.mol_opt.utils import OptimEntry, MoleculeEntry, Pool, generate_random_number, tanimoto_dist_func
-from chemlactica.mol_opt.tunning import supervised_fine_tune
+from chemlactica.mol_opt.tunning import get_training_arguments, get_optimizer_and_lr_scheduler, CustomEarlyStopCallback
 
 
 def create_similar_mol_entries(pool, mol_entry, num_similars):
@@ -70,6 +71,10 @@ def optimize(
     pool = Pool(config["pool_size"], validation_perc=config["validation_perc"])
 
     config["generation_config"]["temperature"] = config["generation_temperature"][0]
+
+    if "rej-sample-v2" in config["strategy"]:
+        training_args = get_training_arguments(config["rej_sample_config"])
+        optimizer, lr_scheduler = get_optimizer_and_lr_scheduler(model, config["rej_sample_config"], config["pool_size"])
     max_score = 0
     tol_level = 0
     num_iter = 0
@@ -199,12 +204,26 @@ def optimize(
                 })
                 train_dataset.shuffle(seed=42)
                 validation_dataset.shuffle(seed=42)
-                config["rej_sample_config"]["formatting_func"] = lambda x: x["sample"]
-                supervised_fine_tune(
-                    model, tokenizer,
-                    train_dataset, validation_dataset,
-                    config["rej_sample_config"]
+
+                model.train()
+                early_stopping_callback = CustomEarlyStopCallback(
+                    early_stopping_patience=1,
+                    early_stopping_threshold=0.0001
                 )
+                trainer = SFTTrainer(
+                    model=model,
+                    train_dataset=train_dataset,
+                    eval_dataset=validation_dataset,
+                    formatting_func=lambda x: x["sample"],
+                    args=training_args,
+                    packing=config["rej_sample_config"]["packing"],
+                    tokenizer=tokenizer,
+                    max_seq_length=config["rej_sample_config"]["max_seq_length"],
+                    # data_collator=collator,
+                    optimizers=[optimizer, lr_scheduler],
+                    callbacks=[early_stopping_callback],
+                )
+                trainer.train()
                 gc.collect()
                 torch.cuda.empty_cache()
                 prev_train_iter = num_iter

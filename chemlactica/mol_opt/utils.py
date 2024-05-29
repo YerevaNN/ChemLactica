@@ -5,7 +5,7 @@ import random
 from pathlib import Path
 import numpy as np
 import torch
-from metrics import top_auc
+from chemlactica.mol_opt.metrics import top_auc
 from rdkit import Chem, DataStructs, RDLogger
 from rdkit.Chem import AllChem, MACCSkeys, rdMolDescriptors
 
