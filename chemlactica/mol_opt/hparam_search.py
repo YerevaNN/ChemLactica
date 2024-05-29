@@ -45,7 +45,7 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained(config["tokenizer_path"], padding_side="left")
 
     seeds = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31]
-    oracle = ConstraedTPSAOracle(max_oracle_calls=5000)
+    oracle = ConstraedTPSAOracle(max_oracle_calls=15000)
     for seed in seeds[:args.n_runs]:
         config["log_dir"] = os.path.join(args.output_dir, "results_tpsa+weight+num_rungs.log")
         config["rej_sample_config"]["should_train"] = choose_train_condition("tolerance")
