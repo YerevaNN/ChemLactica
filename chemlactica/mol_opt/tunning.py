@@ -4,6 +4,8 @@ from transformers import TrainingArguments, get_polynomial_decay_schedule_with_w
 from torch.optim.lr_scheduler import ConstantLR
 import torch
 import math
+import time
+from chemlactica.mol_opt.utils import generate_random_number
 
 
 class CustomEarlyStopCallback(TrainerCallback):
@@ -58,23 +60,27 @@ class CustomEarlyStopCallback(TrainerCallback):
 
 
 def get_training_arguments(config):
+    checkpoints_dir = config["checkpoints_dir"] + "_" + str(time.time())
     return TrainingArguments(
-        output_dir=config["checkpoints_dir"],
+        output_dir=checkpoints_dir,
         per_device_train_batch_size=config["train_batch_size"],
         per_device_eval_batch_size=config["train_batch_size"],
         max_grad_norm=config["global_gradient_norm"],
         num_train_epochs=config["num_train_epochs"],
         evaluation_strategy="epoch",
+        # save_strategy="epoch",
         dataloader_drop_last=False,
         dataloader_pin_memory=True,
         dataloader_num_workers=config["dataloader_num_workers"],
         gradient_accumulation_steps=config["gradient_accumulation_steps"],
         logging_steps=1,
-        metric_for_best_model="loss"
+        metric_for_best_model="loss",
+        # load_best_model_at_end=True,
+        # save_total_limit=1
     )
 
 
-def get_optimizer_and_lr_scheduler(model, config, tr_ds_size):
+def get_optimizer_and_lr_scheduler(model, config, max_train_steps):
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=config["max_learning_rate"],
@@ -84,8 +90,8 @@ def get_optimizer_and_lr_scheduler(model, config, tr_ds_size):
     lr_scheduler = get_polynomial_decay_schedule_with_warmup(
         optimizer,
         num_warmup_steps=config["warmup_steps"],
-        num_training_steps=config["num_train_epochs"] * (tr_ds_size // config["train_batch_size"] + 1),
-        lr_end=0.99999 * config["max_learning_rate"],
+        num_training_steps=max_train_steps,
+        lr_end=0,
         power=1.0,
     )
     return optimizer, lr_scheduler

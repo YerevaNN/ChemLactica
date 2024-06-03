@@ -6,6 +6,7 @@ import gc
 import math
 import tqdm
 import random
+import shutil
 from functools import partial
 from trl import SFTTrainer
 import numpy as np
@@ -74,7 +75,11 @@ def optimize(
 
     if "rej-sample-v2" in config["strategy"]:
         training_args = get_training_arguments(config["rej_sample_config"])
-        optimizer, lr_scheduler = get_optimizer_and_lr_scheduler(model, config["rej_sample_config"], config["pool_size"])
+        effective_batch_size = config["rej_sample_config"]["gradient_accumulation_steps"] * config["rej_sample_config"]["train_batch_size"]
+        num_single_train_steps = config["rej_sample_config"]["num_train_epochs"] * ((1 - config["validation_perc"]) * config["pool_size"] / effective_batch_size)
+        max_num_trains = oracle.max_oracle_calls / (config["rej_sample_config"]["train_tol_level"] * config["num_gens_per_iter"])
+        max_num_train_steps = int(max_num_trains * num_single_train_steps)
+        optimizer, lr_scheduler = get_optimizer_and_lr_scheduler(model, config["rej_sample_config"], max_num_train_steps)
     max_score = 0
     tol_level = 0
     num_iter = 0
@@ -85,7 +90,7 @@ def optimize(
         iter_unique_optim_entries: List[OptimEntry] = {}
         while len(iter_unique_optim_entries) < config["num_gens_per_iter"]:
             optim_entries = create_optimization_entries(
-                config["num_gens_per_iter"], pool,
+                config["generation_batch_size"], pool,
                 config=config
             )
             for i in range(len(optim_entries)):
@@ -105,20 +110,18 @@ def optimize(
                 for optim_entry in optim_entries
             ]
             output_texts = []
-            for i in range(0, len(prompts), config["generation_batch_size"]):
-                prompt_batch = prompts[i: min(len(prompts), i + config["generation_batch_size"])]
-                data = tokenizer(prompt_batch, return_tensors="pt", padding=True).to(model.device)
-                if type(model) == OPTForCausalLM:
-                    del data["token_type_ids"]
-                for key, value in data.items():
-                    data[key] = value[:, -2048 + config["generation_config"]["max_new_tokens"]:]
-                output = model.generate(
-                    **data,
-                    **config["generation_config"]
-                )
-                gc.collect()
-                torch.cuda.empty_cache()
-                output_texts.extend(tokenizer.batch_decode(output))
+            data = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
+            if type(model) == OPTForCausalLM:
+                del data["token_type_ids"]
+            for key, value in data.items():
+                data[key] = value[:, -2048 + config["generation_config"]["max_new_tokens"]:]
+            output = model.generate(
+                **data,
+                **config["generation_config"]
+            )
+            gc.collect()
+            torch.cuda.empty_cache()
+            output_texts.extend(tokenizer.batch_decode(output))
 
             current_unique_optim_entries = {}
             with multiprocessing.Pool(processes=config["num_processes"]) as pol:
@@ -165,7 +168,7 @@ def optimize(
             tol_level = 0
 
         print(f"num_iter: {num_iter}, tol_level: {tol_level}, prev_train_iter: {prev_train_iter}")
-        if num_iter != initial_num_iter:
+        if num_iter > initial_num_iter:
             config["generation_config"]["temperature"] += config["num_gens_per_iter"] / (oracle.budget - config["num_gens_per_iter"]) * (config["generation_temperature"][1] - config["generation_temperature"][0])
             print(f"Generation temperature: {config['generation_config']['temperature']}")
 
@@ -180,7 +183,7 @@ def optimize(
             # round_entries = list(np.unique(round_entries))[::-1]
             # top_k = int(len(all_entries) * config["rej_sample_config"]["rej_perc"])
             # if top_k >= config["rej_sample_config"]["num_samples_per_round"]:
-            if config["rej_sample_config"]["should_train"](tol_level, config["rej_sample_config"]["train_tol_level"]):
+            if tol_level >= config["rej_sample_config"]["train_tol_level"]:
                 train_entries, validation_entries = pool.get_train_valid_entries()
                 print(f"Num of training examples: {len(train_entries)}, num of validation examples: {len(validation_entries)}.")
                 file.write("Training entries\n")
@@ -220,10 +223,12 @@ def optimize(
                     tokenizer=tokenizer,
                     max_seq_length=config["rej_sample_config"]["max_seq_length"],
                     # data_collator=collator,
-                    optimizers=[optimizer, lr_scheduler],
                     callbacks=[early_stopping_callback],
+                    optimizers=[optimizer, lr_scheduler],
                 )
                 trainer.train()
+                shutil.rmtree(training_args.output_dir)
                 gc.collect()
                 torch.cuda.empty_cache()
+                tol_level = 0
                 prev_train_iter = num_iter
