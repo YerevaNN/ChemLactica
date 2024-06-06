@@ -223,7 +223,8 @@ class Pool:
         return train_entries, valid_entries
 
     def random_subset(self, subset_size):
-        rand_inds = np.random.permutation(min(len(self.optim_entries), subset_size))
+        rand_inds = np.random.permutation(len(self.optim_entries))
+        rand_inds = rand_inds[:subset_size]
         return [self.optim_entries[i] for i in rand_inds]
 
     def __len__(self):

@@ -124,16 +124,16 @@ def optimize(
             output_texts.extend(tokenizer.batch_decode(output))
 
             current_unique_optim_entries = {}
-            with multiprocessing.Pool(processes=config["num_processes"]) as pol:
-                for i, molecule in enumerate(pol.map(create_molecule_entry, output_texts)):
-                    if molecule and not optim_entries[i].contains_entry(molecule):
-                        if molecule.smiles not in oracle.mol_buffer and molecule.smiles not in current_unique_optim_entries:
-                            molecule.similar_mol_entries = optim_entries[i].last_entry.similar_mol_entries
-                            for prop_name, prop_spec in additional_properties.items():
-                                molecule.add_props[prop_name] = prop_spec
-                                molecule.add_props[prop_name]["value"] = molecule.add_props[prop_name]["calculate_value"](molecule)
-                            optim_entries[i].last_entry = molecule
-                            current_unique_optim_entries[molecule.smiles] = optim_entries[i]
+            # with multiprocessing.Pool(processes=config["num_processes"]) as pol:
+            for i, molecule in enumerate(map(create_molecule_entry, output_texts)):
+                if molecule and not optim_entries[i].contains_entry(molecule):
+                    if molecule.smiles not in oracle.mol_buffer and molecule.smiles not in current_unique_optim_entries:
+                        molecule.similar_mol_entries = optim_entries[i].last_entry.similar_mol_entries
+                        for prop_name, prop_spec in additional_properties.items():
+                            molecule.add_props[prop_name] = prop_spec
+                            molecule.add_props[prop_name]["value"] = molecule.add_props[prop_name]["calculate_value"](molecule)
+                        optim_entries[i].last_entry = molecule
+                        current_unique_optim_entries[molecule.smiles] = optim_entries[i]
 
             num_of_molecules_to_score = min(len(current_unique_optim_entries), config["num_gens_per_iter"] - len(iter_unique_optim_entries))
             current_unique_smiles_list = list(current_unique_optim_entries.keys())[:num_of_molecules_to_score]
