@@ -92,6 +92,7 @@ def get_optimizer_and_lr_scheduler(model, config, max_train_steps):
         num_warmup_steps=config["warmup_steps"],
         num_training_steps=max_train_steps,
         lr_end=0,
+        # lr_end=0.9999 * config["max_learning_rate"],
         power=1.0,
     )
     return optimizer, lr_scheduler
