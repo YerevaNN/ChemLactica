@@ -16,7 +16,7 @@ from chemlactica.mol_opt.tunning import get_training_arguments, get_optimizer_an
 
 
 def create_similar_mol_entries(pool, mol_entry, num_similars):
-    similar_entries = [e.last_entry for e in pool.random_subset(num_similars + 1)]
+    similar_entries = [e.last_entry for e in pool.random_subset(num_similars)]
     count = 0
     valid_similar_entries = []
     for similar_entry in similar_entries:
