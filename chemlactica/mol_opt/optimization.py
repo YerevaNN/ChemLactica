@@ -12,7 +12,7 @@ from trl import SFTTrainer
 import numpy as np
 from transformers import OPTForCausalLM
 from chemlactica.mol_opt.utils import OptimEntry, MoleculeEntry, Pool, generate_random_number, tanimoto_dist_func
-from chemlactica.mol_opt.tunning import get_training_arguments, get_optimizer_and_lr_scheduler, CustomEarlyStopCallback
+from chemlactica.mol_opt.tunning import get_training_arguments, get_optimizer_and_lr_scheduler
 
 
 def create_similar_mol_entries(pool, mol_entry, num_similars):
@@ -209,10 +209,6 @@ def optimize(
                 validation_dataset.shuffle(seed=42)
 
                 model.train()
-                early_stopping_callback = CustomEarlyStopCallback(
-                    early_stopping_patience=1,
-                    early_stopping_threshold=0.0001
-                )
                 trainer = SFTTrainer(
                     model=model,
                     train_dataset=train_dataset,
@@ -223,7 +219,6 @@ def optimize(
                     tokenizer=tokenizer,
                     max_seq_length=config["rej_sample_config"]["max_seq_length"],
                     # data_collator=collator,
-                    callbacks=[early_stopping_callback],
                     optimizers=[optimizer, lr_scheduler],
                 )
                 trainer.train()
