@@ -1,18 +1,12 @@
 from typing import List
 import torch
 from datasets import Dataset
-import multiprocessing
 import gc
-import math
-import tqdm
-import random
 import shutil
-from functools import partial
 from trl import SFTTrainer
-import numpy as np
 from transformers import OPTForCausalLM
-from chemlactica.mol_opt.utils import OptimEntry, MoleculeEntry, Pool, generate_random_number, tanimoto_dist_func
-from chemlactica.mol_opt.tunning import get_training_arguments, get_optimizer_and_lr_scheduler
+from chemlactica.mol_opt.utils import OptimEntry, MoleculeEntry, Pool
+from chemlactica.mol_opt.tunning import get_training_arguments, get_optimizer_and_lr_scheduler, CustomEarlyStopCallback
 
 
 def create_similar_mol_entries(pool, mol_entry, num_similars):
@@ -208,6 +202,11 @@ def optimize(
                 train_dataset.shuffle(seed=42)
                 validation_dataset.shuffle(seed=42)
 
+                early_stopping_callback = CustomEarlyStopCallback(
+                    early_stopping_patience=1,
+                    early_stopping_threshold=0.0001
+                )
+
                 model.train()
                 trainer = SFTTrainer(
                     model=model,
@@ -219,6 +218,7 @@ def optimize(
                     tokenizer=tokenizer,
                     max_seq_length=config["rej_sample_config"]["max_seq_length"],
                     # data_collator=collator,
+                    callbacks=[early_stopping_callback],
                     optimizers=[optimizer, lr_scheduler],
                 )
                 trainer.train()

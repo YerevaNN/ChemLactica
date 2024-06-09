@@ -162,7 +162,7 @@ class Pool:
     def __init__(self, size, validation_perc: float):
         self.size = size
         self.optim_entries: List[OptimEntry] = []
-        self.num_validation_entries = int(size * validation_perc)
+        self.num_validation_entries = int(size * validation_perc + 1)
 
     # def random_dump(self, num):
     #     for _ in range(num):
