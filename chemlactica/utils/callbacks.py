@@ -387,7 +387,7 @@ class SFTNumericalEval(TrainerCallback):
             except ValueError:
                 print(f"could not generate for {sample['smiles']}")
                 pass
-        rmse = root_mean_squared_error(ground_truths, gens)
+        rmse = root_mean_squared_error(ground_truths, gens) if gens else 10
         self.aim._run.track({"numerical eval rmse": rmse}, step=state.global_step)
         print(f"{rmse=}")
 
