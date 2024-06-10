@@ -1,3 +1,5 @@
+from functools import partial
+
 from custom_trainer import CustomTrainer
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 
@@ -7,7 +9,9 @@ from utils.utils import get_tokenizer
 from config.default_train_config import SFTTrainConfig
 
 
-def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_eval):
+def get_trainer(
+    train_type, model, dataset, training_args, evaluate_only, slurm_eval, model_config
+):
     if train_type == "pretrain":
         trainer = CustomTrainer(
             model=model,
@@ -33,7 +37,10 @@ def get_trainer(train_type, model, dataset, training_args, evaluate_only, slurm_
             model=model,
             train_dataset=dataset["train"],
             eval_dataset=dataset["validation"],
-            formatting_func=sft_formatting_prompts_func,
+            formatting_func=partial(
+                sft_formatting_prompts_func,
+                separator_token=model_config.separator_token,
+            ),
             args=training_args,
             packing=sft_config.packing,
             tokenizer=tokenizer,

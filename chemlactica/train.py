@@ -282,6 +282,7 @@ def train(
             training_args,
             evaluate_only,
             slurm_eval,
+            model_config,
         )
         if train_type == "sft":
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(

@@ -199,12 +199,12 @@ def process_dataset(
     return lm_datasets
 
 
-def sft_formatting_prompts_func(example):
+def sft_formatting_prompts_func(example, separator_token):
     output_texts = []
     for i in range(len(example["smiles"])):
         text = (
-            f"<bos>[START_SMILES]{example['smiles'][i]}[END_SMILES]"
-            "[PROPERTY]activity {round(example['activity'][i], 2)}[/PROPERTY]"
+            f"{separator_token}[START_SMILES]{example['smiles'][i]}[END_SMILES]"
+            f"[PROPERTY]activity {round(example['activity'][i], 2)}[/PROPERTY]"
         )
         output_texts.append(text)
     return output_texts
