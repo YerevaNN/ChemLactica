@@ -5,6 +5,7 @@ from torch.optim.lr_scheduler import ConstantLR
 import torch
 import math
 import time
+from collections import OrderedDict
 from chemlactica.mol_opt.utils import generate_random_number
 
 
@@ -32,6 +33,23 @@ class CustomEarlyStopCallback(TrainerCallback):
         if self.current_patiance >= self.early_stopping_patience:
             control.should_training_stop = True
         return super().on_evaluate(args, state, control, **kwargs)
+
+
+class CustomModelSelectionCallback(TrainerCallback):
+
+    def __init__(self):
+        super().__init__()
+        self.best_validation_loss: float = math.inf
+        self.best_model_state_dict: OrderedDict = OrderedDict()
+
+    def on_evaluate(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, metrics, model, **kwargs):
+        if metrics["eval_loss"] <= self.best_validation_loss:
+            self.best_validation_loss = metrics["eval_loss"]
+            print(f"Better validation loss achieved {self.best_validation_loss}, updating the state dict.")
+            for key, value in model.state_dict().items():
+                self.best_model_state_dict[key] = value.detach().clone()
+        return super().on_evaluate(args, state, control, **kwargs)
+
 
 # class CustomSFTTrainer(SFTTrainer):
 # 

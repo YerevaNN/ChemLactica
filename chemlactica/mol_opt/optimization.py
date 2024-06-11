@@ -6,7 +6,7 @@ import shutil
 from trl import SFTTrainer
 from transformers import OPTForCausalLM
 from chemlactica.mol_opt.utils import OptimEntry, MoleculeEntry, Pool
-from chemlactica.mol_opt.tunning import get_training_arguments, get_optimizer_and_lr_scheduler, CustomEarlyStopCallback
+from chemlactica.mol_opt.tunning import get_training_arguments, get_optimizer_and_lr_scheduler, CustomEarlyStopCallback, CustomModelSelectionCallback
 
 
 def create_similar_mol_entries(pool, mol_entry, num_similars):
@@ -202,10 +202,11 @@ def optimize(
                 train_dataset.shuffle(seed=42)
                 validation_dataset.shuffle(seed=42)
 
-                early_stopping_callback = CustomEarlyStopCallback(
-                    early_stopping_patience=1,
-                    early_stopping_threshold=0.0001
-                )
+                # early_stopping_callback = CustomEarlyStopCallback(
+                #     early_stopping_patience=1,
+                #     early_stopping_threshold=0.0001
+                # )
+                model_selection_callback = CustomModelSelectionCallback()
 
                 model.train()
                 trainer = SFTTrainer(
@@ -218,10 +219,12 @@ def optimize(
                     tokenizer=tokenizer,
                     max_seq_length=config["rej_sample_config"]["max_seq_length"],
                     # data_collator=collator,
-                    callbacks=[early_stopping_callback],
+                    callbacks=[model_selection_callback],
                     optimizers=[optimizer, lr_scheduler],
                 )
                 trainer.train()
+                print(f"Loading the best model state dict with validation loss {model_selection_callback.best_validation_loss}")
+                model.load_state_dict(model_selection_callback.best_model_state_dict)
                 shutil.rmtree(training_args.output_dir)
                 gc.collect()
                 torch.cuda.empty_cache()
