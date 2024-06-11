@@ -33,7 +33,6 @@ class CustomEarlyStopCallback(TrainerCallback):
             control.should_training_stop = True
         return super().on_evaluate(args, state, control, **kwargs)
 
-
 # class CustomSFTTrainer(SFTTrainer):
 # 
     # def __init__(self, *args, patience, toll, **kwargs):
