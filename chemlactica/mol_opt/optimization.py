@@ -142,8 +142,8 @@ def optimize(
                 current_unique_optim_entries[smiles].last_entry.score = oracle_score
                 iter_unique_optim_entries[smiles] = current_unique_optim_entries[smiles]
                 file.write(f"generated smiles: {smiles}, score: {current_unique_optim_entries[smiles].last_entry.score:.4f}\n")
-                if current_unique_optim_entries[smiles].last_entry.score > max_score:
-                    max_score = current_unique_optim_entries[smiles].last_entry.score
+                if max_score >= config["max_possible_oracle_score"] - 1e-2 or current_unique_optim_entries[smiles].last_entry.score > max_score:
+                    max_score = max(max_score, current_unique_optim_entries[smiles].last_entry.score)
                     new_best_molecule_generated = True
 
             print(f"Iter unique optim entries: {len(iter_unique_optim_entries)}, budget: {len(oracle)}")
@@ -189,13 +189,19 @@ def optimize(
                 
                 train_dataset = Dataset.from_dict({
                     "sample": [
-                        optim_entry.to_prompt(is_generation=False, include_oracle_score=True, config=config)
+                        optim_entry.to_prompt(
+                            is_generation=False, include_oracle_score=True,
+                            config=config, max_score=config["max_possible_oracle_score"]
+                        )
                         for optim_entry in train_entries
                     ]
                 })
                 validation_dataset = Dataset.from_dict({
                     "sample": [
-                        optim_entry.to_prompt(is_generation=False, include_oracle_score=True, config=config)
+                        optim_entry.to_prompt(
+                            is_generation=False, include_oracle_score=True,
+                            config=config, max_score=config["max_possible_oracle_score"]
+                        )
                         for optim_entry in validation_entries
                     ]
                 })
@@ -225,7 +231,7 @@ def optimize(
                 trainer.train()
                 print(f"Loading the best model state dict with validation loss {model_selection_callback.best_validation_loss}")
                 model.load_state_dict(model_selection_callback.best_model_state_dict)
-                shutil.rmtree(training_args.output_dir)
+                del model_selection_callback.best_model_state_dict
                 gc.collect()
                 torch.cuda.empty_cache()
                 tol_level = 0
