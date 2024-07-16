@@ -11,10 +11,10 @@ num_gpus = 1
 # model_name = "gemma"
 # model_size = "2b"
 model_name = "galactica"
-model_size = "125m"
+model_size = "1b"
 train_type = "sft"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "Sol_chem_3wu_32bs_15ep_1e4_nef20"
+job_name = "Sol_6d68"
 
 slurm_params = {
     "slurm_job_name": job_name,
@@ -22,7 +22,7 @@ slurm_params = {
     "nodes": 1,
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
-    "cpus_per_task": num_gpus * 8,
+    "cpus_per_task": num_gpus * 2,
     "mem_gb": num_gpus * 40.0 + 20.0,
     "stderr_to_stdout": True,
 }
@@ -30,7 +30,7 @@ slurm_params = {
 accelerate_config = {"num_processes": num_gpus}
 
 env_variables = {
-    "TOKENIZERS_PARALLELISM": "true",
+    "TOKENIZERS_PARALLELISM": "false",
     "CUDA_VISIBLE_DEVICES": "0, 1, 2, 3, 4, 5, 6, 7",
     # "CUDA_VISIBLE_DEVICES": "7",
 }
@@ -41,12 +41,15 @@ cli_arguments = {
     #     "galactica-125m/9954e52e400b43d18d3a40f6/checkpoint-20480",
     # "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/facebook/"\
     #     "galactica-125m/1f289ff103034364bd27e1c3/checkpoint-18000/",
+    "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/h100/facebook/"
+    "galactica-1.3b/6d68b252d53647a99cf2fa8b/checkpoint-19000",
     # "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/google/"\
     #     "gemma-2b/d6e6a76e91814ad68d5fa264/checkpoint-11000",
     # "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/h100/"\
     #     "google/gemma-2b/0717d445bcf44e31b2887892/checkpoint-12000",
-    "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/h100/"
-    "google/gemma-2b/0717d445bcf44e31b2887892/checkpoint-18000",
+    # "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/h100/"
+    # "google/gemma-2b/0717d445bcf44e31b2887892/checkpoint-18000",
+    "model_config": train_name,
     "dir_data_types": "computed",
     "training_data_dirs": "/auto/home/menuab/code/sft_data/ADME_Sol",
     "valid_data_dir": "",
@@ -60,10 +63,11 @@ cli_arguments = {
     "valid_batch_size": 32,
     "dataloader_num_workers": 1,
     "experiment_name": job_name,
-    "checkpoints_root_dir": "/nfs/dgx/raid/chem/checkpoints/",
+    "checkpoints_root_dir": "/nfs/ap/mnt/sxtn2/chem/experiments/checkpoints/",
     "flash_attn": False,
     "track": True,
-    "track_dir": "/nfs/dgx/raid/chem/aim/",
+    "track_dir": "/nfs/ap/mnt/sxtn2/chem/experiments/aim/",
+    "neftune_noise": 50,
     # "profile":,
     # "profile_dir":,
     # "gradient_accumulation_steps":,
@@ -127,6 +131,27 @@ if __name__ == "__main__":
         print("train_name: ", train_name)
         print("logs_path: ", logs_path)
         print("repo path: ", repo_path)
-        function = submitit.helpers.CommandFunction(command, env=env_variables)
-        job = executor.submit(function)
+        jobs = []
+        with executor.batch():
+            for lr in [0.00001, 0.00005, 0.0001, 0.0002]:
+                for wu in [0, 0.2, 0.5]:
+                    for ep in [10, 15, 20]:
+                        for nfn in [0.0, 5.0, 10.0]:
+                            wup = int(wu * ep) * cli_arguments["eval_steps"]
+                            cli_arguments["learning_rate"] = lr
+                            cli_arguments["warmup"] = wup
+                            cli_arguments["num_train_epochs"] = ep
+                            cli_arguments["neftune_noise"] = nfn
+                            cli_arguments[
+                                "experiment_name"
+                            ] = f"Sol_6d68_lr{lr}_wu{wu}_epoch{ep}_nef{nfn}"
+                            command = get_command(use_accelerate)
+                            function = submitit.helpers.CommandFunction(
+                                command, env=env_variables
+                            )
+                            job = executor.submit(function)
+                            jobs.append(job)
+        # function = submitit.helpers.CommandFunction(command, env=env_variables)
+        # job = executor.submit(function)
+        # jobs.append(job)
         # print(job.result())
