@@ -18,6 +18,7 @@ def get_dataset(
     evaluate_only,
     slurm_eval,
     shuffle_buffer_size,
+    random_seed,
 ):
     if train_type == "pretrain":
         assert len(training_data_dirs) == len(dir_data_types)
@@ -79,6 +80,6 @@ def get_dataset(
         dataset = {"train": train_dataset, "validation": processed_eval_dataset}
 
     elif train_type == "sft":
-        dataset = load_dataset(training_data_dirs[0])
+        dataset = load_dataset(training_data_dirs[0]).shuffle(seed=random_seed)
 
     return dataset

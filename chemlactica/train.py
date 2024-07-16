@@ -281,6 +281,7 @@ def train(
             evaluate_only,
             slurm_eval,
             shuffle_buffer_size,
+            random_seed,
         )
         trainer = get_trainer(
             train_type,
