@@ -10,7 +10,14 @@ from config.default_train_config import SFTTrainConfig
 
 
 def get_trainer(
-    train_type, model, dataset, training_args, evaluate_only, slurm_eval, model_config
+    train_type,
+    model,
+    dataset,
+    training_args,
+    evaluate_only,
+    slurm_eval,
+    model_config,
+    neftune_noise,
 ):
     if train_type == "pretrain":
         trainer = CustomTrainer(
@@ -46,6 +53,6 @@ def get_trainer(
             tokenizer=tokenizer,
             max_seq_length=sft_config.max_seq_length,
             data_collator=collator,
-            neftune_noise_alpha=sft_config.neftune_noise_alpha,
+            neftune_noise_alpha=None if neftune_noise == 0.0 else neftune_noise,
         )
     return trainer

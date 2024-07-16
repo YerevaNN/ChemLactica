@@ -45,15 +45,18 @@ from chemlactica.utils.flop_counter import get_theoretical_peak_flops
 from chemlactica.get_dataset import get_dataset
 from chemlactica.get_trainer import get_trainer
 
-torch.manual_seed(42)
-random.seed(42)
-numpy.random.seed(42)
 logger = logging.get_logger("transformers")
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "caching_allocator"
 # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # signal.signal(signal.SIGINT, signal_handler)
 # signal.signal(signal.SIGTERM, signal_handler)
+
+
+def set_seed(seed=42):
+    torch.manual_seed(seed)
+    random.seed(seed)
+    numpy.random.seed(seed)
 
 
 def train(
@@ -87,7 +90,11 @@ def train(
     valid_batch_size=None,
     profile=False,
     profile_dir=None,
+    neftune_noise=None,
+    random_seed=42,
 ):
+    set_seed(random_seed)
+
     transformers.logging.set_verbosity_info()
     transformers.utils.logging.enable_explicit_format()
 
@@ -283,6 +290,7 @@ def train(
             evaluate_only,
             slurm_eval,
             model_config,
+            neftune_noise,
         )
         if train_type == "sft":
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(

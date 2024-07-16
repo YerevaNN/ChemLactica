@@ -260,5 +260,23 @@ def init_parser():
         required=False,
         dest="slurm_eval",
     )
+    parser.add_argument(
+        "--neftune_noise",
+        type=float,
+        metavar="NFN",
+        dest="neftune_noise",
+        required=False,
+        default=None,
+        help="neftune noise",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        metavar="SEED",
+        dest="random_seed",
+        required=False,
+        default=42,
+        help="random seed",
+    )
     parser.set_defaults(profile=False)
     return parser
