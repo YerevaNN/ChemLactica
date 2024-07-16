@@ -10,6 +10,7 @@ from datasets import load_dataset
 from .model_utils import load_model
 from tqdm.auto import tqdm
 from sklearn.metrics import root_mean_squared_error
+from scipy.stats import pearsonr
 
 
 from aim.hugging_face import AimCallback
@@ -387,9 +388,14 @@ class SFTNumericalEval(TrainerCallback):
             except ValueError:
                 print(f"could not generate for {sample['smiles']}")
                 pass
-        rmse = root_mean_squared_error(ground_truths, gens) if gens else 10
+        try:
+            rmse = root_mean_squared_error(ground_truths, gens) if gens else 10
+            r, _ = pearsonr(ground_truths, gens)
+        except ValueError:
+            rmse, r = 10, 0
         self.aim._run.track({"numerical eval rmse": rmse}, step=state.global_step)
-        print(f"{rmse=}")
+        self.aim._run.track({"numerical eval pearson R": r}, step=state.global_step)
+        print(f"{rmse=}, {r=}")
 
 
 class GradientAccumulationScheduler(TrainerCallback):
