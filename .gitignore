@@ -183,3 +183,4 @@ src/live_prompt.ipynb
 src/*.ipynb
 *.sh
 submitit_logs/*
+local_submit_files/*

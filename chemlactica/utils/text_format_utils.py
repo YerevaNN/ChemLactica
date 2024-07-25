@@ -87,10 +87,12 @@ def delete_empty_tags(compound_json):
 
 def generate_formatted_string(compound_json, rng, model_config):
     key_value_pairs = []
-    if compound_json.get("SMILES") and rng.random() < 0.5:
-        key = "SMILES"
-        key_value_pairs.append(format_key_value(key, compound_json[key], rng))
-        del compound_json["SMILES"]
+    key = "SMILES"
+    value = compound_json.get(key, "")
+    if rng.integers(2) == 0:
+        if value:
+            key_value_pairs.append(format_key_value(key, value, rng))
+            del compound_json[key]
     keys = list(compound_json.keys())
     rng.shuffle(keys)
 
@@ -115,9 +117,7 @@ def format_key_value(key, value, rng):
             formatted_string += f"{SPECIAL_TAGS['similarity']['start']}{pair['SMILES']} {rounded_sim}{SPECIAL_TAGS['similarity']['end']}"  # noqa
     elif key == "experimental":
         for pair in value:
-            formatted_string += (
-                f"[PROPERTY]{pair['PROPERTY_NAME']} {pair['PROPERTY_VALUE']}[/PROPERTY]"
-            )
+            formatted_string += f"[PROPERTY]{pair['PROPERTY_NAME']} {pair['PROPERTY_VALUE']}[/PROPERTY]"  # noqa
     elif key == "synonyms":
         for val in value:
             formatted_string += f"{SPECIAL_TAGS['synonym']['start']}{val['name']}{SPECIAL_TAGS['synonym']['end']}"  # noqa
@@ -126,10 +126,12 @@ def format_key_value(key, value, rng):
             if SPECIAL_TAGS[key].get("type") is float:
                 value = "{:.2f}".format(float(value))
                 assert len(value.split(".")[-1]) == 2
+            start = SPECIAL_TAGS[key]["start"]
+            end = SPECIAL_TAGS[key]["end"]
         except Exception as e:
             print(e)
-        start = SPECIAL_TAGS[key]["start"]
-        end = SPECIAL_TAGS[key]["end"]
+            print("Failed to parse: ", key, value)
+            start = value = end = ""
         return f"{start}{value}{end}"
 
     return formatted_string

@@ -6,12 +6,26 @@ train_config:
   eval_step: 256
   global_gradient_norm: 1.0
   learning_rate_decay: 0.1
-  max_learning_rate: 6.0e-4
-  n_heads: 12
-  n_layers: 12
+  max_learning_rate: 1.4e-3
   warmup_steps: 500
   weight_decay: 0.1
+  bf16: true
+  bf16_full_eval: true
+  fp16: false
+  tf32: true
+  evaluation_strategy: "no"
+  save_total_limit: 8
+  grad_accumulation_scheduler: false
+  dynamic_grad_accumulation: false
+  grad_accumulation_patience: 4000
+  grad_accumulation_max: 256
+  grad_accumulation_delta_steps: 100
+  grad_accumulation_delta_percentage: 0.02
 model_config:
+  n_heads: 12
+  n_layers: 12
   block_size: 2048
   vocab_size: 50000
   separator_token: </s>
+  separator_token_id: 2
+  tokenizer_path: "./chemlactica/tokenizer/ChemLacticaTokenizer66"

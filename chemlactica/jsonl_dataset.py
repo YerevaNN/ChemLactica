@@ -39,6 +39,7 @@ def samples_generator(
 ):
     file_states = setup_generator(shared_jsonl_files, files)
 
+    # TODO: there should be a more elegant way to do this without per line conditions
     returned = True
     while returned:
         returned = False

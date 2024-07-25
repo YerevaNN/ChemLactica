@@ -13,8 +13,9 @@ import transformers
 from transformers import (
     ProgressCallback,
 )
-from accelerate import Accelerator, logging, InitProcessGroupKwargs
+from accelerate import logging, InitProcessGroupKwargs
 from accelerate.utils import broadcast_object_list
+from chemlactica.custom_accelerator import CustomAccelerator
 
 from chemlactica.custom_trainer import CustomArguments
 from chemlactica.utils.callbacks import (
@@ -27,6 +28,7 @@ from chemlactica.utils.callbacks import (
     JsonlDatasetResumeCallback,
     EarlyStoppingCallback,
     SFTNumericalEval,
+    GradientAccumulationScheduler,
 )
 from chemlactica.utils.utils import (
     # signal_handler,
@@ -64,6 +66,7 @@ def train(
     dir_data_types,
     valid_data_dir,
     learning_rate,
+    warmup_steps,
     scheduler_max_steps,
     eval_steps,
     save_steps,
@@ -90,7 +93,7 @@ def train(
 
     kwargs = InitProcessGroupKwargs(timeout=timedelta(seconds=7200))
 
-    accelerator = Accelerator(
+    accelerator = CustomAccelerator(
         kwargs_handlers=[kwargs], log_with="all", project_dir=track_dir
     )
 
@@ -113,7 +116,6 @@ def train(
         gradient_checkpointing=gradient_checkpointing,
         auth_token=auth_token,
     )
-
     # special_tokens = get_tokenizer_special_tokens(model_config.tokenizer_path)
     # print(f"{len(special_tokens)} {special_tokens} additional special tokens.")
     tokenizer_length = get_tokenizer_length(model_config)
@@ -188,7 +190,6 @@ def train(
     trainer_callback_dict["progress_callback"] = CustomProgressCallback(
         max_steps, total_theoretical_peak_flops
     )
-
     accelerator.wait_for_everyone()
 
     with multiprocessing.Manager() as manager:
@@ -225,10 +226,10 @@ def train(
             per_device_eval_batch_size=valid_batch_size,
             # log_level = "info",
             log_on_each_node=True,
-            bf16=True,
-            bf16_full_eval=True,
-            fp16=False,
-            tf32=True if train_type == "pretrain" else None,
+            bf16=train_config.bf16,
+            bf16_full_eval=train_config.bf16_full_eval,
+            fp16=train_config.fp16,
+            tf32=train_config.tf32 if train_type == "pretrain" else None,
             logging_dir=track_dir,
             learning_rate=learning_rate
             if learning_rate
@@ -236,15 +237,16 @@ def train(
             weight_decay=train_config.weight_decay,
             adam_beta1=train_config.adam_beta1,
             adam_beta2=train_config.adam_beta2,
-            warmup_steps=train_config.warmup_steps,
+            warmup_steps=warmup_steps if warmup_steps else train_config.warmup_steps,
             max_grad_norm=train_config.global_gradient_norm,
-            evaluation_strategy="steps",
+            evaluation_strategy=train_config.evaluation_strategy,
             max_steps=scheduler_max_steps,
             num_train_epochs=num_train_epochs,
             eval_steps=eval_steps,
             save_steps=save_steps,
             dataloader_drop_last=True,
             dataloader_pin_memory=True,
+            dispatch_batches=False,
             # torch_compile=True,
             # torch_compile requires to set use_orig_params=true
             # which has some conflict with saving checkpoints
@@ -254,7 +256,7 @@ def train(
             # gradient_checkpointing=gradient_checkpointing,
             # gradient_checkpointing_kwargs={"use_reentrant": False},
             gradient_accumulation_steps=gradient_accumulation_steps,
-            # save_total_limit=4, in order for offline eval to work, we keep all of them for now
+            save_total_limit=train_config.save_total_limit,
             resume_from_checkpoint=resume_from_checkpoint,
             lr_scheduler_type=train_config.lr_scheduler_type,
             optim=train_config.optimizer,
@@ -283,8 +285,20 @@ def train(
         )
         if train_type == "sft":
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
-                dataset, aim_callback
+                dataset, aim_callback, model_config.separator_token
             )
+        elif train_type == "pretrain":
+            if train_config.grad_accumulation_scheduler:
+                trainer_callback_dict[
+                    "gradient_accumulation_scheduler"
+                ] = GradientAccumulationScheduler(
+                    aim_callback=trainer_callback_dict.get("aim_callback", None),
+                    dynamic_ga=train_config.dynamic_grad_accumulation,
+                    max_ga=train_config.grad_accumulation_max,
+                    ga_delta_steps=train_config.grad_accumulation_delta_steps,
+                    ga_delta_percentage=train_config.grad_accumulation_delta_percentage,
+                    patience=train_config.grad_accumulation_patience,
+                )
 
         trainer.remove_callback(ProgressCallback)
         for additional_callback in list(trainer_callback_dict.values()):
@@ -300,6 +314,7 @@ def train(
             try:
                 if not evaluate_only:
                     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+                    trainer.save_model(output_dir=os.path.join(checkpoints_dir, "last"))
                 else:
                     pass
             except Exception as e:
