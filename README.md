@@ -1,4 +1,18 @@
-# ChemLactica
+# Chemlactica / Chemma: Large Language Models for Small Molecules
+
+TL;DR
+* A family of models that understand small organic molecules written in SMILES, their basic properties, and similarities between molecules.
+* [**Chemlactica-125M** 🤗](https://huggingface.co/yerevann/chemlactica-125m) and [**-1.3B** 🤗](https://huggingface.co/yerevann/chemlactica-1.3b) trained on top of Meta's [Galactica models](https://huggingface.co/facebook/galactica-1.3b).
+* [**Chemma-2B** 🤗](https://huggingface.co/yerevann/chemma-2b) is built on top of Google's [Gemma-2B](https://huggingface.co/google/gemma-2b).
+* All models are trained on **40B** tokens covering 100M+ molecules from PubChem. [The dataset is also available at 🤗](https://huggingface.co/datasets/yerevann/PubChemForLM).
+* A prompt like `</s>[SAS]2.25[/SAS][SIMILAR]0.62 CC(=O)OC1=CC=CC=C1C(=O)O[/SIMILAR][START_SMILES]` will generate a molecule that has ~2.25 SAS score and has ~0.62 similarity score to the given molecule.
+* The models can be easily tuned to perform property prediction (~0.3 RMSE on FreeSolv from MoleculeNet).
+* The models wrapped into a **genetic-like optimization algorithm** beat all **molecular optimization** benchmarks we tried.
+  * [**Practical Molecular Optimization**](https://arxiv.org/abs/2206.12411): **17.5** vs 16.2 (previous SOTA: [Genetic-guided GFlowNets](https://arxiv.org/abs/2402.05961)).
+  * Optimization for **docking** with AutoDock Vina: 3-4x less oracle calls for generating 100 _good_ molecules than previous SOTA.
+  * QED optimization from the [RetMol paper](https://arxiv.org/abs/2208.11126): **99%** success rate with 10K oracle calls with Chemlactica-125M (vs. 96% with 50K calls).
+* All details in the paper [Small Molecule Optimization with Large Language Models](https://yerevann.com/papers/small-molecule-optimization-with-large-language-models).
+ 
 
 ## Table of contents
 - [Description](#Description)
@@ -17,22 +31,16 @@ Fine tuning the galactica models on chemistry data from PubChem.
 conda create -n ChemLactica python=3.11 -y -f environment.yml
 conda activate chemlactica
 ```
+
 ## Usage
-### Training
-The script for training the model is ```train.py```
-which can be run from the command line using the following syntax:
-``` bash
-python train.py --model_type galactica/125m --training_data_dir .small_data/train --valid_data_dir .small_data/valid --max_steps 128 --eval_steps 64 --track --eval_accumulation_steps 8
-```
-Here's what these arguments do
-- `--model_type <model_name>` - type of model to train, one of galactica/125m, galactica/1.3B , galactica/20B
-- `--training_data_dir` - directory containing training data
-- `--valid_data_dir` - directory containing validation data
-- `--max_steps` - maximum number of steps to run training for
-- `--eval_steps` - the interval at which to run evaluation
-- `--track` - whether to track model checkpoint or not
-- `--eval_accumulation_steps` - the number of steps after which to move the prediction tensor from GPU
-                        to CPU during the evaluation (specified to avoid OOM errors)
+### Pretraining
+Instructions coming soon...
+
+### Fine-tuning
+Instructions coming soon...
+
+### Molecular optimization
+Instructions coming soon...
 
 ## Tests
 The test for running the a small sized model with the same
