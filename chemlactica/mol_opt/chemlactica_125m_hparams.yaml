@@ -1,5 +1,5 @@
-checkpoint_path: /nfs/dgx/raid/chem/checkpoints/facebook/galactica-125m/1f289ff103034364bd27e1c3/checkpoint-18000
-tokenizer_path: ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66
+checkpoint_path: /path/to/model_dir
+tokenizer_path: /path/to/tokenizer_dir
 pool_size: 10
 validation_perc: 0.2
 num_mols: 0

@@ -44,7 +44,82 @@ Instructions coming soon...
 Instructions coming soon...
 
 ### Molecular optimization
-Instructions coming soon...
+In order to run the optimization algorithm, define the Oracle as a class, that is responsible for calculating the Oracle fuction for given molecules.
+
+```python
+# Oracle implementation scheme
+
+class ExampleOracle:
+    def __init__(self, ...):
+        # maximum number of oracle calls to make
+        self.max_oracle_calls: int = ...
+
+        # the frequence with which to log
+        self.freq_log: int = ...
+
+        # the buffer to keep track of all unique molecules generated
+        self.mol_buffer: Dict = ...
+
+        # the maximum possible oracle score or an upper bound
+        self.max_possible_oracle_score: float = ... 
+
+    def __call__(self, molecules):
+        """
+            Evaluate and return the oracle scores for molecules. Log the intermediate results if necessary.
+        """
+        ...
+        return oracle_scores
+
+    @property
+    def finish(self):
+        """ 
+            Specify the stopping condition for the optimization process.
+        """
+        return stopping_condition
+```
+
+Define configuration and hyperparameters used for the optimization process in a yaml file.
+
+```yaml
+# yaml config scheme
+
+checkpoint_path: /path/to/model_dir
+tokenizer_path: /path/to/tokenizer_dir
+
+... optimization algorithm hyperparameter (pool size, number of similar molecules to use, etc.) ...
+
+generation_config:
+  ... molecule generation hyperparameters ...
+
+strategy: [rej-sample-v2] # or use [default] for not performing the fine-tuning step during the optimization.
+
+rej_sample_config:
+    ... fine tuning hyperparameters ...
+```
+
+Putting everything toghether and running the optimization process.
+
+```python
+from chemlactica.mol_opt.optimization import optimize
+
+# Load config
+config = yaml.safe_load(open(path_to_yaml_config))
+
+# Load the model and the tokenizer
+model = AutoModelForCausalLM.from_pretrained(...)
+tokenizer = AutoTokenizer.from_pretrained(...)
+
+# Create Oracle
+oracle = ExampleOracle(...)
+
+# Call the optimize function to optimize against the defined oracle
+optimize(
+    model, tokenizer,
+    oracle, config
+)
+```
+
+[example_run.py]() illustrates a full working example of an optimization run. For more complex examples refer to the [ChemlacticaTestSuit]() repository [mol_opt/run.py]() and [retmol/run_qed.py]() files.
 
 ## Tests
 The test for running the a small sized model with the same

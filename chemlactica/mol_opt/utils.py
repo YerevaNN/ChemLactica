@@ -5,7 +5,6 @@ import random
 from pathlib import Path
 import numpy as np
 import torch
-from chemlactica.mol_opt.metrics import top_auc
 from rdkit import Chem, DataStructs, RDLogger
 from rdkit.Chem import AllChem, MACCSkeys, rdMolDescriptors
 
@@ -84,78 +83,6 @@ class MoleculeEntry:
         return str(self)
     def __hash__(self):
         return hash(self.smiles)
-
-
-class ConstrainedTPSAOracle:
-    def __init__(self, max_oracle_calls: int):
-        self.max_oracle_calls = max_oracle_calls
-        self.freq_log = 100
-        self.mol_buffer = {}
-        self.max_possible_oracle_score = 1.0
-        self.takes_entry = True
-
-    def __call__(self, molecules):
-        oracle_scores = []
-        for molecule in molecules:
-            if self.mol_buffer.get(molecule.smiles):
-                oracle_scores.append(sum(self.mol_buffer[molecule.smiles][0]))
-            else:
-                try:
-                    tpsa = rdMolDescriptors.CalcTPSA(molecule.mol)
-                    tpsa_score = min(tpsa / 1000, 1)
-                    weight = rdMolDescriptors.CalcExactMolWt(molecule.mol)
-                    if weight <= 349:
-                        weight_score = 1
-                    elif weight >= 500:
-                        weight_score = 0
-                    else:
-                        weight_score = -0.00662 * weight + 3.31125
-                    
-                    num_rings = rdMolDescriptors.CalcNumRings(molecule.mol)
-                    if num_rings >= 2:
-                        num_rights_score = 1
-                    else:
-                        num_rights_score = 0
-                    # print(tpsa_score, weight_score, num_rights_score)
-                    oracle_score = (tpsa_score + weight_score + num_rights_score) / 3
-                except Exception as e:
-                    print(e)
-                    oracle_score = 0
-                self.mol_buffer[molecule.smiles] = [oracle_score, len(self.mol_buffer) + 1]
-                if len(self.mol_buffer) % 100 == 0:
-                    self.log_intermediate()
-                oracle_scores.append(oracle_score)
-        return oracle_scores
-    
-    def log_intermediate(self):
-        scores = [v[0] for v in self.mol_buffer.values()]
-        scores_sorted = sorted(scores, reverse=True)[:100]
-        n_calls = len(self.mol_buffer)
-
-        score_avg_top1 = np.max(scores_sorted)
-        score_avg_top10 = np.mean(scores_sorted[:10])
-        score_avg_top100 = np.mean(scores_sorted)
-
-        print(f"{n_calls}/{self.max_oracle_calls} | ",
-                f"auc_top1: {top_auc(self.mol_buffer, 1, False, self.freq_log, self.max_oracle_calls)} | ",
-                f"auc_top10: {top_auc(self.mol_buffer, 10, False, self.freq_log, self.max_oracle_calls)} | ",
-                f"auc_top100: {top_auc(self.mol_buffer, 100, False, self.freq_log, self.max_oracle_calls)}")
-
-        print(f'avg_top1: {score_avg_top1:.3f} | '
-                f'avg_top10: {score_avg_top10:.3f} | '
-                f'avg_top100: {score_avg_top100:.3f}')
-
-    def __len__(self):
-        return len(self.mol_buffer)
-
-    @property
-    def budget(self):
-        return self.max_oracle_calls
-
-    @property
-    def finish(self):
-        return len(self.mol_buffer) >= self.max_oracle_calls
-
 
 
 class Pool:
