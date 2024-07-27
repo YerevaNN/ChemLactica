@@ -86,7 +86,7 @@ class MoleculeEntry:
         return hash(self.smiles)
 
 
-class ConstraedTPSAOracle:
+class ConstrainedTPSAOracle:
     def __init__(self, max_oracle_calls: int):
         self.max_oracle_calls = max_oracle_calls
         self.freq_log = 100
