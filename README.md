@@ -43,12 +43,12 @@ Instructions coming soon...
 ### Fine-tuning
 Instructions coming soon...
 
-### Molecular optimization
-In order to run the optimization algorithm, define the Oracle as a class, that is responsible for calculating the Oracle fuction for given molecules.
+### Molecular Optimization 🎯
+Running the Optimization Algorithm requires two steps:
+
+**Step 1.** Define the Oracle, which is responsible to evaluate the oracle score for the given molecules. Below is presented the Oracle implementation scheme.
 
 ```python
-# Oracle implementation scheme
-
 class ExampleOracle:
     def __init__(self, ...):
         # maximum number of oracle calls to make
@@ -75,14 +75,14 @@ class ExampleOracle:
         """ 
             Specify the stopping condition for the optimization process.
         """
+        ...
         return stopping_condition
 ```
 
-Define configuration and hyperparameters used for the optimization process in a yaml file.
+**Step 2**. Define the hyperparameters for the optimization algorithm (such as the pool size, number of similar molecules to have in the prompts, sampling temperature, etc.) in a *.yaml* file.
 
 ```yaml
-# yaml config scheme
-
+# model_hparams.yaml
 checkpoint_path: /path/to/model_dir
 tokenizer_path: /path/to/tokenizer_dir
 
@@ -97,7 +97,7 @@ rej_sample_config:
     ... fine tuning hyperparameters ...
 ```
 
-Putting everything toghether and running the optimization process.
+Calling the **optimize** function.
 
 ```python
 from chemlactica.mol_opt.optimization import optimize
@@ -119,7 +119,7 @@ optimize(
 )
 ```
 
-[example_run.py]() illustrates a full working example of an optimization run. For more complex examples refer to the [ChemlacticaTestSuit]() repository [mol_opt/run.py]() and [retmol/run_qed.py]() files.
+Refer to [example_run.py](https://github.com/YerevaNN/ChemLactica/blob/main/chemlactica/mol_opt/example_run.py) for a full working example of an optimization run. For more complex examples refer to the [ChemlacticaTestSuit]() repository [mol_opt]() and [retmol]() directories.
 
 ## Tests
 The test for running the a small sized model with the same
