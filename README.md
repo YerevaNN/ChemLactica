@@ -5,7 +5,7 @@ TL;DR
 * [**Chemlactica-125M** 🤗](https://huggingface.co/yerevann/chemlactica-125m) and [**-1.3B** 🤗](https://huggingface.co/yerevann/chemlactica-1.3b) are trained on top of Meta's [Galactica models](https://huggingface.co/facebook/galactica-1.3b).
 * [**Chemma-2B** 🤗](https://huggingface.co/yerevann/chemma-2b) is built on top of Google's [Gemma-2B](https://huggingface.co/google/gemma-2b).
 * All models are trained on **40B** tokens covering 100M+ molecules from PubChem. [Check the corpus at 🤗](https://huggingface.co/datasets/yerevann/PubChemForLM).
-* A prompt like `</s>[SAS]2.25[/SAS][SIMILAR]0.62 CC(=O)OC1=CC=CC=C1C(=O)O[/SIMILAR][START_SMILES]` will generate a molecule that has ~2.25 SAS score and has ~0.62 similarity score to the given molecule.
+* A prompt like `</s>[SAS]2.25[/SAS][SIMILAR]CC(=O)OC1=CC=CC=C1C(=O)O 0.62[/SIMILAR][START_SMILES]` will generate a molecule that has ~2.25 SAS score and has ~0.62 similarity score to the given molecule.
 * The models can be easily tuned to perform property prediction (~0.3 RMSE on [FreeSolv](https://paperswithcode.com/sota/molecular-property-prediction-on-freesolv) from MoleculeNet).
 * The models wrapped into a **genetic-like optimization algorithm** beat all **molecular optimization** benchmarks we tried.
   * [**Practical Molecular Optimization**](https://arxiv.org/abs/2206.12411)
