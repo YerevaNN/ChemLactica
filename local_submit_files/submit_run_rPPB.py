@@ -54,8 +54,8 @@ cli_arguments = {
     "training_data_dirs": "/auto/home/menuab/code/sft_data/ADME_rPPB",
     "valid_data_dir": "",
     # "max_steps":120000,
-    "num_train_epochs": 15,
-    "learning_rate": 0.0001,
+    "num_train_epochs": 10,
+    "learning_rate": 0.0002,
     "warmup": 50,
     "eval_steps": 35,
     "save_steps": 2440,
@@ -67,7 +67,7 @@ cli_arguments = {
     "flash_attn": False,
     "track": True,
     "track_dir": "/nfs/ap/mnt/sxtn2/chem/experiments/aim/",
-    "neftune_noise": 50,
+    "neftune_noise": 5,
     # "profile":,
     # "profile_dir":,
     # "gradient_accumulation_steps":,
@@ -131,26 +131,40 @@ if __name__ == "__main__":
         print("train_name: ", train_name)
         print("logs_path: ", logs_path)
         print("repo path: ", repo_path)
+        # jobs = []
+        # with executor.batch():
+        #     for lr in [0.00001, 0.00005, 0.0001, 0.0002]:
+        #         for wu in [0, 0.1, 0.2]:
+        #             for ep in [10, 15, 20]:
+        #                 for nfn in [0.0, 5.0, 10.0]:
+        #                     wup = int(wu * ep) * cli_arguments["eval_steps"]
+        #                     cli_arguments["learning_rate"] = lr
+        #                     cli_arguments["warmup"] = wup
+        #                     cli_arguments["num_train_epochs"] = ep
+        #                     cli_arguments["neftune_noise"] = nfn
+        #                     cli_arguments[
+        #                         "experiment_name"
+        #                     ] = f"rPPB_1f28_lr{lr}_wu{wu}_epoch{ep}_nef{nfn}"
+        #                     command = get_command(use_accelerate)
+        #                     function = submitit.helpers.CommandFunction(
+        #                         command, env=env_variables
+        #                     )
+        #                     job = executor.submit(function)
+        #                     jobs.append(job)
         jobs = []
         with executor.batch():
-            for lr in [0.00001, 0.00005, 0.0001, 0.0002]:
-                for wu in [0, 0.2, 0.3, 0.5]:
-                    for ep in [10, 15, 20]:
-                        for nfn in [0.0, 5.0, 10.0, 2.0]:
-                            wup = int(wu * ep) * cli_arguments["eval_steps"]
-                            cli_arguments["learning_rate"] = lr
-                            cli_arguments["warmup"] = wup
-                            cli_arguments["num_train_epochs"] = ep
-                            cli_arguments["neftune_noise"] = nfn
-                            cli_arguments[
-                                "experiment_name"
-                            ] = f"rPPB2_1f28_lr{lr}_wu{wu}_epoch{ep}_nef{nfn}"
-                            command = get_command(use_accelerate)
-                            function = submitit.helpers.CommandFunction(
-                                command, env=env_variables
-                            )
-                            job = executor.submit(function)
-                            jobs.append(job)
+            for rs in range(42, 72, 10):
+                wup = (
+                    int(0 * cli_arguments["num_train_epochs"])
+                    * cli_arguments["eval_steps"]
+                )
+                cli_arguments["warmup"] = wup
+                cli_arguments["seed"] = rs
+                cli_arguments["experiment_name"] = f"{job_name}_seed{rs}"
+                command = get_command(use_accelerate)
+                function = submitit.helpers.CommandFunction(command, env=env_variables)
+                job = executor.submit(function)
+                jobs.append(job)
         # function = submitit.helpers.CommandFunction(command, env=env_variables)
         # job = executor.submit(function)
         # jobs.append(job)

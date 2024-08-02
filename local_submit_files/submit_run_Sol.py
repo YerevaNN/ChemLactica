@@ -8,13 +8,13 @@ rsync_enabled = False
 executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
 num_gpus = 1
-# model_name = "gemma"
-# model_size = "2b"
-model_name = "galactica"
-model_size = "1b"
+model_name = "gemma"
+model_size = "2b"
+# model_name = "galactica"
+# model_size = "1b"
 train_type = "sft"
 train_name = "_".join([model_name, model_size, train_type])
-job_name = "Sol_6d68"
+job_name = "Sol_0717"
 
 slurm_params = {
     "slurm_job_name": job_name,
@@ -41,21 +41,21 @@ cli_arguments = {
     #     "galactica-125m/9954e52e400b43d18d3a40f6/checkpoint-20480",
     # "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/facebook/"\
     #     "galactica-125m/1f289ff103034364bd27e1c3/checkpoint-18000/",
-    "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/h100/facebook/"
-    "galactica-1.3b/6d68b252d53647a99cf2fa8b/checkpoint-19000",
+    # "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/h100/facebook/"
+    # "galactica-1.3b/6d68b252d53647a99cf2fa8b/checkpoint-19000",
     # "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/google/"\
     #     "gemma-2b/d6e6a76e91814ad68d5fa264/checkpoint-11000",
     # "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/h100/"\
     #     "google/gemma-2b/0717d445bcf44e31b2887892/checkpoint-12000",
-    # "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/h100/"
-    # "google/gemma-2b/0717d445bcf44e31b2887892/checkpoint-18000",
+    "from_pretrained": "/nfs/dgx/raid/chem/checkpoints/h100/"
+    "google/gemma-2b/0717d445bcf44e31b2887892/checkpoint-18000",
     "model_config": train_name,
     "dir_data_types": "computed",
     "training_data_dirs": "/auto/home/menuab/code/sft_data/ADME_Sol",
     "valid_data_dir": "",
     # "max_steps":120000,
     "num_train_epochs": 15,
-    "learning_rate": 0.0001,
+    "learning_rate": 0.0002,
     "warmup": 130,
     "eval_steps": 87,
     "save_steps": 2440,
@@ -67,7 +67,7 @@ cli_arguments = {
     "flash_attn": False,
     "track": True,
     "track_dir": "/nfs/ap/mnt/sxtn2/chem/experiments/aim/",
-    "neftune_noise": 50,
+    "neftune_noise": 5,
     # "profile":,
     # "profile_dir":,
     # "gradient_accumulation_steps":,
@@ -131,26 +131,40 @@ if __name__ == "__main__":
         print("train_name: ", train_name)
         print("logs_path: ", logs_path)
         print("repo path: ", repo_path)
+        # jobs = []
+        # with executor.batch():
+        #     for lr in [0.00001, 0.00005, 0.0001, 0.0002]:
+        #         for wu in [0, 0.2, 0.5]:
+        #             for ep in [10, 15, 20]:
+        #                 for nfn in [0.0, 5.0, 10.0]:
+        #                     wup = int(wu * ep) * cli_arguments["eval_steps"]
+        #                     cli_arguments["learning_rate"] = lr
+        #                     cli_arguments["warmup"] = wup
+        #                     cli_arguments["num_train_epochs"] = ep
+        #                     cli_arguments["neftune_noise"] = nfn
+        #                     cli_arguments[
+        #                         "experiment_name"
+        #                     ] = f"Sol_6d68_lr{lr}_wu{wu}_epoch{ep}_nef{nfn}"
+        #                     command = get_command(use_accelerate)
+        #                     function = submitit.helpers.CommandFunction(
+        #                         command, env=env_variables
+        #                     )
+        #                     job = executor.submit(function)
+        #                     jobs.append(job)
         jobs = []
         with executor.batch():
-            for lr in [0.00001, 0.00005, 0.0001, 0.0002]:
-                for wu in [0, 0.2, 0.5]:
-                    for ep in [10, 15, 20]:
-                        for nfn in [0.0, 5.0, 10.0]:
-                            wup = int(wu * ep) * cli_arguments["eval_steps"]
-                            cli_arguments["learning_rate"] = lr
-                            cli_arguments["warmup"] = wup
-                            cli_arguments["num_train_epochs"] = ep
-                            cli_arguments["neftune_noise"] = nfn
-                            cli_arguments[
-                                "experiment_name"
-                            ] = f"Sol_6d68_lr{lr}_wu{wu}_epoch{ep}_nef{nfn}"
-                            command = get_command(use_accelerate)
-                            function = submitit.helpers.CommandFunction(
-                                command, env=env_variables
-                            )
-                            job = executor.submit(function)
-                            jobs.append(job)
+            for rs in range(42, 72, 10):
+                wup = (
+                    int(0 * cli_arguments["num_train_epochs"])
+                    * cli_arguments["eval_steps"]
+                )
+                cli_arguments["warmup"] = wup
+                cli_arguments["seed"] = rs
+                cli_arguments["experiment_name"] = f"{job_name}_seed{rs}"
+                command = get_command(use_accelerate)
+                function = submitit.helpers.CommandFunction(command, env=env_variables)
+                job = executor.submit(function)
+                jobs.append(job)
         # function = submitit.helpers.CommandFunction(command, env=env_variables)
         # job = executor.submit(function)
         # jobs.append(job)
