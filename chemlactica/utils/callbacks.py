@@ -397,6 +397,48 @@ class SFTNumericalEval(TrainerCallback):
         self.aim._run.track({"numerical eval pearson R": r}, step=state.global_step)
         print(f"{rmse=}, {r=}")
 
+        print("on train end called")
+        # super().on_train_end(args, state, control, **kwargs)
+        print("after super")
+        model.eval()
+        ground_truths, gens, diffs = [], [], []
+        eos_token_id = tokenizer.encode("[/PROPERTY]")[0]
+        for sample in self.dataset["test"]:
+            ground_truth = round(sample["activity"], 2)
+            prompt = (
+                f"{self.separator_token}[START_SMILES]{sample['smiles']}"
+                "[END_SMILES][PROPERTY]activity"
+            )
+            prompt = tokenizer(prompt, return_tensors="pt").to(model.device)
+            out = model.generate(
+                prompt.input_ids,
+                do_sample=False,
+                eos_token_id=eos_token_id,
+                max_new_tokens=100,
+            )
+            out = tokenizer.batch_decode(out)[0]
+            try:
+                gen = out[
+                    out.find("activity ")
+                    + len("activity ") : out.find("[/PROPERTY]")  # noqa
+                ]
+                gen = float(gen)
+                diff = abs(ground_truth - gen)
+                ground_truths.append(ground_truth)
+                gens.append(gen)
+                diffs.append(diff)
+            except ValueError:
+                print(f"could not generate for {sample['smiles']}")
+                pass
+        try:
+            rmse = root_mean_squared_error(ground_truths, gens) if gens else 10
+            r, _ = pearsonr(ground_truths, gens)
+        except ValueError:
+            rmse, r = 10, 0
+        self.aim._run.track({"numerical test rmse": rmse}, step=state.global_step)
+        self.aim._run.track({"numerical test pearson R": r}, step=state.global_step)
+        print(f"{rmse=}, {r=}")
+
 
 class GradientAccumulationScheduler(TrainerCallback):
     def __init__(
