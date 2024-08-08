@@ -9,8 +9,9 @@ rsync_enabled = False
 executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
 num_gpus = 1
-task_name = "freesolv"
-training_data_dirs = f"gayane/{task_name}"
+task_name = "ADME_RLM"
+# training_data_dirs = f"gayane/{task_name}"
+training_data_dirs = f"/auto/home/menuab/code/sft_data/{task_name}"
 model_name = "chemlactica-125m"
 train_type = "sft"
 job_name = f"{task_name}_{model_name}"
@@ -55,7 +56,7 @@ cli_arguments = {
     "from_pretrained": checkpoints[model_name],
     "model_config": model_name + "-" + train_type,
     "dir_data_types": "computed",
-    "training_data_dirs": "gayane/freesolv",
+    "training_data_dirs": training_data_dirs,
     "valid_data_dir": "",
     # "max_steps":120000,
     "num_train_epochs": 15,
