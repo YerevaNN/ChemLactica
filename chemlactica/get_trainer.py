@@ -36,7 +36,9 @@ def get_trainer(
     elif train_type == "sft":
         sft_config = SFTTrainConfig()
         tokenizer = get_tokenizer(training_args.tokenizer_path)
+        # tokenizer.pad_token = model_config.separator_token
         response_template = tokenizer.encode("[PROPERTY]activity")
+        # response_template = tokenizer.encode("\n\nAnswer:")
         collator = DataCollatorForCompletionOnlyLM(
             response_template, tokenizer=tokenizer
         )
