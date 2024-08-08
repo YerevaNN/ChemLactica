@@ -4,6 +4,11 @@ import yaml
 from transformers import AutoTokenizer
 from functools import cache
 from chemlactica.config.default_train_config import TrainConfig, ModelConfig
+from sklearn.metrics import root_mean_squared_error
+
+# from sklearn.metrics import roc_auc_score
+from scipy.stats import pearsonr
+import torch
 
 default_tokenizer_path = (
     "/auto/home/menuab/code/ChemLactica/chemlactica/tokenizer/ChemLacticaTokenizer66"
@@ -100,7 +105,7 @@ def get_model_train_config(train_config_name):
         "..",
         "config",
         "config_yamls",
-        f"{train_config_name}_config.yaml",
+        f"{train_config_name}-config.yaml",
     )
     with open(config_path, "r") as infile:
         custom_config = yaml.full_load(infile)
@@ -109,6 +114,91 @@ def get_model_train_config(train_config_name):
         for k, v in custom_config["train_config"].items():
             setattr(train_config, k, v)
     return model_config, train_config
+
+
+def get_numerical_validation(model, tokenizer, dataset, separator_token):
+    # uncomment for sft classification tasks
+    # model.eval()
+    # ground_truths, preds, probs = [], [], []
+    # eos_token_id = tokenizer.encode("[/PROPERTY]")[0]
+    # for sample in self.dataset["validation"]:
+    #     ground_truth = round(sample["activity"], 2)
+    #     prompt = (
+    #                 f"{self.separator_token}[START_SMILES]{sample['smiles']}"
+    #                 "[END_SMILES][PROPERTY]activity"
+    #             )
+    #     texts = [" 0.0[/PROPERTY]", " 1.0[/PROPERTY]"]
+    #     #uncomment the section below to fine tune a galactica model
+    #     # prompt = f"Here is a SMILES formula: [START_I_SMILES]{sample['smiles']}[END_I_SMILES]"
+    #                f"\n\nQuestion: Will the chemical compound penetrate the blood-brain barrier?"
+    #                f"\n\nAnswer:"
+    #     # texts = [" No</s>", " Yes</s>"]
+    #     scores = []
+    #     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(model.device)
+    #     for text in texts:
+    #         text_ids = tokenizer(text, return_tensors="pt").input_ids.to(model.device)
+    #         sequence_ids = torch.cat([input_ids, text_ids], dim=-1).to(model.device)
+    #         labels = torch.full(sequence_ids.shape, -100)
+    #         labels[:, -text_ids.size(1):] = text_ids
+    #         labels = labels.to(model.device)
+    #         with torch.no_grad():
+    #             outputs = model(sequence_ids, attention_mask=torch.ones_like(sequence_ids),\
+    #                       labels=labels, return_dict = True)
+    #             perplexity = -torch.exp(outputs.loss).item()
+    #             scores.append(perplexity)
+    #             torch.cuda.empty_cache()
+    #             gc.collect()
+    #     scores = [(score - scipy.special.logsumexp(scores)) for score in scores]
+    #     probs_ = list(np.exp(scores))
+    #     pred = np.argmax(probs_)
+    #     probs.append(probs_[1])
+    #     preds.append(pred)
+    #     ground_truths.append(ground_truth)
+    # try:
+    #     rmse = root_mean_squared_error(ground_truths, preds) if preds else 10
+    #     roc = roc_auc_score(ground_truths, probs)
+    # except ValueError:
+    #     rmse, roc = 10, 0
+    # model.train()
+    # return rmse, roc
+    model.eval()
+    ground_truths, gens, diffs = [], [], []
+    eos_token_id = tokenizer.encode("[/PROPERTY]")[0]
+    for sample in dataset:
+        ground_truth = round(sample["activity"], 2)
+        prompt = (
+            f"{separator_token}[START_SMILES]{sample['smiles']}"
+            "[END_SMILES][PROPERTY]activity"
+        )
+        prompt = tokenizer(prompt, return_tensors="pt").to(model.device)
+        with torch.no_grad():
+            out = model.generate(
+                prompt.input_ids,
+                do_sample=False,
+                eos_token_id=eos_token_id,
+                max_new_tokens=100,
+            )
+        out = tokenizer.batch_decode(out)[0]
+        try:
+            gen = out[
+                out.find("activity ")
+                + len("activity ") : out.find("[/PROPERTY]")  # noqa
+            ]
+            gen = float(gen)
+            diff = abs(ground_truth - gen)
+            ground_truths.append(ground_truth)
+            gens.append(gen)
+            diffs.append(diff)
+        except ValueError:
+            print(f"could not generate for {sample['smiles']}")
+            pass
+    try:
+        rmse = root_mean_squared_error(ground_truths, gens) if gens else 10
+        r, _ = pearsonr(ground_truths, gens)
+    except ValueError:
+        rmse, r = 10, 0
+    model.train()
+    return rmse, r
 
 
 if __name__ == "__main__":
