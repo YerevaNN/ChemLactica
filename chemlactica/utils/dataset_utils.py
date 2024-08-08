@@ -206,5 +206,9 @@ def sft_formatting_prompts_func(example, separator_token):
             f"{separator_token}[START_SMILES]{example['smiles'][i]}[END_SMILES]"
             f"[PROPERTY]activity {round(example['activity'][i], 2)}[/PROPERTY]"
         )
+        # prompt formatting used for original galactica fine tuning (specifically for BBBp task)
+        # text = (f"Here is a SMILES formula: [START_I_SMILES]{example['smiles'][i]}[END_I_SMILES]"
+        #         f"\n\nQuestion: Will the chemical compound penetrate the blood-brain barrier?"
+        #         f"\n\nAnswer:{'Yes' if example['activity'][i] == 1.0 else 'No'}</s>")
         output_texts.append(text)
     return output_texts
