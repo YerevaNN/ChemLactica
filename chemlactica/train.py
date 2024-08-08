@@ -84,6 +84,7 @@ def train(
     evaluate_only,
     max_steps,
     num_train_epochs=1,
+    save_final_model=False,
     track=False,
     track_dir=None,
     check_reproducability=False,
@@ -324,7 +325,10 @@ def train(
             try:
                 if not evaluate_only:
                     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
-                    trainer.save_model(output_dir=os.path.join(checkpoints_dir, "last"))
+                    if save_final_model:
+                        trainer.save_model(
+                            output_dir=os.path.join(checkpoints_dir, "last")
+                        )
                 else:
                     pass
             except Exception as e:

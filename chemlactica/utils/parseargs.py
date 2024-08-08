@@ -214,6 +214,12 @@ def init_parser():
         help="whether or not to use flash attn)",
     )
     parser.add_argument(
+        "--save_final_model",
+        action="store_true",
+        dest="save_final_model",
+        help="whether to save the final model",
+    )
+    parser.add_argument(
         "--no_flash_attn",
         action="store_false",
         dest="flash_attn",
