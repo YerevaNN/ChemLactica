@@ -22,7 +22,7 @@ class TPSA_Weight_Oracle:
         self.mol_buffer = {}
 
         # the maximum possible oracle score or an upper bound
-        self.max_possible_oracle_score = 1.0
+        self.max_possible_oracle_score = 800
 
         # if True the __call__ function takes list of MoleculeEntry objects
         # if False (or unspecified) the __call__ function takes list of SMILES strings
@@ -39,16 +39,14 @@ class TPSA_Weight_Oracle:
             else:
                 try:
                     tpsa = rdMolDescriptors.CalcTPSA(molecule.mol)
-                    tpsa_score = min(tpsa / 1000, 1)
+                    oracle_score = tpsa
                     weight = rdMolDescriptors.CalcExactMolWt(molecule.mol)
-                    if weight <= 349:
-                        weight_score = 1
-                    elif weight >= 500:
-                        weight_score = 0
-                    else:
-                        weight_score = -0.00662 * weight + 3.31125
-                    
-                    oracle_score = (tpsa_score + weight_score) / 3
+                    num_rings = rdMolDescriptors.CalcNumRings(molecule.mol)
+                    if weight >= 350:
+                        oracle_score = 0
+                    if num_rings < 2:
+                        oracle_score = 0
+
                 except Exception as e:
                     print(e)
                     oracle_score = 0
@@ -105,7 +103,7 @@ if __name__ == "__main__":
     for i in range(args.n_runs):
         set_seed(seeds[i])
         oracle = TPSA_Weight_Oracle(max_oracle_calls=1000)
-        config["log_dir"] = os.path.join(args.output_dir, "results_tpsa+weight+num_rungs.log")
+        config["log_dir"] = os.path.join(args.output_dir, f"results_chemlactica_tpsa+weight+num_rungs_{seeds[i]}.log")
         config["max_possible_oracle_score"] = oracle.max_possible_oracle_score
         optimize(
             model, tokenizer,

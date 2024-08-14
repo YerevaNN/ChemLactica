@@ -46,7 +46,7 @@ Instructions coming soon...
 ### Molecular Optimization 🎯
 Running the Optimization Algorithm requires two steps:
 
-**Step 1.** Define the Oracle, which is responsible to evaluate the oracle score for the given molecules. Below is presented the Oracle implementation scheme.
+**Step 1.** Define the Oracle, which is responsible to evaluate the oracle scores for the given molecules. Below is presented the Oracle implementation scheme.
 
 ```python
 class ExampleOracle:
@@ -97,7 +97,7 @@ rej_sample_config:
     ... fine tuning hyperparameters ...
 ```
 
-Calling the **optimize** function.
+Call the **optimize** function.
 
 ```python
 from chemlactica.mol_opt.optimization import optimize
@@ -119,7 +119,7 @@ optimize(
 )
 ```
 
-Refer to [example_run.py](https://github.com/YerevaNN/ChemLactica/blob/main/chemlactica/mol_opt/example_run.py) for a full working example of an optimization run. For more complex examples refer to the [ChemlacticaTestSuit]() repository [mol_opt]() and [retmol]() directories.
+Refer to [example_run.py](https://github.com/YerevaNN/ChemLactica/blob/main/chemlactica/mol_opt/example_run.py) for a full working example of an optimization run. For more complex examples refer to the [ChemlacticaTestSuit]() repository [mol_opt](https://github.com/YerevaNN/ChemLacticaTestSuite/tree/master/mol_opt) and [retmol](https://github.com/YerevaNN/ChemLacticaTestSuite/tree/master/retmol) directories.
 
 ## Tests
 The test for running the a small sized model with the same
