@@ -2,12 +2,12 @@ from typing import List
 import torch
 from datasets import Dataset
 import gc
+from functools import partial
 import shutil
 from trl import SFTTrainer
 from transformers import OPTForCausalLM
 from chemlactica.mol_opt.utils import OptimEntry, MoleculeEntry, Pool
 from chemlactica.mol_opt.tunning import get_training_arguments, get_optimizer_and_lr_scheduler, CustomEarlyStopCallback, CustomModelSelectionCallback
-
 
 def create_similar_mol_entries(pool, mol_entry, num_similars):
     similar_entries = [e.last_entry for e in pool.random_subset(num_similars)]
@@ -122,7 +122,7 @@ def optimize(
 
             current_unique_optim_entries = {}
             # with multiprocessing.Pool(processes=config["num_processes"]) as pol:
-            for i, molecule in enumerate(map(create_molecule_entry, output_texts)):
+            for i, molecule in enumerate(map(partial(create_molecule_entry, validate_smiles=validate_smiles), output_texts)):
                 if molecule and not optim_entries[i].contains_entry(molecule):
                     if molecule.smiles not in oracle.mol_buffer and molecule.smiles not in current_unique_optim_entries:
                         molecule.similar_mol_entries = optim_entries[i].last_entry.similar_mol_entries
