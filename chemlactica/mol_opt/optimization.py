@@ -36,13 +36,15 @@ def create_optimization_entries(num_entries, pool, config):
     return optim_entries
 
 
-def create_molecule_entry(output_text):
+def create_molecule_entry(output_text, validate_smiles):
     start_smiles_tag, end_smiles_tag = "[START_SMILES]", "[END_SMILES]"
     start_ind = output_text.rfind(start_smiles_tag)
     end_ind = output_text.rfind(end_smiles_tag)
     if start_ind == -1 or end_ind == -1:
         return None
     generated_smiles = output_text[start_ind+len(start_smiles_tag):end_ind]
+    if not validate_smiles(generated_smiles):
+        return None
     if len(generated_smiles) == 0:
         return None
 
@@ -58,7 +60,8 @@ def create_molecule_entry(output_text):
 def optimize(
         model, tokenizer,
         oracle, config,
-        additional_properties={}
+        additional_properties={},
+        validate_smiles=lambda x:True
     ):
     file = open(config["log_dir"], "w")
     print("config", config)
