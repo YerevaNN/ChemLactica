@@ -1,6 +1,7 @@
 import os
 import json
 import yaml
+import gc
 from transformers import AutoTokenizer
 from functools import cache
 from chemlactica.config.default_train_config import TrainConfig, ModelConfig
@@ -192,6 +193,9 @@ def get_numerical_validation(model, tokenizer, dataset, separator_token):
         except ValueError:
             print(f"could not generate for {sample['smiles']}")
             pass
+        torch.cuda.empty_cache()
+        gc.collect()
+        del out
     try:
         rmse = root_mean_squared_error(ground_truths, gens) if gens else 10
         r, _ = pearsonr(ground_truths, gens)
