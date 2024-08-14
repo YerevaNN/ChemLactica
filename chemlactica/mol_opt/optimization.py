@@ -141,10 +141,19 @@ def optimize(
             else:
                 oracle_scores = oracle(current_unique_smiles_list)
 
+            reports_component_scores = getattr(oracle, "reports_component_scores", False)
+
             for smiles, oracle_score in zip(current_unique_smiles_list, oracle_scores):
+                component_scores_str = ""
+                if reports_component_scores or isinstance(oracle_score, (list, tuple)):
+                    oracle_score, component_scores = oracle_score
+                    component_scores_str = ", ".join([f"{comp}: {score:.4f}" for comp, score in component_scores.items()])
+
                 current_unique_optim_entries[smiles].last_entry.score = oracle_score
                 iter_unique_optim_entries[smiles] = current_unique_optim_entries[smiles]
-                file.write(f"generated smiles: {smiles}, score: {current_unique_optim_entries[smiles].last_entry.score:.4f}\n")
+                
+                file.write(f"generated smiles: {smiles}, aggregate score: {current_unique_optim_entries[smiles].last_entry.score:.4f}, {component_scores_str}\n")
+                
                 if max_score >= config["max_possible_oracle_score"] - 1e-2 or current_unique_optim_entries[smiles].last_entry.score > max_score:
                     max_score = max(max_score, current_unique_optim_entries[smiles].last_entry.score)
                     new_best_molecule_generated = True

@@ -1,5 +1,5 @@
-checkpoint_path: yerevann/chemlactica-125m
-tokenizer_path: yerevann/chemlactica-125m
+checkpoint_path: "yerevann/chemlactica-125m" 
+tokenizer_path: "yerevann/chemlactica-125m"
 pool_size: 10
 validation_perc: 0.2
 num_mols: 0
