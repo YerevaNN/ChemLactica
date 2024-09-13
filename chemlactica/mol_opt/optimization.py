@@ -152,7 +152,10 @@ def optimize(
                 current_unique_optim_entries[smiles].last_entry.score = oracle_score
                 iter_unique_optim_entries[smiles] = current_unique_optim_entries[smiles]
                 
-                file.write(f"generated smiles: {smiles}, aggregate score: {current_unique_optim_entries[smiles].last_entry.score:.4f}, {component_scores_str}\n")
+                if component_scores_str:
+                    file.write(f"generated smiles: {smiles}, aggregate score: {current_unique_optim_entries[smiles].last_entry.score:.4f}, {component_scores_str}\n")
+                else:
+                    file.write(f"generated smiles: {smiles}, aggregate score: {current_unique_optim_entries[smiles].last_entry.score:.4f}\n")
                 
                 if max_score >= config["max_possible_oracle_score"] - 1e-2 or current_unique_optim_entries[smiles].last_entry.score > max_score:
                     max_score = max(max_score, current_unique_optim_entries[smiles].last_entry.score)
