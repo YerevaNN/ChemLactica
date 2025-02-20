@@ -114,6 +114,17 @@ def load_model(
             from_pretrained, torch_dtype=dtype, attn_implementation=attn_implementation
         )
 
+        # # Freeze the weights of the first 9 layers
+        # for layer_idx, layer in enumerate(model.model.decoder.layers):
+        #     if layer_idx < 9:
+        #         for param in layer.parameters():
+        #             param.requires_grad = False
+
+        # # Print a summary to confirm
+        # for layer_idx, layer in enumerate(model.model.decoder.layers):
+        #     print(f"Layer {layer_idx}: {'Frozen' "\
+        # f"if not any(p.requires_grad for p in layer.parameters()) else 'Trainable'}")
+
         # model.lm_head = float_casting_decorator(model.lm_head.__class__)(
         #     in_features=model.lm_head.in_features,
         #     out_features=model.lm_head.out_features,
