@@ -340,11 +340,13 @@ class EarlyStoppingCallback(TrainerCallback):
 
 
 class SFTNumericalEval(TrainerCallback):
-    def __init__(self, dataset, aim_callback, separator_token) -> None:
+    def __init__(self, dataset, aim_callback, model_config, datasetname) -> None:
         super().__init__()
         self.dataset = dataset
         self.aim = aim_callback
-        self.separator_token = separator_token
+        self.separator_token = model_config.separator_token
+        self.tokenizer_path = model_config.tokenizer_path
+        self.datasetname = datasetname
 
     def on_evaluate(
         self,
@@ -356,8 +358,12 @@ class SFTNumericalEval(TrainerCallback):
         **kwargs,
     ):
         super().on_evaluate(args, state, control, **kwargs)
-        rmse, r = get_numerical_validation(
-            model, tokenizer, self.dataset["validation"], self.separator_token
+        rmse, r, gens = get_numerical_validation(
+            model,
+            self.tokenizer_path,
+            self.dataset["validation"],
+            datasetname=self.datasetname,
+            separator_token=self.separator_token,
         )
         self.aim.experiment.track({"numerical eval rmse": rmse}, step=state.global_step)
         self.aim.experiment.track(
@@ -375,18 +381,30 @@ class SFTNumericalEval(TrainerCallback):
         **kwargs,
     ):
         super().on_train_end(args, state, control, **kwargs)
-        rmse, r = get_numerical_validation(
-            model, tokenizer, self.dataset["validation"], self.separator_token
-        )
-        print(f"validation set results: {rmse=}, {r=}")
-        self.aim.experiment.track({"numerical eval rmse": rmse}, step=state.global_step)
-        self.aim.experiment.track(
-            {"numerical eval pearson R": r}, step=state.global_step
-        )
-        rmse, r = get_numerical_validation(
-            model, tokenizer, self.dataset["test"], self.separator_token
-        )
-        print(f"test set results: {rmse=}, {r=}")
+        if self.dataset["validation"]:
+            rmse, r, gens = get_numerical_validation(
+                model,
+                self.tokenizer_path,
+                self.dataset["validation"],
+                datasetname=self.datasetname,
+                separator_token=self.separator_token,
+            )
+            print(f"validation set results: {rmse=}, {r=}")
+            self.aim.experiment.track(
+                {"numerical eval rmse": rmse}, step=state.global_step
+            )
+            self.aim.experiment.track(
+                {"numerical eval pearson R": r}, step=state.global_step
+            )
+        if "activity" in self.dataset["test"].column_names:
+            rmse, r, gens = get_numerical_validation(
+                model,
+                self.tokenizer_path,
+                self.dataset["test"],
+                datasetname=self.datasetname,
+                separator_token=self.separator_token,
+            )
+            print(f"test set results: {rmse=}, {r=}")
 
 
 class GradientAccumulationScheduler(TrainerCallback):
