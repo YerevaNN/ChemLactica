@@ -23,7 +23,6 @@ from chemlactica.utils.callbacks import (
     WPSCounterCallback,
     ProfCallback,
     EpochCallback,
-    CustomProgressCallback,
     ReproducabilityCallback,
     JsonlDatasetResumeCallback,
     EarlyStoppingCallback,
@@ -31,17 +30,14 @@ from chemlactica.utils.callbacks import (
     GradientAccumulationScheduler,
 )
 from chemlactica.utils.utils import (
-    # signal_handler,
-    # get_tokenizer_special_tokens,
     get_tokenizer_length,
     get_called_command,
     remove_extraneous_args,
 )
 from chemlactica.utils.parseargs import init_parser
 from chemlactica.utils.model_utils import load_model
-from chemlactica.utils.utils import get_model_train_config
+from chemlactica.utils.utils import get_model_train_config, get_numerical_validation
 from chemlactica.utils.distributed_utils import get_experiment_hash
-from chemlactica.utils.flop_counter import get_theoretical_peak_flops
 from chemlactica.get_dataset import get_dataset
 from chemlactica.get_trainer import get_trainer
 
@@ -194,10 +190,6 @@ def train(
             train_config, model_config, flash_attn
         )
 
-    total_theoretical_peak_flops = get_theoretical_peak_flops(accelerator)
-    trainer_callback_dict["progress_callback"] = CustomProgressCallback(
-        max_steps, total_theoretical_peak_flops
-    )
     accelerator.wait_for_everyone()
 
     with multiprocessing.Manager() as manager:
@@ -271,8 +263,9 @@ def train(
             # load_best_model=True
         )
 
-        dataset = get_dataset(
+        dataset, benchmark = get_dataset(
             train_type,
+            training_args,
             training_data_dirs,
             valid_data_dir,
             dir_data_types,
@@ -296,7 +289,7 @@ def train(
         )
         if train_type == "sft":
             trainer_callback_dict["SFT numerical evaluation"] = SFTNumericalEval(
-                dataset, aim_callback, model_config.separator_token
+                dataset, aim_callback, model_config, datasetname=training_data_dirs[0]
             )
         elif train_type == "pretrain":
             if train_config.grad_accumulation_scheduler:
@@ -325,6 +318,21 @@ def train(
             try:
                 if not evaluate_only:
                     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+                    if benchmark and training_data_dirs[0].split("/")[-1] == "full":
+                        rmse, r, gens = get_numerical_validation(
+                            model,
+                            model_config.tokenizer_path,
+                            dataset=dataset["test"],
+                            datasetname=training_data_dirs[0],
+                            separator_token=model_config.separator_token,
+                            verbose=True,
+                        )
+                        results = benchmark.evaluate(gens)
+                        results.name = model_config_name
+                        results.github_url = "https://github.com/YerevaNN/ChemLactica"
+                        results.paper_url = "https://arxiv.org/abs/2407.18897"
+                        results.upload_to_hub(owner="menuab")
+                        print(f"polaris benchamrk result: {results}")
                     if save_final_model:
                         trainer.save_model(
                             output_dir=os.path.join(checkpoints_dir, "last")
