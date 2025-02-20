@@ -2,23 +2,17 @@ import sys
 from contextlib import contextmanager
 from datetime import datetime
 import submitit
-from datasets import load_dataset
 
 use_accelerate = False
 rsync_enabled = False
 executor_name = "slurm"  # options are ["slurm", "local"]
 root_path = ""
 num_gpus = 1
-task_name = "ADME_RLM"
-# training_data_dirs = f"gayane/{task_name}"
-training_data_dirs = f"/auto/home/menuab/code/sft_data/{task_name}"
+task_name = "RLM/full"
 model_name = "chemlactica-125m"
 train_type = "sft"
+job_type = "2"
 job_name = f"{task_name}_{model_name}"
-batch_size = 32
-n_steps = int(
-    load_dataset(f"{training_data_dirs}", split="train").num_rows / batch_size
-)
 
 
 checkpoints = {
@@ -30,15 +24,17 @@ checkpoints = {
     "google/gemma-2b/0717d445bcf44e31b2887892/checkpoint-12000",
     "chemma-2b": "/nfs/dgx/raid/chem/checkpoints/h100/"
     "google/gemma-2b/0717d445bcf44e31b2887892/checkpoint-18000",
+    "galactica-125m": "facebook/galactica-125m",
 }
 
 slurm_params = {
     "slurm_job_name": job_name,
     "timeout_min": 60 * 3,
     "nodes": 1,
+    "slurm_partition": "h100",
     "tasks_per_node": 1,
     "gpus_per_node": num_gpus,
-    "cpus_per_task": num_gpus * 2,
+    "cpus_per_task": num_gpus * 16,
     "mem_gb": num_gpus * 40.0 + 20.0,
     "stderr_to_stdout": True,
 }
@@ -48,7 +44,7 @@ accelerate_config = {"num_processes": num_gpus}
 env_variables = {
     "TOKENIZERS_PARALLELISM": "false",
     "CUDA_VISIBLE_DEVICES": "0, 1, 2, 3, 4, 5, 6, 7",
-    # "CUDA_VISIBLE_DEVICES": "1",
+    # "CUDA_VISIBLE_DEVICES": "0",
 }
 
 cli_arguments = {
@@ -56,24 +52,25 @@ cli_arguments = {
     "from_pretrained": checkpoints[model_name],
     "model_config": model_name + "-" + train_type,
     "dir_data_types": "computed",
-    "training_data_dirs": training_data_dirs,
+    "training_data_dirs": task_name,
     "valid_data_dir": "",
     # "max_steps":120000,
-    "num_train_epochs": 15,
-    "warmup": 3 * n_steps,
-    "learning_rate": 0.0002,
-    "eval_steps": 1 * n_steps,
-    "save_steps": 600,
-    "train_batch_size": batch_size,
-    "valid_batch_size": batch_size,
+    "learning_rate": 0.00002,
+    "warmup": 0,
+    "num_train_epochs": 20,
+    "neftune_noise": 0,
+    "eval_steps": 1,
+    "save_steps": 60000,
+    "train_batch_size": 32,
+    "valid_batch_size": 32,
     "dataloader_num_workers": 1,
     "experiment_name": job_name,
     "checkpoints_root_dir": "/nfs/ap/mnt/sxtn2/chem/experiments/checkpoints/",
     "flash_attn": False,
-    "track": True,
+    "track": False,
     "save_final_model": False,
-    "track_dir": "/nfs/ap/mnt/sxtn2/chem/experiments/aim/",
-    "neftune_noise": 5,
+    "track_dir": "/nfs/ap/mnt/sxtn2/chem/experiments/aim_iclr/",
+    "seed": 42,
     # "profile":,
     # "profile_dir":,
     # "gradient_accumulation_steps":,
@@ -139,37 +136,43 @@ if __name__ == "__main__":
         print("repo path: ", repo_path)
         jobs = []
 
-        # hyperparameter search loop
-        with executor.batch():
-            for lr in [0.00001, 0.00005, 0.0001, 0.0002]:
-                for wu in [0, 1, 2, 3]:
-                    for ep in [10, 15, 20]:
-                        for nfn in [0.0, 5.0, 10.0]:
-                            cli_arguments["learning_rate"] = lr
-                            cli_arguments["warmup"] = wu * n_steps
-                            cli_arguments["num_train_epochs"] = ep
-                            cli_arguments["neftune_noise"] = nfn
-                            cli_arguments[
-                                "experiment_name"
-                            ] = f"{job_name}_lr{lr}_wu{wu}_epoch{ep}_nef{nfn}"
-                            command = get_command(use_accelerate)
-                            function = submitit.helpers.CommandFunction(
-                                command, env=env_variables
-                            )
-                            job = executor.submit(function)
-                            jobs.append(job)
-
-        # random state runs loop
-        # with executor.batch():
-        #     for rs in range(42,72,10):
-        #         cli_arguments['seed'] = rs
-        #         cli_arguments['experiment_name'] = f"{job_name}_seed{rs}"
-        #         command = get_command(use_accelerate)
-        #         function = submitit.helpers.CommandFunction(command, env=env_variables)
-        #         job = executor.submit(function)
-        #         jobs.append(job)
-
-        # single submissions
-        # function = submitit.helpers.CommandFunction(command, env=env_variables)
-        # job = executor.submit(function)
-        # jobs.append(job)
+        if job_type == "0":
+            # hyperparameter search loop
+            cli_arguments["save_final_model"] = False
+            with executor.batch():
+                for lr in [0.00001, 0.00005, 0.0001, 0.0002]:
+                    for wu in [0, 1, 2, 3]:
+                        for ep in [10, 15, 20]:
+                            for nfn in [0.0, 5.0, 10.0]:
+                                cli_arguments["learning_rate"] = lr
+                                cli_arguments["warmup"] = wu
+                                cli_arguments["num_train_epochs"] = ep
+                                cli_arguments["neftune_noise"] = nfn
+                                cli_arguments[
+                                    "experiment_name"
+                                ] = f"{job_name}_lr{lr}_wu{wu}_epoch{ep}_nef{nfn}"
+                                command = get_command(use_accelerate)
+                                function = submitit.helpers.CommandFunction(
+                                    command, env=env_variables
+                                )
+                                job = executor.submit(function)
+                                jobs.append(job)
+        elif job_type == "1":
+            # random state runs loop
+            cli_arguments["save_final_model"] = False
+            with executor.batch():
+                for rs in range(42, 72, 10):
+                    cli_arguments["seed"] = rs
+                    cli_arguments["experiment_name"] = f"{job_name}_seed{rs}"
+                    command = get_command(use_accelerate)
+                    function = submitit.helpers.CommandFunction(
+                        command, env=env_variables
+                    )
+                    job = executor.submit(function)
+                    jobs.append(job)
+        elif job_type == "2":
+            # single submissions
+            cli_arguments["save_final_model"] = False
+            function = submitit.helpers.CommandFunction(command, env=env_variables)
+            job = executor.submit(function)
+            jobs.append(job)
