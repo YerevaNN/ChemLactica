@@ -4,6 +4,7 @@ import orjson
 import numpy as np
 import json
 from .text_format_utils import generate_formatted_string, delete_empty_tags
+from rdkit import Chem
 
 # import torch
 
@@ -212,3 +213,12 @@ def sft_formatting_prompts_func(example, separator_token):
         #         f"\n\nAnswer:{'Yes' if example['activity'][i] == 1.0 else 'No'}</s>")
         output_texts.append(text)
     return output_texts
+
+
+def make_canonical(example):
+    # print(f'pre canonical: {example}')
+    example["smiles"] = Chem.MolToSmiles(
+        Chem.MolFromSmiles(example["smiles"]), canonical=True
+    )
+    # print(f'post canonical: {example}')
+    return example
