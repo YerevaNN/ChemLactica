@@ -42,10 +42,11 @@ def get_trainer(
         collator = DataCollatorForCompletionOnlyLM(
             response_template, tokenizer=tokenizer
         )
+
         trainer = SFTTrainer(
             model=model,
             train_dataset=dataset["train"],
-            eval_dataset=dataset["validation"],
+            eval_dataset=dataset.get("validation", None),
             formatting_func=partial(
                 sft_formatting_prompts_func,
                 separator_token=model_config.separator_token,
