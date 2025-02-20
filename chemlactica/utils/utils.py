@@ -2,12 +2,15 @@ import os
 import json
 import yaml
 import gc
+import re
 from transformers import AutoTokenizer
 from functools import cache
 from chemlactica.config.default_train_config import TrainConfig, ModelConfig
 from sklearn.metrics import root_mean_squared_error
 
-# from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score
+import numpy as np
+import scipy
 from scipy.stats import pearsonr
 import torch
 
@@ -50,6 +53,7 @@ def create_tokenizer(tokenizer_path):
     tok = AutoTokenizer.from_pretrained(tokenizer_path)
     tok.add_bos_token = False
     tok.padding_side = "right"
+    tok.add_special_tokens({"pad_token": "[PAD]"})
     print(f"Process {os.getpid()} created a tokenizer")
     return tok
 
@@ -117,92 +121,127 @@ def get_model_train_config(train_config_name):
     return model_config, train_config
 
 
-def get_numerical_validation(model, tokenizer, dataset, separator_token):
-    # uncomment for sft classification tasks
-    # model.eval()
-    # ground_truths, preds, probs = [], [], []
-    # eos_token_id = tokenizer.encode("[/PROPERTY]")[0]
-    # for sample in self.dataset["validation"]:
-    #     ground_truth = round(sample["activity"], 2)
-    #     prompt = (
-    #                 f"{self.separator_token}[START_SMILES]{sample['smiles']}"
-    #                 "[END_SMILES][PROPERTY]activity"
-    #             )
-    #     texts = [" 0.0[/PROPERTY]", " 1.0[/PROPERTY]"]
-    #     #uncomment the section below to fine tune a galactica model
-    #     # prompt = f"Here is a SMILES formula: [START_I_SMILES]{sample['smiles']}[END_I_SMILES]"
-    #                f"\n\nQuestion: Will the chemical compound penetrate the blood-brain barrier?"
-    #                f"\n\nAnswer:"
-    #     # texts = [" No</s>", " Yes</s>"]
-    #     scores = []
-    #     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(model.device)
-    #     for text in texts:
-    #         text_ids = tokenizer(text, return_tensors="pt").input_ids.to(model.device)
-    #         sequence_ids = torch.cat([input_ids, text_ids], dim=-1).to(model.device)
-    #         labels = torch.full(sequence_ids.shape, -100)
-    #         labels[:, -text_ids.size(1):] = text_ids
-    #         labels = labels.to(model.device)
-    #         with torch.no_grad():
-    #             outputs = model(sequence_ids, attention_mask=torch.ones_like(sequence_ids),\
-    #                       labels=labels, return_dict = True)
-    #             perplexity = -torch.exp(outputs.loss).item()
-    #             scores.append(perplexity)
-    #             torch.cuda.empty_cache()
-    #             gc.collect()
-    #     scores = [(score - scipy.special.logsumexp(scores)) for score in scores]
-    #     probs_ = list(np.exp(scores))
-    #     pred = np.argmax(probs_)
-    #     probs.append(probs_[1])
-    #     preds.append(pred)
-    #     ground_truths.append(ground_truth)
-    # try:
-    #     rmse = root_mean_squared_error(ground_truths, preds) if preds else 10
-    #     roc = roc_auc_score(ground_truths, probs)
-    # except ValueError:
-    #     rmse, roc = 10, 0
-    # model.train()
-    # return rmse, roc
-    model.eval()
-    ground_truths, gens, diffs = [], [], []
-    eos_token_id = tokenizer.encode("[/PROPERTY]")[0]
-    for sample in dataset:
-        ground_truth = round(sample["activity"], 2)
-        prompt = (
-            f"{separator_token}[START_SMILES]{sample['smiles']}"
-            "[END_SMILES][PROPERTY]activity"
-        )
-        prompt = tokenizer(prompt, return_tensors="pt").to(model.device)
-        with torch.no_grad():
-            out = model.generate(
-                prompt.input_ids,
-                do_sample=False,
-                eos_token_id=eos_token_id,
-                max_new_tokens=100,
+def find_first_float(s):
+    match = re.search(r"-?\d*\.\d+", s)
+    if match:
+        return float(match.group())
+    return 0
+
+
+def get_numerical_validation(
+    model, tokenizer_path, dataset, datasetname, separator_token, verbose=False
+):
+    tokenizer = get_tokenizer(tokenizer_path)
+    if "bbbp" in datasetname:
+        print("in classification eval")
+        model.eval()
+        ground_truths, preds, probs = [], [], []
+        for sample in dataset:
+            ground_truth = round(sample["activity"], 2)
+            if "chemlactica" in tokenizer_path:
+                prompt = (
+                    f"{separator_token}[START_SMILES]{sample['smiles']}"
+                    "[END_SMILES][PROPERTY]activity"
+                )
+                texts = [" 0.0[/PROPERTY]", " 1.0[/PROPERTY]"]
+            else:
+                # fine tune a galactica model
+                prompt = (
+                    f"Here is a SMILES formula: [START_I_SMILES]{sample['smiles']}[END_I_SMILES]"
+                    f"\n\nQuestion: Will the chemical compound penetrate the blood-brain barrier?"
+                    f"\n\nAnswer:"
+                )
+                texts = [" No</s>", " Yes</s>"]
+            scores = []
+            input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(
+                model.device
             )
-        out = tokenizer.batch_decode(out)[0]
-        try:
-            gen = out[
-                out.find("activity ")
-                + len("activity ") : out.find("[/PROPERTY]")  # noqa
-            ]
-            gen = float(gen)
-            diff = abs(ground_truth - gen)
+            for text in texts:
+                text_ids = tokenizer(text, return_tensors="pt").input_ids.to(
+                    model.device
+                )
+                sequence_ids = torch.cat([input_ids, text_ids], dim=-1).to(model.device)
+                labels = torch.full(sequence_ids.shape, -100)
+                labels[:, -text_ids.size(1) :] = text_ids  # noqa
+                labels = labels.to(model.device)
+                with torch.no_grad():
+                    outputs = model(
+                        sequence_ids,
+                        attention_mask=torch.ones_like(sequence_ids),
+                        labels=labels,
+                        return_dict=True,
+                    )
+                    perplexity = -torch.exp(outputs.loss).item()
+                    scores.append(perplexity)
+                    torch.cuda.empty_cache()
+                    gc.collect()
+            scores = [(score - scipy.special.logsumexp(scores)) for score in scores]
+            probs_ = list(np.exp(scores))
+            pred = np.argmax(probs_)
+            probs.append(probs_[1])
+            preds.append(pred)
             ground_truths.append(ground_truth)
-            gens.append(gen)
-            diffs.append(diff)
+        try:
+            rmse = root_mean_squared_error(ground_truths, preds) if preds else 10
+            roc = roc_auc_score(ground_truths, probs)
+            print(f"{rmse=} {roc=}")
         except ValueError:
-            print(f"could not generate for {sample['smiles']}")
-            pass
-        torch.cuda.empty_cache()
-        gc.collect()
-        del out
-    try:
-        rmse = root_mean_squared_error(ground_truths, gens) if gens else 10
-        r, _ = pearsonr(ground_truths, gens)
-    except ValueError:
-        rmse, r = 10, 0
-    model.train()
-    return rmse, r
+            rmse, roc = 10, 0
+        model.train()
+        return rmse, roc, None
+    else:
+        print("in regression eval")
+        model.eval()
+        ground_truths, gens, diffs = [], [], []
+        eos_token_id = tokenizer.encode("[/PROPERTY]")[0]
+        for sample in dataset:
+            ground_truth = (
+                round(sample["activity"], 2)
+                if "activity" in dataset.column_names
+                else 100
+            )
+            prompt = (
+                f"{separator_token}[START_SMILES]{sample['smiles']}"
+                "[END_SMILES][PROPERTY]activity"
+            )
+            prompt = tokenizer(prompt, return_tensors="pt").to(model.device)
+            with torch.no_grad():
+                out = model.generate(
+                    prompt.input_ids,
+                    do_sample=False,
+                    eos_token_id=eos_token_id,
+                    max_new_tokens=100,
+                )
+            out = tokenizer.batch_decode(out)[0]
+            if verbose:
+                print(out, ground_truth)
+            try:
+                # gen = out[
+                #     out.find("activity ")
+                #     + len("activity ") : out.find("[/PROPERTY]")  # noqa
+                # ]
+                # print(out)
+                gen = out[out.find("activity ") + len("activity ") :]  # noqa
+                # print("slicing: ",gen)
+                gen = find_first_float(gen)
+                # print("capturing: ",gen)
+                diff = abs(ground_truth - gen)
+                ground_truths.append(ground_truth)
+                gens.append(gen)
+                diffs.append(diff)
+            except ValueError:
+                print(f"could not generate for {sample['smiles']}")
+                pass
+            # torch.cuda.empty_cache()
+            # gc.collect()
+            # del out
+        try:
+            rmse = root_mean_squared_error(ground_truths, gens) if gens else 10
+            r, _ = pearsonr(ground_truths, gens)
+        except ValueError:
+            rmse, r = 10, 0
+        model.train()
+        return rmse, r, gens
 
 
 if __name__ == "__main__":
