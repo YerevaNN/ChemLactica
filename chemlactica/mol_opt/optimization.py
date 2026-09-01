@@ -1,3 +1,4 @@
+from functools import partial
 from typing import List
 import torch
 from datasets import Dataset
@@ -60,9 +61,11 @@ def create_molecule_entry(output_text, validate_smiles):
 def optimize(
         model, tokenizer,
         oracle, config,
-        additional_properties={},
-        validate_smiles=lambda x:True
+        additional_properties=None,
+        validate_smiles=lambda x: True
     ):
+    if additional_properties is None:
+        additional_properties = {}
     file = open(config["log_dir"], "w")
     print("config", config)
     # print("molecule generation arguments", config["generation_config"])
@@ -96,7 +99,7 @@ def optimize(
                     pool, last_entry, config["num_similars"]
                 )
                 for prop_name, prop_spec in additional_properties.items():
-                    last_entry.add_props[prop_name] = prop_spec
+                    last_entry.add_props[prop_name] = prop_spec.copy()
                 optim_entries[i].last_entry = last_entry
 
             prompts = [
@@ -122,12 +125,15 @@ def optimize(
 
             current_unique_optim_entries = {}
             # with multiprocessing.Pool(processes=config["num_processes"]) as pol:
-            for i, molecule in enumerate(map(create_molecule_entry, output_texts)):
+            create_validated_entry = partial(
+                create_molecule_entry, validate_smiles=validate_smiles
+            )
+            for i, molecule in enumerate(map(create_validated_entry, output_texts)):
                 if molecule and not optim_entries[i].contains_entry(molecule):
                     if molecule.smiles not in oracle.mol_buffer and molecule.smiles not in current_unique_optim_entries:
                         molecule.similar_mol_entries = optim_entries[i].last_entry.similar_mol_entries
                         for prop_name, prop_spec in additional_properties.items():
-                            molecule.add_props[prop_name] = prop_spec
+                            molecule.add_props[prop_name] = prop_spec.copy()
                             molecule.add_props[prop_name]["value"] = molecule.add_props[prop_name]["calculate_value"](molecule)
                         optim_entries[i].last_entry = molecule
                         current_unique_optim_entries[molecule.smiles] = optim_entries[i]
