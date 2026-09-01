@@ -266,4 +266,3 @@ dependencies:
       - xmltodict==0.13.0
       - xxhash==3.4.1
       - yarl==1.9.4
-prefix: /auto/home/menuab/miniforge3/envs/gemma_env_new
