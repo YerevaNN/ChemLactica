@@ -90,7 +90,7 @@ convention.
 | Model | Task-agnostic | Task-informed |
 | --- | ---: | ---: |
 | Chemlactica-125M | 16.944598 | 20.429421 |
-| Chemlactica-1.3B | 17.168555 | 20.373261 |
+| Chemlactica-1.3B | 17.168555 | 20.192229 |
 | Chemma-2B | 17.500147 | 20.550791 |
 
 The two columns expose different amounts of task information and should be treated
